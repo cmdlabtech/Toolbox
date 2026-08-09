@@ -54,6 +54,7 @@ Windows AOS-CX backups: see [aos-cx-config-backup/README.md](aos-cx-config-backu
 - **No account required** for these tools themselves. Where APIs are involved, you use *your* GreenLake / Central / ClearPass credentials.
 - **Prefer local-first.** NetWatch and the GreenLake Flask app bind to localhost. The ClearPass console keeps tokens in memory only (reload clears them).
 - **Binaries** (where available) live on GitHub Releases of the original standalone repos or future monorepo releases — this tree is source-focused.
+- **No maintainer secrets in this repo.** Samples are synthetic; runtime configs and API keys stay on your machine. See [SECURITY.md](SECURITY.md).
 
 ### Related standalone repos
 

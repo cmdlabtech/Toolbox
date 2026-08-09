@@ -13,10 +13,14 @@ Desktop.ini
 *.swo
 *~
 
-# Claude Code / agents
+# Claude Code / agents / editor agents
 .claude/
 .continue/
 graphify-out/
+**/copilot-instructions.md
+**/.github/copilot-instructions.md
+**/AGENTS.md
+**/CLAUDE.md
 
 # Python
 __pycache__/
@@ -62,9 +66,20 @@ dist/
 
 # Build artifacts (use Releases for binaries)
 **/build/
-# keep aos-cx packaging helpers under .build/
-!aos-cx-config-backup/.build/
 *.exe
 *.dmg
 *.app
+*.spec
+!netwatch/netwatch.spec
+# keep aos-cx packaging helpers under .build/ (CI uses these)
+!aos-cx-config-backup/.build/
 !aos-cx-config-backup/.build/**
+!aos-cx-config-backup/.build/*.spec
+
+# Local PyInstaller / icon copies next to sources (CI uses .build/)
+aos-cx-config-backup/build.bat
+aos-cx-config-backup/icon.ico
+netwatch/icon.ico
+
+# Generated reports anywhere
+**/ap_license_report.html
