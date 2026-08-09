@@ -22,7 +22,16 @@ view it, so it is safe to share with people who have no GreenLake/Central login.
 Works with **both flavors of Central**: New Central (GreenLake-native) and
 Classic Aruba Central — pick the mode in the UI or in `config.ini`.
 
-## Quick start — web UI
+## Use it now (hosted)
+
+**Public app:** [https://ap-license-report.admin2655.workers.dev/](https://ap-license-report.admin2655.workers.dev/)
+
+Open that URL, enter your own GreenLake / Aruba Central credentials, and
+generate the report. No install. Credentials stay in your browser’s
+localStorage and are only sent over HTTPS for each API call — nothing is
+stored on the server. Source for the hosted app is under [`worker/`](worker/).
+
+## Quick start — local web UI
 
 ```bash
 pip install -r requirements.txt

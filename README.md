@@ -10,7 +10,7 @@ Each folder is standalone. Clone the whole repo or copy a single tool. Most were
 |------|--------|--------------|--------|
 | **[NetWatch](netwatch/)** | `netwatch/` | Continuous ping loss monitoring → automatic packet capture → Claude/Grok root-cause analysis | Python, local browser GUI |
 | **[AOS-CX Config Backup](aos-cx-config-backup/)** | `aos-cx-config-backup/` | Scheduled config backups for AOS-CX switches (local, GitHub, or Wasabi S3) from a Windows tray app | Python / Windows EXE |
-| **[GreenLake AP Licensing](greenlake-ap-licensing/)** | `greenlake-ap-licensing/` | Joins HPE GreenLake subscriptions with Aruba Central AP status into one searchable HTML report | Python (Flask/CLI) + optional Cloudflare Worker |
+| **[GreenLake AP Licensing](greenlake-ap-licensing/)** | `greenlake-ap-licensing/` | Joins HPE GreenLake subscriptions with Aruba Central AP status into one searchable HTML report — **[use the hosted app](https://ap-license-report.admin2655.workers.dev/)** | Python (Flask/CLI) + Cloudflare Worker |
 | **[ClearPass Endpoint Console](clearpass-endpoint-console/)** | `clearpass-endpoint-console/` | Bulk or manual import of MACs into ClearPass Policy Manager endpoint and guest device repositories | Single-file HTML (browser → CPPM API) |
 | **[ClearPass CertKit notes](clearpass-certkit/)** | `clearpass-certkit/` | Setup checklist for automating ClearPass certificate deployment via CertKit + ISRG Root X1 PEM | Ops guide |
 
@@ -29,7 +29,9 @@ Then open the tool folder you need and follow its README.
 # NetWatch (requires Python 3.11+)
 cd netwatch && python3 netwatch.py
 
-# GreenLake AP licensing report (local UI)
+# GreenLake AP licensing report — hosted (no install):
+#   https://ap-license-report.admin2655.workers.dev/
+# Local UI (optional):
 cd greenlake-ap-licensing
 pip install -r requirements.txt
 python app.py   # http://localhost:8321

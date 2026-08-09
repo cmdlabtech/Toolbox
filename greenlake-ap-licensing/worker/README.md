@@ -5,6 +5,13 @@ Same UI and report as the local Flask app ([../README.md](../README.md)), but
 runs as a Cloudflare Worker so anyone can open the URL, enter their own
 credentials, and generate a report — no local install.
 
+## Live URL
+
+**https://ap-license-report.admin2655.workers.dev/**
+
+That is the public instance used for day-to-day work. Open it in a browser,
+enter credentials, and run reports or detach actions there.
+
 The Python code in `../glc/` and `../app.py` is unchanged and still works for
 CLI / local use. This directory is a standalone TypeScript rewrite of the
 backend (the Flask server and `requests`-based clients don't run on Workers).
