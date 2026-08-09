@@ -1,4 +1,4 @@
-# Random Tools
+# Toolbox
 
 Small, open utilities for network admins — especially **HPE Aruba**, **ClearPass**, and **GreenLake**.
 
@@ -17,8 +17,8 @@ Each folder is standalone. Clone the whole repo or copy a single tool. Most were
 ## Quick start
 
 ```bash
-git clone https://github.com/cmdlabtech/random-tools.git
-cd random-tools
+git clone https://github.com/cmdlabtech/Toolbox.git
+cd Toolbox
 ```
 
 Then open the tool folder you need and follow its README.
