@@ -1,5 +1,15 @@
 # NetWatch
 
+<p align="left">
+  <a href="../README.md"><img src="https://img.shields.io/badge/Toolbox-cmdlabtech-181717?style=flat-square&logo=github" alt="Toolbox"/></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7B3E?style=flat-square" alt="MIT"/></a>
+  <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"/>
+  <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-555?style=flat-square" alt="Platform"/>
+  <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
+</p>
+
+> **Part of [Toolbox](../README.md)** — open network utilities by [cmdlabtech](https://github.com/cmdlabtech).
+
 AI-powered network monitor. Detects packet loss via ICMP ping, triggers automatic packet captures, and uses Claude or Grok to diagnose the root cause and suggest remediation.
 
 Open your browser, configure everything in the GUI, and get plain-English analysis of exactly what went wrong on your network.
@@ -154,6 +164,23 @@ Both `tools\wireshark\` and `tools\npcap-installer.exe` are gitignored — they 
 
 ---
 
+## Support
+
+If NetWatch helps you catch outages faster, consider supporting continued development:
+
+[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD)
+
 ## License
 
-MIT
+MIT — see the [Toolbox LICENSE](../LICENSE).
+
+---
+
+<p align="center">
+  <sub>
+    <a href="../README.md">Toolbox</a>
+    · <a href="../SECURITY.md">Security</a>
+    · <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">Donate</a>
+    · <a href="https://github.com/cmdlabtech">cmdlabtech</a>
+  </sub>
+</p>

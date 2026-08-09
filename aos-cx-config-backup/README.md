@@ -1,10 +1,20 @@
 # AOS-CX Config Backup Tool
 
-**Automate configuration backups for AOS-CX switches with ease. Schedule backups, store locally or upload to Git/Wasabi S3, all from a system tray app.**
+<p align="left">
+  <a href="../README.md"><img src="https://img.shields.io/badge/Toolbox-cmdlabtech-181717?style=flat-square&logo=github" alt="Toolbox"/></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7B3E?style=flat-square" alt="MIT"/></a>
+  <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows"/>
+  <img src="https://img.shields.io/badge/AOS--CX-10.04%2B-FF8300?style=flat-square" alt="AOS-CX"/>
+  <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
+</p>
 
-A Windows desktop tool for network admins who need reliable, unattended AOS-CX config backups without complex setups.
+> **Part of [Toolbox](../README.md)** — open network utilities by [cmdlabtech](https://github.com/cmdlabtech).
 
-## 📥 Download Latest Version
+**Automate configuration backups for AOS-CX switches.** Schedule backups, store locally or upload to GitHub / Wasabi S3, all from a system tray app—built for network admins who need reliable, unattended backups without a heavy platform.
+
+---
+
+## Download latest version
 
 | Platform | Download | Requirements |
 |----------|----------|--------------|
@@ -80,10 +90,23 @@ Run the EXE directly. If Windows Defender warns you, click "More info" → "Run 
 
 ---
 
-## 📝 License
+## Support
 
-MIT License - Copyright © 2026
+If this tool saves you from a bad change window, consider supporting continued development:
+
+[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD)
+
+## License
+
+MIT License — Copyright © 2026 [cmdlabtech](https://github.com/cmdlabtech). See the [Toolbox LICENSE](../LICENSE).
 
 ---
 
-**Made by Cameron**
+<p align="center">
+  <sub>
+    <a href="../README.md">Toolbox</a>
+    · <a href="../SECURITY.md">Security</a>
+    · <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">Donate</a>
+    · <a href="https://github.com/cmdlabtech">cmdlabtech</a>
+  </sub>
+</p>

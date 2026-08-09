@@ -1,18 +1,43 @@
 # Toolbox
 
-Small, open utilities for network admins — especially **HPE Aruba**, **ClearPass**, and **GreenLake**.
+<p align="center">
+  <strong>Open-source network utilities for HPE Aruba, ClearPass &amp; GreenLake</strong><br/>
+  <sub>Maintained by <a href="https://github.com/cmdlabtech">cmdlabtech</a> · MIT License</sub>
+</p>
 
-Each folder is standalone. Clone the whole repo or copy a single tool. Most were originally built with Claude Code and then cleaned up for public use.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7B3E?style=flat-square" alt="MIT License"/></a>
+  <a href="https://github.com/cmdlabtech/Toolbox"><img src="https://img.shields.io/badge/GitHub-cmdlabtech%2FToolbox-181717?style=flat-square&logo=github" alt="Repository"/></a>
+  <a href="SECURITY.md"><img src="https://img.shields.io/badge/Security-policy-0B5FFF?style=flat-square" alt="Security"/></a>
+  <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate with PayPal"/></a>
+</p>
 
-## Tools
+---
 
-| Tool | Folder | What it does | Stack |
-|------|--------|--------------|--------|
-| **[NetWatch](netwatch/)** | `netwatch/` | Continuous ping loss monitoring → automatic packet capture → Claude/Grok root-cause analysis | Python, local browser GUI |
-| **[AOS-CX Config Backup](aos-cx-config-backup/)** | `aos-cx-config-backup/` | Scheduled config backups for AOS-CX switches (local, GitHub, or Wasabi S3) from a Windows tray app | Python / Windows EXE |
-| **[GreenLake AP Licensing](greenlake-ap-licensing/)** | `greenlake-ap-licensing/` | Joins HPE GreenLake subscriptions with Aruba Central AP status into one searchable HTML report — **[use the hosted app](https://ap-license-report.admin2655.workers.dev/)** | Python (Flask/CLI) + Cloudflare Worker |
-| **[ClearPass Endpoint Console](clearpass-endpoint-console/)** | `clearpass-endpoint-console/` | Bulk or manual import of MACs into ClearPass Policy Manager endpoint and guest device repositories | Single-file HTML (browser → CPPM API) |
-| **[ClearPass CertKit notes](clearpass-certkit/)** | `clearpass-certkit/` | Setup checklist for automating ClearPass certificate deployment via CertKit + ISRG Root X1 PEM | Ops guide |
+## Overview
+
+**Toolbox** is a curated collection of small, production-minded tools for network engineers. Each project lives in its own folder, runs independently, and keeps **your credentials on your machine** (or in your browser)—not in a third-party SaaS account.
+
+| | |
+|---|---|
+| **Audience** | Network admins, MSP engineers, and lab operators |
+| **Focus** | HPE Aruba Central, AOS-CX, ClearPass, GreenLake |
+| **Model** | Free & open source (MIT) · optional support via donation |
+| **Secrets** | Never committed — see [SECURITY.md](SECURITY.md) |
+
+---
+
+## Catalog
+
+| Tool | Description | Get started |
+|------|-------------|-------------|
+| **[NetWatch](netwatch/)** | Continuous ICMP loss monitoring, automatic packet capture, Claude / Grok root-cause analysis | [Docs](netwatch/) · [Releases](https://github.com/cmdlabtech/Netwatch/releases) |
+| **[AOS-CX Config Backup](aos-cx-config-backup/)** | Scheduled AOS-CX config backups from a Windows tray app (local, GitHub, or Wasabi S3) | [Docs](aos-cx-config-backup/) · [EXE V3.7](https://github.com/cmdlabtech/AOS-CX-Config-Backup-Tool/releases/download/V3.7/AOS-CX.Config.Backup.Tool.exe) |
+| **[GreenLake AP Licensing](greenlake-ap-licensing/)** | Join GreenLake subscriptions with Central AP status into one searchable HTML report | **[Launch hosted app](https://ap-license-report.admin2655.workers.dev/)** · [Docs](greenlake-ap-licensing/) |
+| **[ClearPass Endpoint Console](clearpass-endpoint-console/)** | Bulk / manual MAC import into Policy Manager endpoints and Guest devices | [Open console](clearpass-endpoint-console/) · [Docs](clearpass-endpoint-console/) |
+| **[ClearPass CertKit notes](clearpass-certkit/)** | Ops checklist for CertKit → ClearPass certificate deploy + ISRG Root X1 PEM | [Docs](clearpass-certkit/) |
+
+---
 
 ## Quick start
 
@@ -21,62 +46,80 @@ git clone https://github.com/cmdlabtech/Toolbox.git
 cd Toolbox
 ```
 
-Then open the tool folder you need and follow its README.
-
-### Common entry points
+Open the tool folder you need and follow its README. Common entry points:
 
 ```bash
-# NetWatch (requires Python 3.11+)
+# NetWatch (Python 3.11+)
 cd netwatch && python3 netwatch.py
 
-# GreenLake AP licensing report — hosted (no install):
-#   https://ap-license-report.admin2655.workers.dev/
-# Local UI (optional):
+# GreenLake AP licensing — hosted (no install)
+# https://ap-license-report.admin2655.workers.dev/
+
+# GreenLake AP licensing — local UI
 cd greenlake-ap-licensing
 pip install -r requirements.txt
-python app.py   # http://localhost:8321
+python app.py    # http://localhost:8321
 
-# ClearPass endpoint console — open in a browser
+# ClearPass Endpoint Console
 open clearpass-endpoint-console/index.html
-# or: double-click index.html / serve via any static file server
 ```
 
-Windows AOS-CX backups: see [aos-cx-config-backup/README.md](aos-cx-config-backup/README.md) for the prebuilt EXE or source build.
+Windows AOS-CX backups: use the [prebuilt EXE](https://github.com/cmdlabtech/AOS-CX-Config-Backup-Tool/releases) or build from [aos-cx-config-backup/](aos-cx-config-backup/).
 
-## Who this is for
+---
 
-- Network engineers running **Aruba Central**, **AOS-CX**, **ClearPass**, or **HPE GreenLake**
-- Anyone who wants small tools without a heavy install or SaaS dependency
-- People who prefer credentials to stay on their machine (or in their own browser), not in a third-party cloud
+## Design principles
 
-## Design notes
+- **No account required** for Toolbox itself — you supply vendor API credentials only when a tool needs them.
+- **Local-first** — NetWatch and the GreenLake Flask UI bind to localhost; the ClearPass console keeps tokens in memory only.
+- **Source-focused repo** — binaries ship via GitHub Releases where available; this tree is for reading, building, and contributing.
+- **Transparent security** — samples are synthetic; maintainer secrets are never stored here ([SECURITY.md](SECURITY.md)).
 
-- **No account required** for these tools themselves. Where APIs are involved, you use *your* GreenLake / Central / ClearPass credentials.
-- **Prefer local-first.** NetWatch and the GreenLake Flask app bind to localhost. The ClearPass console keeps tokens in memory only (reload clears them).
-- **Binaries** (where available) live on GitHub Releases of the original standalone repos or future monorepo releases — this tree is source-focused.
-- **No maintainer secrets in this repo.** Samples are synthetic; runtime configs and API keys stay on your machine. See [SECURITY.md](SECURITY.md).
-
-### Related standalone repos
-
-Some tools also exist (or existed) as separate repositories:
+### Related standalone repositories
 
 | Tool | Standalone repo |
 |------|-----------------|
 | NetWatch | [cmdlabtech/Netwatch](https://github.com/cmdlabtech/Netwatch) |
 | AOS-CX Config Backup | [cmdlabtech/AOS-CX-Config-Backup-Tool](https://github.com/cmdlabtech/AOS-CX-Config-Backup-Tool) |
 
-This monorepo is the **central public home** for browsing and contributing. Prefer opening issues and PRs here unless you are only updating a standalone release pipeline.
+This monorepo is the **central public home**. Prefer issues and pull requests here unless you are updating a standalone release pipeline.
 
-## License
+---
 
-[MIT](LICENSE) — free to use, modify, and redistribute.
+## Support the project
+
+These tools are free to use and share. If they save you time in the field or the lab, consider a donation—it helps fund hosting, continued development, and new utilities.
+
+<p align="center">
+  <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">
+    <img src="https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate with PayPal"/>
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><strong>paypal.com/donate</strong></a>
+  · one-time or recurring · USD
+</p>
+
+---
 
 ## Contributing
 
 1. Keep each tool self-contained under its folder.
 2. Do not commit secrets, `config.ini`, virtualenvs, `node_modules`, or built binaries.
-3. Prefer small, focused fixes with a short description of the environment you tested on (OS, firmware, API type).
+3. Prefer small, focused fixes with a short note on the environment you tested (OS, firmware, API type).
+
+## License
+
+Distributed under the [MIT License](LICENSE). Copyright © 2026 [cmdlabtech](https://github.com/cmdlabtech).
 
 ---
 
-**Made by Cameron / [cmdlabtech](https://github.com/cmdlabtech)**
+<p align="center">
+  <sub>
+    <a href="https://github.com/cmdlabtech/Toolbox">Toolbox</a>
+    · <a href="SECURITY.md">Security</a>
+    · <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">Donate</a>
+    · <a href="https://github.com/cmdlabtech">cmdlabtech</a>
+  </sub>
+</p>

@@ -1,5 +1,15 @@
 # GreenLake × Aruba Central — AP Licensing Report
 
+<p align="left">
+  <a href="../README.md"><img src="https://img.shields.io/badge/Toolbox-cmdlabtech-181717?style=flat-square&logo=github" alt="Toolbox"/></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7B3E?style=flat-square" alt="MIT"/></a>
+  <img src="https://img.shields.io/badge/Stack-Python%20%7C%20Cloudflare%20Workers-F38020?style=flat-square" alt="Stack"/>
+  <a href="https://ap-license-report.admin2655.workers.dev/"><img src="https://img.shields.io/badge/Hosted-Live-0A7B3E?style=flat-square" alt="Live"/></a>
+  <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
+</p>
+
+> **Part of [Toolbox](../README.md)** — open network utilities by [cmdlabtech](https://github.com/cmdlabtech).
+
 There is no built-in bridge between HPE GreenLake subscription data and Aruba
 Central AP status. This tool builds that bridge: it pulls device + subscription
 data from the GreenLake platform APIs, pulls AP up/down status from the Aruba
@@ -23,6 +33,10 @@ Works with **both flavors of Central**: New Central (GreenLake-native) and
 Classic Aruba Central — pick the mode in the UI or in `config.ini`.
 
 ## Use it now (hosted)
+
+<p align="center">
+  <a href="https://ap-license-report.admin2655.workers.dev/"><img src="https://img.shields.io/badge/Launch_hosted_app-ap--license--report-0B5FFF?style=for-the-badge" alt="Launch hosted app"/></a>
+</p>
 
 **Public app:** [https://ap-license-report.admin2655.workers.dev/](https://ap-license-report.admin2655.workers.dev/)
 
@@ -176,3 +190,25 @@ intranet page for an always-current view.
 - The GreenLake payload field names vary across API versions; parsing is
   defensive (`glc/correlate.py`). If a field comes back empty, run with
   `--dump-json raw.json` and inspect what your tenant actually returns.
+
+## Support
+
+If this report saves you a morning of spreadsheet archaeology, consider supporting continued development:
+
+[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD)
+
+## License
+
+MIT — see the [Toolbox LICENSE](../LICENSE).
+
+---
+
+<p align="center">
+  <sub>
+    <a href="../README.md">Toolbox</a>
+    · <a href="worker/">Worker docs</a>
+    · <a href="../SECURITY.md">Security</a>
+    · <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">Donate</a>
+    · <a href="https://github.com/cmdlabtech">cmdlabtech</a>
+  </sub>
+</p>

@@ -1,11 +1,24 @@
 # AP Licensing Report — Cloudflare Worker
 
+<p align="left">
+  <a href="../../README.md"><img src="https://img.shields.io/badge/Toolbox-cmdlabtech-181717?style=flat-square&logo=github" alt="Toolbox"/></a>
+  <a href="../README.md"><img src="https://img.shields.io/badge/Parent-GreenLake%20tool-0B5FFF?style=flat-square" alt="Parent"/></a>
+  <img src="https://img.shields.io/badge/Runtime-Cloudflare%20Workers-F38020?style=flat-square" alt="Workers"/>
+  <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
+</p>
+
+> **Part of [Toolbox](../../README.md)** · parent tool docs: [GreenLake AP Licensing](../README.md)
+
 A public, hosted version of the GreenLake × Aruba Central AP licensing tool.
 Same UI and report as the local Flask app ([../README.md](../README.md)), but
 runs as a Cloudflare Worker so anyone can open the URL, enter their own
 credentials, and generate a report — no local install.
 
 ## Live URL
+
+<p align="center">
+  <a href="https://ap-license-report.admin2655.workers.dev/"><img src="https://img.shields.io/badge/Launch_hosted_app-Live-0A7B3E?style=for-the-badge" alt="Launch hosted app"/></a>
+</p>
 
 **https://ap-license-report.admin2655.workers.dev/**
 
@@ -104,3 +117,24 @@ Recommended guardrails (both are dashboard-only, no code):
 
 The generated report HTML is byte-identical in structure; the downloadable
 copy is static (no action buttons, no credentials) in both.
+
+## Support
+
+Hosting this Worker and maintaining the tooling takes time. If it helps your team, a donation is appreciated:
+
+[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD)
+
+## License
+
+MIT — see the [Toolbox LICENSE](../../LICENSE).
+
+---
+
+<p align="center">
+  <sub>
+    <a href="../../README.md">Toolbox</a>
+    · <a href="../README.md">GreenLake tool</a>
+    · <a href="../../SECURITY.md">Security</a>
+    · <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">Donate</a>
+  </sub>
+</p>

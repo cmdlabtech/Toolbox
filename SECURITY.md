@@ -1,5 +1,13 @@
 # Security
 
+<p align="left">
+  <a href="README.md"><img src="https://img.shields.io/badge/Toolbox-cmdlabtech-181717?style=flat-square&logo=github" alt="Toolbox"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7B3E?style=flat-square" alt="MIT"/></a>
+  <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
+</p>
+
+> Security policy for **[Toolbox](README.md)** by [cmdlabtech](https://github.com/cmdlabtech).
+
 This document describes what is (and is not) in the public Toolbox repository, and how each tool handles credentials.
 
 ## What’s in the public repo
@@ -54,3 +62,21 @@ If you believe a secret was committed or a vulnerability exists:
 - [ ] No `node_modules/`, `.venv/`, `dist/`, or binaries
 - [ ] Sample data uses placeholders (`example.com`, `DEMO…` serials)
 - [ ] GitHub Actions only use `GITHUB_TOKEN` / documented public downloads (no personal PATs in workflows)
+
+---
+
+## Support
+
+Toolbox is free and open source. Optional donations help cover hosting and continued security work:
+
+[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD)
+
+---
+
+<p align="center">
+  <sub>
+    <a href="README.md">Toolbox</a>
+    · <a href="LICENSE">License</a>
+    · <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">Donate</a>
+  </sub>
+</p>
