@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AP Licensing Report — GreenLake × Aruba Central</title>
+<style>
+  /* light is the default theme; dark applies only when the app (or a user
+     toggle) stamps data-theme="dark" on the root element */
+  :root {
+    color-scheme: light;
+    --page: #f4f4f1; --surface: #ffffff;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e4e3dc; --ring: rgba(11,11,11,0.08);
+    --good: #0ca30c; --good-text: #006300;
+    --warn: #fab219; --warn-text: #7a5200;
+    --serious: #ec835a; --serious-text: #8a3c1d;
+    --crit: #d03b3b; --crit-text: #a02020;
+    --accent: #2a78d6;
+    --shadow: 0 1px 2px rgba(20,20,15,0.05), 0 1px 6px rgba(20,20,15,0.04);
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --ring: rgba(255,255,255,0.10);
+    --good-text: #0ca30c; --warn-text: #fab219;
+    --serious-text: #ec835a; --crit-text: #e66767;
+    --accent: #3987e5;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 2400px; margin: 0 auto;
+          padding: 24px clamp(16px, 2.5vw, 40px) 64px; }
+  header h1 { font-size: 20px; margin: 0 0 2px; }
+  header .sub { color: var(--ink-2); font-size: 13px; }
+
+  /* stat tiles: a bold "needs attention" row up top, a quieter overview row
+     below it — so the numbers that matter aren't lost in a wall of pills */
+  #tiles { margin: 16px 0 20px; }
+  .tiles-primary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+  .tile-lg { flex: 1 1 170px; background: var(--surface); border: 1px solid var(--ring);
+             border-left: 3px solid var(--grid); border-radius: 10px;
+             padding: 11px 16px; box-shadow: var(--shadow); }
+  .tile-lg .v { font-size: 23px; font-weight: 700; line-height: 1.15;
+                font-variant-numeric: tabular-nums; }
+  .tile-lg .l { color: var(--ink-2); font-size: 12.5px; margin-top: 1px; }
+  .tile-lg.alert { border-left-color: var(--crit); }
+  .tile-lg.alert .v { color: var(--crit-text); }
+  .tile-lg.warn-t { border-left-color: var(--warn); }
+  .tile-lg.warn-t .v { color: var(--warn-text); }
+  .tile-lg.ok { border-left-color: var(--good); }
+
+  .tiles-secondary { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tile { display: inline-flex; align-items: baseline; gap: 7px;
+          background: var(--surface); border: 1px solid var(--ring);
+          border-radius: 999px; padding: 5px 13px; box-shadow: var(--shadow); }
+  .tile::before { content: ''; width: 7px; height: 7px; border-radius: 50%;
+                  background: var(--grid); align-self: center; flex: none; }
+  .tile .v { font-size: 15px; font-weight: 700;
+             font-variant-numeric: tabular-nums; }
+  .tile .l { color: var(--ink-2); font-size: 12px; white-space: nowrap; }
+  .tile.alert::before { background: var(--crit); }
+  .tile.warn-t::before { background: var(--warn); }
+  .tile.ok::before { background: var(--good); }
+
+  nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--grid);
+             margin-bottom: 18px; flex-wrap: wrap; }
+  nav.tabs button {
+    appearance: none; background: none; border: none; cursor: pointer;
+    font: inherit; color: var(--ink-2); padding: 8px 12px;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  nav.tabs button.on { color: var(--ink); border-bottom-color: var(--accent);
+                       font-weight: 600; }
+  nav.tabs button .n { color: var(--muted); font-size: 12px; margin-left: 4px; }
+
+  section.panel { display: none; }
+  section.panel.on { display: block; }
+  .block { background: var(--surface); border: 1px solid var(--ring);
+           border-radius: 10px; padding: 16px; margin-bottom: 20px;
+           box-shadow: var(--shadow); }
+  .block h2 { font-size: 15px; margin: 0 0 4px; }
+  .block .desc { color: var(--ink-2); font-size: 13px; margin: 0 0 12px; }
+
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px;
+             flex-wrap: wrap; }
+  .toolbar input[type=search] {
+    flex: 1 1 220px; max-width: 320px; padding: 6px 10px; font: inherit;
+    color: var(--ink); background: var(--page); border: 1px solid var(--grid);
+    border-radius: 6px;
+  }
+  .toolbar .count { color: var(--muted); font-size: 12px; }
+  .toolbar button.csv {
+    margin-left: auto; padding: 6px 12px; font: inherit; font-size: 13px;
+    color: var(--ink); background: var(--page); border: 1px solid var(--grid);
+    border-radius: 6px; cursor: pointer;
+  }
+  .toolbar button.csv:hover { border-color: var(--muted); }
+  .lic-filters { display: flex; gap: 4px; flex-wrap: wrap; }
+  .lic-filters button {
+    font: 550 12px/1 system-ui; padding: 6px 10px; border-radius: 999px;
+    border: 1px solid var(--grid); background: var(--page); color: var(--ink-2);
+    cursor: pointer;
+  }
+  .lic-filters button:hover { color: var(--ink); border-color: var(--muted); }
+  .lic-filters button.on {
+    color: var(--ink); border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .lic-filters button .n { color: var(--muted); margin-left: 4px; }
+  .lic-filters button.on .n { color: var(--ink-2); }
+
+  .tbl-scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid);
+           white-space: nowrap; vertical-align: top; }
+  td.wrap-cell { white-space: normal; min-width: 220px; max-width: 420px; }
+  th { color: var(--ink-2); font-weight: 600; cursor: pointer; user-select: none;
+       position: sticky; top: 0; background: var(--surface); }
+  th .arrow { color: var(--muted); font-size: 10px; }
+  tbody tr:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  td.num { font-variant-numeric: tabular-nums; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .empty { color: var(--muted); padding: 18px 6px; font-size: 13px; }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+           font-weight: 550; }
+  .badge .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .b-up    { color: var(--good-text); }    .b-up .dot    { background: var(--good); }
+  .b-down  { color: var(--crit-text); }    .b-down .dot  { background: var(--crit); }
+  .b-lic   { color: var(--good-text); }    .b-lic .dot   { background: var(--good); }
+  .b-unlic { color: var(--warn-text); }    .b-unlic .dot { background: var(--warn); }
+  .b-exp   { color: var(--serious-text); } .b-exp .dot   { background: var(--serious); }
+  .b-na    { color: var(--muted); }        .b-na .dot    { background: var(--muted); }
+
+  .keychip { display: inline-block; font-family: ui-monospace, Menlo, monospace;
+             font-size: 11.5px; background: var(--page); border: 1px solid var(--grid);
+             border-radius: 4px; padding: 1px 6px; margin: 1px 2px 1px 0; }
+  button.act { font: 550 12px/1 system-ui; padding: 6px 10px; border-radius: 6px;
+               border: 1px solid var(--grid); background: var(--page);
+               color: var(--ink); cursor: pointer; margin-right: 6px; }
+  button.act:hover { border-color: var(--muted); }
+  button.act.warn { color: var(--crit-text); border-color: var(--crit-text); }
+  button.act:disabled { opacity: .45; cursor: default; }
+  .act-note { font-size: 12px; color: var(--muted); }
+  .act-err { font-size: 12px; color: var(--crit-text); white-space: normal;
+             max-width: 280px; margin-top: 4px; }
+  .toolbar .bulk { display: inline-flex; align-items: center; gap: 8px; }
+  .toolbar .bulk .n { color: var(--ink-2); font-size: 12px; white-space: nowrap; }
+  th.sel-col, td.sel-col { width: 1%; white-space: nowrap; }
+  input.row-sel, input.sel-all { cursor: pointer; width: 14px; height: 14px;
+                                  vertical-align: middle; }
+  input.row-sel:disabled { cursor: default; opacity: .35; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 28px; }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; z-index: 60;
+                   background: rgba(0,0,0,0.45); align-items: center;
+                   justify-content: center; }
+  .modal-overlay.on { display: flex; }
+  .modal-panel { background: var(--surface); border: 1px solid var(--ring);
+                 border-radius: 10px; box-shadow: var(--shadow);
+                 width: min(420px, 90vw); max-height: 70vh;
+                 display: flex; flex-direction: column; padding: 14px 16px; }
+  .modal-head { display: flex; align-items: center; justify-content: space-between;
+                gap: 12px; margin-bottom: 8px; }
+  .modal-head h3 { font-size: 14px; margin: 0; word-break: break-all; }
+  .modal-close { appearance: none; background: none; border: none; cursor: pointer;
+                 color: var(--ink-2); font-size: 14px; padding: 4px; line-height: 1; }
+  .modal-close:hover { color: var(--ink); }
+  .modal-list { overflow-y: auto; border-top: 1px solid var(--grid); padding-top: 6px; }
+  .modal-row { padding: 5px 2px; font-size: 13px; border-bottom: 1px solid var(--grid); }
+  .modal-row:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>AP Licensing Report</h1>
+    <div class="sub">HPE GreenLake subscriptions × <span id="src">Aruba
+      Central</span> AP status &middot; generated <span id="gen"></span></div>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+  <nav class="tabs" id="tabs"></nav>
+  <div id="panels"></div>
+
+  <div class="modal-overlay" id="aps-modal">
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="aps-modal-title">
+      <div class="modal-head">
+        <h3 id="aps-modal-title">Attached APs</h3>
+        <button type="button" class="modal-close" id="aps-modal-close" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="modal-list" id="aps-modal-list"></div>
+    </div>
+  </div>
+
+  <footer>Data joined on device serial number (MAC address as fallback).
+    “Detach candidates” are Down APs still holding an active subscription.
+    Generated by the greenlake-licensing tool.</footer>
+</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+const D = JSON.parse(document.getElementById('data').textContent);
+document.getElementById('gen').textContent = D.generated;
+if (D.central_source)
+  document.getElementById('src').textContent = D.central_source;
+
+/* ---------- cell renderers ---------- */
+const esc = s => String(s ?? '').replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const badge = (cls, label) =>
+  `<span class="badge ${cls}"><span class="dot"></span>${esc(label)}</span>`;
+const R = {
+  status: v => v === 'Up'   ? badge('b-up', 'Up')
+             : v === 'Down' ? badge('b-down', 'Down')
+             : badge('b-na', v || 'Unknown'),
+  license: v => v === 'Licensed'   ? badge('b-lic', 'Licensed')
+              : v === 'Unlicensed' ? badge('b-unlic', '⚠ Unlicensed')
+              : v === 'Expired'    ? badge('b-exp', '⚠ Expired')
+              : badge('b-na', v || '—'),
+  keys: v => (v && v.length)
+    ? v.map(k => `<span class="keychip">${esc(k)}</span>`).join('')
+    : '<span class="badge b-na">—</span>',
+  subtype: v => v === 'Eval' ? badge('b-unlic', 'Eval') : badge('b-lic', 'Paid'),
+  list: v => (v && v.length) ? esc(v.join(', ')) : '—',
+  mono: v => v ? `<span class="mono">${esc(v)}</span>` : '—',
+  num: v => v == null ? '—' : esc(v),
+  text: v => v ? esc(v) : '—',
+  days: v => v == null ? '—' : v < 0 ? badge('b-exp', 'expired') :
+    v <= D.expiring_days ? badge('b-unlic', v + ' days') : esc(v + ' days'),
+};
+const plain = v => Array.isArray(v) ? v.join('; ') : String(v ?? '');
+
+/* ---------- table definitions ---------- */
+const apCols = [
+  {k:'name',   l:'AP Name', t:'text'},
+  {k:'serial', l:'Serial', t:'mono'},
+  {k:'mac',    l:'MAC', t:'mono'},
+  {k:'model',  l:'Model', t:'text'},
+  {k:'site',   l:'Site', t:'text'},
+  {k:'status', l:'Status', t:'status'},
+  {k:'license_state', l:'License', t:'license'},
+  {k:'keys',   l:'Subscription Key', t:'keys'},
+  {k:'tiers',  l:'Tier', t:'list'},
+  {k:'sub_end',l:'Sub End', t:'mono'},
+  {k:'tags',   l:'Tags', t:'list', wrap:true},
+];
+const INTERACTIVE = !!window.GLC_INTERACTIVE;
+// Tables whose rows carry a Detach action — the only ones bulk-select applies to.
+const BULK_DETACH_IDS = ['detach', 'gl-only'];
+const TABLES = [
+  {tab:'Action needed', id:'detach',
+   title:'Down APs holding a subscription (detach candidates)',
+   desc:'These APs are Down in Aruba Central but still consume a GreenLake ' +
+        'subscription seat. Detach decommissioned units to free the seat; ' +
+        'Ignore APs that are only down temporarily.',
+   cols:[...apCols.slice(0,6), apCols[7], apCols[8], apCols[9], apCols[10],
+         {k:'last_seen', l:'Last Seen', t:'mono'}],
+   rows:D.down_licensed},
+  {tab:'Action needed', id:'ignored',
+   title:'Ignored — down temporarily',
+   desc:'Down APs holding a subscription that were marked as temporarily ' +
+        'down for this instance. They are excluded from the detach list ' +
+        'above until unignored.',
+   cols:[...apCols.slice(0,6), apCols[7], apCols[9], apCols[10],
+         {k:'last_seen', l:'Last Seen', t:'mono'}],
+   rows:D.ignored_down || []},
+  {tab:'Action needed', id:'unlic',
+   title:'Unlicensed APs',
+   desc:'Devices in GreenLake with no subscription attached. Up APs here are ' +
+        'running without a license.',
+   cols:[...apCols.slice(0,6), apCols[10]], rows:D.unlicensed},
+  {tab:'All APs', id:'all',
+   title:'Full AP inventory',
+   desc:'Every AP in the GreenLake workspace, joined with its Aruba Central ' +
+        'status. Search by name, serial, MAC, site, or key.',
+   cols:apCols, rows:D.aps},
+  {tab:'Subscriptions', id:'subs',
+   title:'Subscription keys',
+   desc:'Each GreenLake subscription key with usage and the APs (by name) ' +
+        'attached to it.',
+   cols:[
+     {k:'key', l:'Key', t:'mono'},
+     {k:'sub_type', l:'Type', t:'subtype'},
+     {k:'tier', l:'Tier', t:'text'},
+     {k:'sku', l:'SKU', t:'mono'},
+     {k:'device_types', l:'Device Type', t:'list'},
+     {k:'used', l:'Used', t:'num'},
+     {k:'quantity', l:'Total', t:'num'},
+     {k:'available', l:'Free', t:'num'},
+     {k:'start', l:'Start', t:'mono'},
+     {k:'end', l:'End', t:'mono'},
+     {k:'days_left', l:'Days Left', t:'days'},
+     {k:'aps', l:'Attached APs', t:'apsBtn'},
+     {k:'tags', l:'Tags', t:'list', wrap:true},
+   ], rows:D.subscriptions},
+  {tab:'Mismatches', id:'gl-only',
+   title:'In GreenLake but not in Central',
+   desc:'Devices in the GreenLake inventory that Aruba Central has never ' +
+        'seen (not yet provisioned, RMA’d, or spares on the shelf). Ones ' +
+        'still holding a subscription can be detached to free the seat.',
+   cols:[apCols[1], apCols[2], apCols[3], apCols[6], apCols[7], apCols[9], apCols[10]],
+   rows:D.not_in_central},
+];
+
+// the ignored table is noise in a static report with nothing ignored;
+// in the app it stays visible so ignores have somewhere to land
+if (!INTERACTIVE && !(D.ignored_down || []).length) {
+  TABLES.splice(TABLES.findIndex(t => t.id === 'ignored'), 1);
+}
+if (INTERACTIVE) {
+  for (const t of TABLES) {
+    if (t.id === 'detach' || t.id === 'ignored' || t.id === 'gl-only')
+      t.cols = [...t.cols, {k:'_act', l:'Actions', t:'actions'}];
+    if (BULK_DETACH_IDS.includes(t.id))
+      t.cols = [{k:'_sel', l:'', t:'select'}, ...t.cols];
+  }
+}
+
+function actionsHtml(r, tableId) {
+  if (r._state === 'detached') return badge('b-lic', 'Detached ✓');
+  if (r._state === 'pending')
+    return '<span class="act-note">Detaching…</span>';
+  const detachBtn =
+    `<button class="act warn" data-act="detach" data-serial="${esc(r.serial)}">Detach</button>`;
+  let html;
+  if (tableId === 'detach')
+    html = detachBtn +
+      `<button class="act" data-act="ignore" data-serial="${esc(r.serial)}">Ignore</button>`;
+  else if (tableId === 'gl-only')
+    // only rows actually holding a subscription have anything to detach
+    html = (r.keys && r.keys.length) ? detachBtn
+                                     : '<span class="act-note">—</span>';
+  else
+    html = `<button class="act" data-act="unignore" data-serial="${esc(r.serial)}">Unignore</button>`;
+  if (r._error) html += `<div class="act-err">${esc(r._error)}</div>`;
+  return html;
+}
+
+function apsBtnHtml(r) {
+  const n = (r.aps || []).length;
+  return n
+    ? `<button type="button" class="act" data-aps-key="${esc(r.key)}">Attached APs (${n})</button>`
+    : '<span class="act-note">None</span>';
+}
+
+/* ---------- summary tiles ---------- */
+// primary row: the numbers that need a decision; secondary row: plain counts
+function renderTiles() {
+  const S = D.summary;
+  const primary = [
+    {v:S.down_licensed, l:'Detach candidates (Down + licensed)',
+     c:S.down_licensed ? 'alert' : 'ok'},
+    {v:S.unlicensed, l:'Unlicensed APs', c:S.unlicensed ? 'warn-t' : 'ok'},
+    {v:S.expiring_soon, l:`Expiring within ${D.expiring_days}d`,
+     c:S.expiring_soon ? 'warn-t' : 'ok'},
+    {v:S.expired, l:'On expired subscription', c:S.expired ? 'warn-t' : 'ok'},
+  ];
+  const secondary = [
+    {v:S.total_aps, l:'APs in GreenLake'},
+    {v:S.up, l:'Up', c:'ok'},
+    {v:S.down, l:'Down', c:S.down ? 'alert' : ''},
+    ...(S.ignored_down ? [{v:S.ignored_down, l:'Ignored (temp. down)'}] : []),
+    {v:S.subscriptions, l:'Subscription keys'},
+  ];
+  const bigTile = t => `<div class="tile-lg ${t.c || ''}"><div class="v">${t.v}</div>
+     <div class="l">${t.l}</div></div>`;
+  const smallTile = t => `<div class="tile ${t.c || ''}"><div class="v">${t.v}</div>
+     <div class="l">${t.l}</div></div>`;
+  document.getElementById('tiles').innerHTML =
+    `<div class="tiles-primary">${primary.map(bigTile).join('')}</div>
+     <div class="tiles-secondary">${secondary.map(smallTile).join('')}</div>`;
+}
+renderTiles();
+
+/* ---------- tabs & panels ---------- */
+const tabNames = [...new Set(TABLES.map(t => t.tab))];
+const tabsEl = document.getElementById('tabs');
+const panelsEl = document.getElementById('panels');
+const state = {};   // per-table: {q, sortK, sortDir}
+
+tabNames.forEach((name, i) => {
+  const total = TABLES.filter(t => t.tab === name)
+                      .reduce((a, t) => a + t.rows.length, 0);
+  const b = document.createElement('button');
+  b.innerHTML = `${esc(name)}<span class="n">${total}</span>`;
+  b.onclick = () => selectTab(i);
+  tabsEl.appendChild(b);
+
+  const sec = document.createElement('section');
+  sec.className = 'panel'; sec.dataset.tab = name;
+  TABLES.filter(t => t.tab === name).forEach(t => {
+    state[t.id] = {q:'', sortK:null, sortDir:1, lic:'all', subType:'all',
+                   devType:'all', sel:new Set()};
+    const hasLic = t.tab === 'Mismatches' && t.cols.some(c => c.k === 'license_state');
+    const licFilters = hasLic ? `
+        <div class="lic-filters" data-t="${t.id}" data-kind="lic">
+          <button type="button" class="on" data-lic="all">All
+            <span class="n" data-n="all">0</span></button>
+          <button type="button" data-lic="Licensed">Licensed
+            <span class="n" data-n="Licensed">0</span></button>
+          <button type="button" data-lic="Unlicensed">Unlicensed
+            <span class="n" data-n="Unlicensed">0</span></button>
+        </div>` : '';
+    const hasSubType = t.id === 'subs';
+    const subTypeFilters = hasSubType ? `
+        <div class="lic-filters" data-t="${t.id}" data-kind="subtype">
+          <button type="button" class="on" data-val="all">All
+            <span class="n" data-n="all">0</span></button>
+          <button type="button" data-val="Paid">Paid
+            <span class="n" data-n="Paid">0</span></button>
+          <button type="button" data-val="Eval">Eval
+            <span class="n" data-n="Eval">0</span></button>
+        </div>` : '';
+    const devTypeValues = hasSubType
+      ? [...new Set(t.rows.flatMap(r => r.device_types || []))].sort() : [];
+    const devTypeFilters = devTypeValues.length ? `
+        <div class="lic-filters" data-t="${t.id}" data-kind="devtype">
+          <button type="button" class="on" data-val="all">All
+            <span class="n" data-n="all">0</span></button>
+          ${devTypeValues.map(v => `<button type="button" data-val="${esc(v)}">${esc(v)}
+            <span class="n" data-n="${esc(v)}">0</span></button>`).join('')}
+        </div>` : '';
+    const bulkBar = BULK_DETACH_IDS.includes(t.id) ? `
+        <span class="bulk" data-t="${t.id}">
+          <span class="n" data-bulk-n></span>
+          <button type="button" class="act warn" data-bulk-detach="${t.id}" disabled>Detach selected</button>
+        </span>` : '';
+    const blk = document.createElement('div');
+    blk.className = 'block';
+    blk.innerHTML = `
+      <h2>${esc(t.title)}</h2><p class="desc">${esc(t.desc)}</p>
+      <div class="toolbar">
+        <input type="search" placeholder="Filter…" data-t="${t.id}">
+        ${licFilters}
+        ${subTypeFilters}
+        ${devTypeFilters}
+        ${bulkBar}
+        <span class="count" id="count-${t.id}"></span>
+        <button class="csv" data-t="${t.id}">Download CSV</button>
+      </div>
+      <div class="tbl-scroll"><table id="tbl-${t.id}"></table></div>`;
+    sec.appendChild(blk);
+  });
+  panelsEl.appendChild(sec);
+});
+
+function selectTab(i) {
+  [...tabsEl.children].forEach((b, j) => b.classList.toggle('on', j === i));
+  [...panelsEl.children].forEach((p, j) => p.classList.toggle('on', j === i));
+}
+selectTab(0);
+
+function updateTabCounts() {
+  tabNames.forEach((name, i) => {
+    const total = TABLES.filter(t => t.tab === name)
+                        .reduce((a, t) => a + t.rows.length, 0);
+    tabsEl.children[i].querySelector('.n').textContent = total;
+  });
+}
+
+/* ---------- rendering, filtering, sorting ---------- */
+function licenseCounts(rows) {
+  let licensed = 0, unlicensed = 0;
+  for (const r of rows) {
+    if (r.license_state === 'Licensed') licensed++;
+    else if (r.license_state === 'Unlicensed') unlicensed++;
+  }
+  return {all: rows.length, Licensed: licensed, Unlicensed: unlicensed};
+}
+
+function countBy(rows, fn) {
+  const counts = {all: rows.length};
+  for (const r of rows) {
+    const v = fn(r);
+    if (v) counts[v] = (counts[v] || 0) + 1;
+  }
+  return counts;
+}
+
+function countByMulti(rows, fn) {
+  const counts = {all: rows.length};
+  for (const r of rows)
+    for (const v of fn(r)) counts[v] = (counts[v] || 0) + 1;
+  return counts;
+}
+
+// Applies every active filter except `skip` (e.g. skip='lic' when computing
+// the license pill counts, so each pill shows the count you'd get if you
+// clicked it, given the current search text and other active filters.
+function filterRows(t, skip) {
+  const st = state[t.id];
+  let rows = t.rows;
+  if (skip !== 'lic' && st.lic && st.lic !== 'all')
+    rows = rows.filter(r => r.license_state === st.lic);
+  if (skip !== 'subType' && st.subType && st.subType !== 'all')
+    rows = rows.filter(r => r.sub_type === st.subType);
+  if (skip !== 'devType' && st.devType && st.devType !== 'all')
+    rows = rows.filter(r => (r.device_types || []).includes(st.devType));
+  if (st.q) {
+    const q = st.q.toLowerCase();
+    rows = rows.filter(r => t.cols.some(
+      c => plain(r[c.k]).toLowerCase().includes(q)));
+  }
+  return rows;
+}
+
+function visibleRows(t) {
+  const st = state[t.id];
+  let rows = filterRows(t, null);
+  if (st.sortK) {
+    const k = st.sortK, dir = st.sortDir;
+    rows = [...rows].sort((a, b) => {
+      const va = a[k], vb = b[k];
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (typeof va === 'number' && typeof vb === 'number')
+        return (va - vb) * dir;
+      return String(plain(va)).localeCompare(String(plain(vb))) * dir;
+    });
+  }
+  return rows;
+}
+
+/* ---------- multi-select + bulk detach ---------- */
+// At most one bulk-detach batch runs at a time (across all tables), so a
+// user can never fire overlapping waves of PATCH calls at GreenLake.
+let activeBulk = null;   // {tableId, items:[serial,...], done}
+
+function isSelectable(t, r) {
+  if (!BULK_DETACH_IDS.includes(t.id)) return false;
+  if (r._state === 'detached' || r._state === 'pending') return false;
+  if (t.id === 'gl-only') return !!(r.keys && r.keys.length);
+  return true;
+}
+
+function updateBulkBar(t, visibleRowsForTable) {
+  if (!BULK_DETACH_IDS.includes(t.id)) return;
+  const st = state[t.id];
+  const bar = document.querySelector(`.bulk[data-t="${t.id}"]`);
+  if (!bar) return;
+  const btn = bar.querySelector('[data-bulk-detach]');
+  const n = bar.querySelector('[data-bulk-n]');
+  const mine = activeBulk && activeBulk.tableId === t.id;
+  if (mine) {
+    n.textContent = `Detaching ${activeBulk.done}/${activeBulk.items.length}…`;
+    btn.textContent = 'Stop'; btn.disabled = false;
+  } else {
+    n.textContent = st.sel.size ? `${st.sel.size} selected` : '';
+    btn.textContent = 'Detach selected';
+    btn.disabled = st.sel.size === 0 || !!activeBulk;
+  }
+  const selAll = document.querySelector(`#tbl-${t.id} input.sel-all`);
+  if (selAll) {
+    const selectable = visibleRowsForTable.filter(r => isSelectable(t, r));
+    const checkedCount = selectable.filter(r => st.sel.has(r.serial)).length;
+    selAll.disabled = selectable.length === 0 || !!activeBulk;
+    selAll.checked = selectable.length > 0 && checkedCount === selectable.length;
+    selAll.indeterminate = checkedCount > 0 && checkedCount < selectable.length;
+  }
+}
+
+// keeps every table's bulk bar (esp. the one *not* running) in sync with
+// activeBulk — e.g. disabling gl-only's button while detach's batch runs
+function refreshAllBulkBars() {
+  for (const id of BULK_DETACH_IDS) {
+    const tbl = TABLES.find(x => x.id === id);
+    if (tbl) updateBulkBar(tbl, visibleRows(tbl));
+  }
+}
+
+function renderTable(t) {
+  const st = state[t.id];
+  // drop selections for rows that vanished or are no longer selectable
+  // (e.g. a row that just got detached) so a stale checkbox can't linger
+  if (st.sel.size)
+    for (const serial of [...st.sel]) {
+      const row = t.rows.find(r => r.serial === serial);
+      if (!row || !isSelectable(t, row)) st.sel.delete(serial);
+    }
+  const rows = visibleRows(t);
+  const el = document.getElementById('tbl-' + t.id);
+  const head = '<thead><tr>' + t.cols.map(c => {
+    if (c.t === 'select')
+      return `<th class="sel-col"><input type="checkbox" class="sel-all" title="Select all"></th>`;
+    const arrow = st.sortK === c.k ? (st.sortDir > 0 ? '▲' : '▼') : '';
+    return `<th data-k="${c.k}">${esc(c.l)} <span class="arrow">${arrow}</span></th>`;
+  }).join('') + '</tr></thead>';
+  const body = rows.length
+    ? '<tbody>' + rows.map(r => '<tr>' + t.cols.map(c => {
+        if (c.t === 'select') {
+          const dis = !isSelectable(t, r) || !!activeBulk;
+          const checked = !dis && st.sel.has(r.serial);
+          return `<td class="sel-col"><input type="checkbox" class="row-sel" ` +
+            `data-serial="${esc(r.serial)}"${dis ? ' disabled' : ''}${checked ? ' checked' : ''}></td>`;
+        }
+        const cls = [c.t === 'num' ? 'num' : '', c.wrap ? 'wrap-cell' : '']
+          .filter(Boolean).join(' ');
+        const html = c.t === 'actions' ? actionsHtml(r, t.id)
+                   : c.t === 'apsBtn' ? apsBtnHtml(r)
+                                       : (R[c.t] || R.text)(r[c.k]);
+        return `<td${cls ? ` class="${cls}"` : ''}>${html}</td>`;
+      }).join('') + '</tr>').join('') + '</tbody>'
+    : `<tbody><tr><td colspan="${t.cols.length}"><div class="empty">` +
+      (t.rows.length ? 'No rows match the filter.' : 'Nothing here — all clear.') +
+      '</div></td></tr></tbody>';
+  el.innerHTML = head + body;
+  const filtered = !!(st.q || (st.lic && st.lic !== 'all') ||
+    (st.subType && st.subType !== 'all') || (st.devType && st.devType !== 'all'));
+  document.getElementById('count-' + t.id).textContent =
+    filtered ? `${rows.length} of ${t.rows.length}` : `${t.rows.length} rows`;
+  // refresh filter-pill counts — each bar reflects the search text and every
+  // other active filter, so a pill's number always matches what clicking it
+  // would show
+  document.querySelectorAll(`.lic-filters[data-t="${t.id}"]`).forEach(bar => {
+    const kind = bar.dataset.kind;
+    const baseRows = kind === 'subtype' ? filterRows(t, 'subType')
+                    : kind === 'devtype' ? filterRows(t, 'devType')
+                                          : filterRows(t, 'lic');
+    const counts = kind === 'subtype' ? countBy(baseRows, r => r.sub_type)
+                 : kind === 'devtype' ? countByMulti(baseRows, r => r.device_types || [])
+                                       : licenseCounts(baseRows);
+    const active = kind === 'subtype' ? (st.subType || 'all')
+                 : kind === 'devtype' ? (st.devType || 'all')
+                                       : (st.lic || 'all');
+    bar.querySelectorAll('button').forEach(btn => {
+      const val = kind === 'lic' ? btn.dataset.lic : btn.dataset.val;
+      btn.classList.toggle('on', val === active);
+      const n = btn.querySelector('.n');
+      if (n) n.textContent = counts[val] ?? 0;
+    });
+  });
+  if (BULK_DETACH_IDS.includes(t.id)) {
+    const selAll = el.querySelector('th.sel-col input.sel-all');
+    if (selAll) selAll.onchange = () => {
+      rows.forEach(r => {
+        if (!isSelectable(t, r)) return;
+        if (selAll.checked) st.sel.add(r.serial); else st.sel.delete(r.serial);
+      });
+      renderTable(t);
+    };
+    el.querySelectorAll('input.row-sel').forEach(cb => cb.onchange = () => {
+      if (cb.checked) st.sel.add(cb.dataset.serial); else st.sel.delete(cb.dataset.serial);
+      updateBulkBar(t, rows);
+    });
+    updateBulkBar(t, rows);
+  }
+  el.querySelectorAll('th[data-k]').forEach(th => th.onclick = () => {
+    const k = th.dataset.k;
+    if (st.sortK === k) st.sortDir *= -1; else { st.sortK = k; st.sortDir = 1; }
+    renderTable(t);
+  });
+  el.querySelectorAll('button.act').forEach(btn => btn.onclick = () => {
+    if (btn.dataset.apsKey) {
+      const row = t.rows.find(r => r.key === btn.dataset.apsKey);
+      openApsModal(btn.dataset.apsKey, (row && row.aps) || []);
+      return;
+    }
+    const row = t.rows.find(r => r.serial === btn.dataset.serial);
+    if (!row || row._state === 'pending') return;
+    window.parent.postMessage({glc: btn.dataset.act, serial: row.serial,
+                               name: row.name, keys: row.keys || [],
+                               gl_id: row.gl_id || ''}, '*');
+  });
+}
+TABLES.forEach(renderTable);
+
+document.querySelectorAll('.toolbar input[type=search]').forEach(inp => {
+  inp.addEventListener('input', () => {
+    const t = TABLES.find(t => t.id === inp.dataset.t);
+    state[t.id].q = inp.value.trim();
+    renderTable(t);
+  });
+});
+
+document.querySelectorAll('[data-bulk-detach]').forEach(btn => {
+  btn.onclick = () => {
+    const t = TABLES.find(t => t.id === btn.dataset.bulkDetach);
+    if (activeBulk) {
+      // only the batch's own table can stop it; the other table's button
+      // is disabled while a batch is running, so this is always "mine"
+      if (activeBulk.tableId === t.id)
+        window.parent.postMessage({glc: 'bulk-detach-cancel'}, '*');
+      return;
+    }
+    const st = state[t.id];
+    const items = [...st.sel]
+      .map(serial => t.rows.find(r => r.serial === serial))
+      .filter(r => r && isSelectable(t, r));
+    if (!items.length) return;
+    const preview = items.slice(0, 12)
+      .map(r => `• ${r.name ? r.name + ' — ' : ''}${r.serial}`).join('\n');
+    const more = items.length > 12 ? `\n… and ${items.length - 12} more` : '';
+    const plural = items.length === 1 ? '' : 's';
+    if (!confirm(
+      `Detach ${items.length} AP${plural} and free ${items.length === 1 ? 'its' : 'their'} ` +
+      `subscription seat${plural}?\n\n${preview}${more}\n\n` +
+      `This removes the subscription assignment in GreenLake for each device, one at a ` +
+      `time. You can re-license devices later if they come back.`
+    )) return;
+    activeBulk = {tableId: t.id, items: items.map(r => r.serial), done: 0};
+    st.sel.clear();
+    renderTable(t);
+    refreshAllBulkBars();
+    window.parent.postMessage({glc: 'bulk-detach', items: items.map(r =>
+      ({serial: r.serial, name: r.name || '', keys: r.keys || [], gl_id: r.gl_id || ''}))}, '*');
+  };
+});
+
+document.querySelectorAll('.lic-filters').forEach(bar => {
+  const kind = bar.dataset.kind || 'lic';
+  bar.querySelectorAll('button').forEach(btn => {
+    btn.onclick = () => {
+      const t = TABLES.find(t => t.id === bar.dataset.t);
+      if (kind === 'lic') state[t.id].lic = btn.dataset.lic;
+      else if (kind === 'subtype') state[t.id].subType = btn.dataset.val;
+      else if (kind === 'devtype') state[t.id].devType = btn.dataset.val;
+      renderTable(t);
+    };
+  });
+});
+
+/* ---------- Attached APs modal ---------- */
+const apsModal = document.getElementById('aps-modal');
+const apsModalTitle = document.getElementById('aps-modal-title');
+const apsModalList = document.getElementById('aps-modal-list');
+function openApsModal(key, aps) {
+  apsModalTitle.textContent = `Attached APs — ${key}`;
+  apsModalList.innerHTML = aps.length
+    ? aps.map(name => `<div class="modal-row">${esc(name)}</div>`).join('')
+    : '<div class="empty">No APs attached.</div>';
+  apsModal.classList.add('on');
+}
+function closeApsModal() { apsModal.classList.remove('on'); }
+document.getElementById('aps-modal-close').onclick = closeApsModal;
+apsModal.addEventListener('click', e => { if (e.target === apsModal) closeApsModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && apsModal.classList.contains('on')) closeApsModal();
+});
+
+/* ---------- in-app actions: results arriving from the parent page ---------- */
+if (INTERACTIVE) {
+  const tblById = id => TABLES.find(t => t.id === id);
+  const findRow = serial => {
+    for (const id of ['detach', 'ignored', 'gl-only']) {
+      const row = tblById(id).rows.find(r => r.serial === serial);
+      if (row) return {row, id};
+    }
+    return {};
+  };
+  window.addEventListener('message', ev => {
+    if (ev.source !== window.parent) return;
+    const m = ev.data;
+    if (!m || !m.glc) return;
+    if (m.glc === 'theme') {   // live theme switch from the app
+      document.documentElement.dataset.theme = m.theme;
+      return;
+    }
+    if (m.glc === 'bulk-detach-done') {
+      // fires whether the batch finished or was stopped early — either way
+      // the report is done waiting and both tables' bars must unlock
+      const finishedId = activeBulk && activeBulk.tableId;
+      activeBulk = null;
+      if (finishedId) renderTable(tblById(finishedId));
+      refreshAllBulkBars();
+      return;
+    }
+    const {row, id} = findRow(m.serial);
+    if (!row) return;
+    if (m.glc === 'detach-pending') {
+      row._state = 'pending'; row._error = null;
+      renderTable(tblById(id));
+    } else if (m.glc === 'detach-result') {
+      row._state = m.ok ? 'detached' : null;
+      row._error = m.ok ? null : m.error;
+      if (activeBulk && activeBulk.tableId === id && activeBulk.items.includes(m.serial))
+        activeBulk.done++;
+      renderTable(tblById(id));
+    } else if (m.glc === 'ignore-applied') {
+      const shouldMove = (m.ignored && id === 'detach') ||
+                         (!m.ignored && id === 'ignored');
+      if (!shouldMove) return;
+      const from = tblById(id);
+      const to = tblById(m.ignored ? 'ignored' : 'detach');
+      from.rows.splice(from.rows.indexOf(row), 1);
+      row.ignored = m.ignored;
+      to.rows.push(row);
+      D.summary.down_licensed = tblById('detach').rows.length;
+      D.summary.ignored_down = tblById('ignored').rows.length;
+      renderTable(from); renderTable(to);
+      renderTiles(); updateTabCounts();
+    }
+  });
+}
+
+document.querySelectorAll('button.csv').forEach(btn => {
+  btn.onclick = () => {
+    const t = TABLES.find(t => t.id === btn.dataset.t);
+    const rows = visibleRows(t);
+    const csvEsc = v => {
+      const s = String(plain(v));
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const cols = t.cols.filter(c => c.t !== 'actions');
+    const csv = [cols.map(c => csvEsc(c.l)).join(',')]
+      .concat(rows.map(r => cols.map(c => csvEsc(r[c.k])).join(',')))
+      .join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'}));
+    a.download = t.id + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+});
+</script>
+</body>
+</html>

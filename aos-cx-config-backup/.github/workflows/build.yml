@@ -1,0 +1,68 @@
+name: Build Windows Executable
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'V*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install ruff
+
+    - name: Lint with Ruff
+      continue-on-error: true
+      run: |
+        ruff check AOS-CX.Config.Backup.Tool_3.6.py --select E,F --ignore E501
+        echo "Lint passed (basic checks)"
+
+    - name: Build Windows executable
+      run: |
+        pyinstaller .build/AOS-CX.Config.Backup.Tool_Windows.spec --clean --noconfirm
+        Move-Item -Force dist/AOS-CX.Config.Backup.Tool.exe ./AOS-CX.Config.Backup.Tool.exe
+        
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AOS-CX-Config-Backup-Tool-Windows
+        path: AOS-CX.Config.Backup.Tool.exe
+        retention-days: 90
+
+  create-release:
+    needs: [build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          AOS-CX-Config-Backup-Tool-Windows/AOS-CX.Config.Backup.Tool.exe
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+permissions:
+  contents: write

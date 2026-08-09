@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClearPass Endpoint Console</title>
+<style>
+:root{
+  --bg:#FFFFFF; --card:#FFFFFF; --card-alt:#FAFAFA; --line:#E4E4E7; --line-soft:#EEEEF0;
+  --ink:#18181B; --ink-soft:#6B7280; --ink-dim:#A1A1AA;
+
+  --pm:#2563EB; --pm-soft:#EFF4FE; --pm-text:#1D4ED8; --pm-line:#BFD3FB;
+  --gd:#0D9488; --gd-soft:#EEFAF9; --gd-text:#0F766E; --gd-line:#BFE6E2;
+
+  --ok:#16A34A; --ok-soft:#F0FBF3; --ok-text:#15803D;
+  --err:#DC2626; --err-soft:#FDF1F1; --err-text:#B91C1C;
+  --warn:#D97706; --warn-soft:#FEF7EC; --warn-text:#B45309;
+
+  --body:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Consolas,"Liberation Mono",monospace;
+  --r-lg:8px; --r-md:6px; --r-sm:5px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+a{color:var(--pm-text)}
+
+/* ---------- topbar ---------- */
+.topbar{position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:1180px;margin:0 auto;padding:13px 22px 11px;display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.mark{width:30px;height:30px;border-radius:var(--r-sm);background:var(--ink);display:flex;align-items:center;justify-content:center;flex:none}
+.mark span{font-weight:700;font-size:12px;color:#fff;letter-spacing:.01em}
+.brandtext h1{margin:0;font-weight:700;font-size:15px}
+.brandtext .sub{font-size:12px;color:var(--ink-soft);margin-top:1px}
+.spacer{flex:1}
+.conn{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-soft);background:var(--card-alt);border:1px solid var(--line);padding:5px 10px 5px 8px;border-radius:var(--r-sm)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ink-dim)}
+.dot.live{background:var(--ok)}
+.dot.stale{background:var(--warn)}
+@media(prefers-reduced-motion:reduce){.dot.live{animation:none}}
+
+.tabs{max-width:1180px;margin:0 auto;padding:0 22px;display:flex}
+.tabtrack{display:flex;gap:4px}
+.tab{appearance:none;background:none;border:0;border-bottom:2px solid transparent;padding:10px 4px;margin-right:20px;cursor:pointer;color:var(--ink-soft);font-family:var(--body);font-weight:600;font-size:13px}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.tab .cnt{color:var(--ink-dim);margin-left:4px;font-weight:500}
+
+main{max-width:1180px;margin:0 auto;padding:24px 22px 100px}
+.view[hidden]{display:none}
+
+/* ---------- panels ---------- */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);margin-bottom:16px;overflow:hidden}
+.phead{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.icb{width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink-soft)}
+.icb svg{width:16px;height:16px}
+.icb.n,.icb.pm,.icb.gd{background:none;color:var(--ink-soft)}
+.stepno{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex:none}
+.phead h2{margin:0;font-family:var(--body);font-weight:700;font-size:13.5px}
+.phead .note{font-size:12px;color:var(--ink-dim)}
+.pbody{padding:18px}
+
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:860px){.g2,.g3,.g4{grid-template-columns:1fr}}
+
+label.f{display:block}
+label.f>span{display:block;margin-bottom:5px;font-weight:600;font-size:11px;letter-spacing:.02em;color:var(--ink-soft)}
+input[type=text],input[type=password],input[type=number],select,textarea{
+  width:100%;background:var(--card);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:8px 10px;font-family:var(--mono);font-size:12.5px;outline:none;transition:border-color .1s;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
+textarea{resize:vertical;line-height:1.55}
+select{cursor:pointer}
+.hint{margin-top:5px;font-size:12px;color:var(--ink-dim);line-height:1.5}
+
+.btn{appearance:none;cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:8px 14px;font-family:var(--body);font-weight:600;font-size:12.5px;color:var(--ink);transition:background .1s,border-color .1s}
+.btn:hover:not(:disabled){background:var(--card-alt);border-color:var(--ink-dim)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.pri{background:var(--pm);border-color:var(--pm);color:#fff}
+.btn.pri:hover:not(:disabled){background:#1D4ED8}
+.btn.gd{background:var(--gd);border-color:var(--gd);color:#fff}
+.btn.gd:hover:not(:disabled){background:#0F766E}
+.btn.sm{padding:5px 10px;font-size:11.5px}
+.btn.danger{color:var(--err-text);border-color:var(--line);background:var(--card)}
+.btn.danger:hover:not(:disabled){border-color:var(--err);background:var(--err-soft)}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+:focus-visible{outline:2px solid var(--pm);outline-offset:2px}
+
+/* ---------- switches ---------- */
+.switch{position:relative;display:inline-flex;width:36px;height:20px;flex:none;cursor:pointer}
+.switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.switch .track{position:absolute;inset:0;background:var(--line);border-radius:999px;transition:background .1s}
+.switch .knob{position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .1s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.switch input:checked ~ .track{background:var(--pm)}
+.switch.gd input:checked ~ .track{background:var(--gd)}
+.switch input:checked ~ .track .knob{transform:translateX(16px)}
+.switch input:focus-visible ~ .track{outline:2px solid var(--pm);outline-offset:2px}
+
+/* ---------- destination cards ---------- */
+.togcard{display:flex;align-items:flex-start;gap:11px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card);cursor:pointer;transition:border-color .1s}
+.togcard:hover{border-color:var(--ink-dim)}
+.togcard.pm.on{border-color:var(--pm)}
+.togcard.gd.on{border-color:var(--gd)}
+.togcard .icb{margin-top:1px}
+.togcard.pm.on .icb{color:var(--pm-text)}
+.togcard.gd.on .icb{color:var(--gd-text)}
+.togcard b{font-family:var(--body);font-weight:700;font-size:13px;display:block}
+.togcard small{color:var(--ink-soft);font-size:12px;display:block;margin-top:2px;line-height:1.4}
+.togcard .switch{margin-left:auto;margin-top:2px}
+
+.toglet{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card)}
+.toglet:has(input:checked){border-color:var(--gd)}
+.toglet b{font-weight:700;font-size:12.5px;display:block}
+.toglet small{color:var(--ink-soft);font-size:11.5px;display:block;margin-top:2px}
+
+.callout{display:flex;gap:11px;border:1px solid var(--line);border-left:3px solid var(--warn);background:var(--card);padding:12px 14px;border-radius:var(--r-md);font-size:12.5px;color:var(--ink);margin-bottom:14px}
+.callout .icb{color:var(--warn-text)}
+.callout b{color:var(--warn-text);font-weight:700;font-size:12px;display:block;margin-bottom:3px}
+.callout code{font-family:var(--mono);font-size:11.5px;background:var(--card-alt);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+.callout.err{border-left-color:var(--err)}
+.callout.err b{color:var(--err-text)}
+.callout.err .icb{color:var(--err-text)}
+
+/* ---------- tables ---------- */
+.tw{overflow:auto;border:1px solid var(--line);border-radius:var(--r-md);max-height:460px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{position:sticky;top:0;z-index:2;background:var(--card-alt);text-align:left;padding:8px 12px;font-size:10.5px;
+  letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px 12px;border-bottom:1px solid var(--line-soft);vertical-align:middle;white-space:nowrap;font-family:var(--mono);font-size:12px}
+tbody tr:hover{background:var(--card-alt)}
+tbody tr:last-child td{border-bottom:0}
+td.wrap{white-space:normal;min-width:220px}
+.tdim{color:var(--ink-dim)}
+td select,td input{padding:5px 8px;font-size:11.5px;min-width:130px}
+
+.pill{display:inline-block;padding:1px 8px;border-radius:var(--r-sm);font-family:var(--body);font-weight:700;font-size:10.5px;letter-spacing:.01em;border:1px solid}
+.p-ep{color:var(--pm-text);border-color:var(--pm-line);background:var(--pm-soft)}
+.p-gd{color:var(--gd-text);border-color:var(--gd-line);background:var(--gd-soft)}
+.p-ok{color:var(--ok-text);border-color:#CFEBD8;background:var(--ok-soft)}
+.p-err{color:var(--err-text);border-color:#F5D3D3;background:var(--err-soft)}
+.p-warn{color:var(--warn-text);border-color:#F3DFB8;background:var(--warn-soft)}
+.p-idle{color:var(--ink-dim);border-color:var(--line);background:var(--card-alt)}
+
+/* ---------- payload rail ---------- */
+.rail{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.rail{grid-template-columns:1fr}}
+.jbox{border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:var(--card)}
+.jbox>header{padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card-alt);border-bottom:1px solid var(--line)}
+.jbox>header .lbl{display:flex;align-items:center;gap:7px;font-weight:700;font-size:12.5px;color:var(--ink)}
+.jbox .dotm{width:6px;height:6px;border-radius:50%}
+.jbox.ep .dotm{background:var(--pm)} .jbox.gd .dotm{background:var(--gd)}
+.jbox .m{font-family:var(--mono);font-size:10.5px;color:var(--ink-dim)}
+.jbox pre{margin:0;padding:12px 13px;font-family:var(--mono);font-size:11.5px;line-height:1.6;max-height:290px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:var(--ink)}
+
+/* ---------- activity feed ---------- */
+#log{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:5px;height:220px;overflow:auto}
+#log div{display:flex;gap:9px;align-items:baseline;padding:5px 8px}
+#log div:hover{background:var(--card-alt)}
+#log .t{font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);flex:none;padding-top:1px}
+#log span.ok,#log span.er,#log span.wa,#log span.in{font-size:12px}
+#log .ok{color:var(--ok-text)} #log .er{color:var(--err-text)} #log .wa{color:var(--warn-text)} #log .in{color:var(--ink-soft)}
+
+/* ---------- attrs / kv ---------- */
+.kv{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--card-alt);color:var(--ink-soft)}
+.chip b{color:var(--ink);font-weight:600}
+
+/* ---------- progress ---------- */
+.bar{height:4px;background:var(--card-alt);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:12px}
+.bar>i{display:block;height:100%;width:0;background:var(--pm);transition:width .18s ease}
+.stats{display:flex;gap:20px;font-size:12px;color:var(--ink-soft);margin-top:11px;flex-wrap:wrap}
+.stats b{color:var(--ink);font-family:var(--mono);font-weight:600}
+
+.empty{padding:34px 16px;text-align:center;color:var(--ink-dim);font-size:12.5px}
+.empty svg{width:24px;height:24px;margin-bottom:8px;opacity:.5}
+
+#toast{position:fixed;right:20px;bottom:20px;z-index:90;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--ok);border-radius:var(--r-md);
+  padding:10px 14px;font-size:12.5px;max-width:340px;box-shadow:0 4px 14px rgba(0,0,0,.08);animation:sl .15s ease}
+.toast.er{border-left-color:var(--err)} .toast.wa{border-left-color:var(--warn)}
+@keyframes sl{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="mark"><span>CP</span></div>
+    <div class="brandtext">
+      <h1>ClearPass Endpoint Console</h1>
+      <div class="sub">One form, two repositories — Policy Manager and Guest, side by side.</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="conn"><span class="dot" id="dot"></span><span id="connTxt">Not connected</span></div>
+  </div>
+  <div class="tabs">
+    <div class="tabtrack" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-view="v-conn">Connection</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="v-bulk">Bulk import<span class="cnt" id="cBulk"></span></button>
+      <button class="tab" role="tab" aria-selected="false" data-view="v-man">Manual entry<span class="cnt" id="cMan"></span></button>
+      <button class="tab" role="tab" aria-selected="false" data-view="v-res">Results<span class="cnt" id="cRes"></span></button>
+    </div>
+  </div>
+</div>
+
+<main>
+
+<!-- ============ CONNECTION ============ -->
+<section class="view" id="v-conn">
+  <div class="callout">
+    <div class="icb n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg></div>
+    <div>
+      <b>Before your first run</b>
+      This page talks to the CPPM REST API straight from your browser. Two things need to already be true: the browser trusts the ClearPass certificate (open <code>https://your-cppm/api-docs</code> once and accept it), and CPPM sends CORS headers back for this page's origin. If token requests succeed but everything after fails with a vague network error, that's almost always CORS — front CPPM with a small reverse proxy and point <b>API base override</b> below at it.
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><div class="icb n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="9" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <h2>Server &amp; credentials</h2><span class="note">Nothing here touches disk or browser storage — a reload clears it all.</span></div>
+    <div class="pbody">
+      <div class="grid g3">
+        <label class="f"><span>CPPM host</span>
+          <input type="text" id="host" placeholder="cppm.example.com" spellcheck="false">
+          <div class="hint">Hostname only — <code>https://</code> is added for you.</div>
+        </label>
+        <label class="f"><span>API base override</span>
+          <input type="text" id="baseOv" placeholder="https://proxy.example.com/cppm" spellcheck="false">
+          <div class="hint">Optional. A full origin + path prefix that fronts <code>/api</code>.</div>
+        </label>
+        <label class="f"><span>Grant type</span>
+          <select id="grant">
+            <option value="client_credentials">client_credentials</option>
+            <option value="password">password</option>
+          </select>
+          <div class="hint">Whatever's set on the API client in Guest &gt; Administration.</div>
+        </label>
+      </div>
+
+      <div class="grid g2" style="margin-top:15px">
+        <label class="f"><span>Client ID</span><input type="text" id="cid" spellcheck="false" autocomplete="off"></label>
+        <label class="f"><span>Client secret</span><input type="password" id="csec" autocomplete="off">
+          <div class="hint">Leave blank if the client has no secret.</div></label>
+      </div>
+
+      <div class="grid g2" id="pwFields" style="margin-top:15px;display:none">
+        <label class="f"><span>Username</span><input type="text" id="uname" spellcheck="false" autocomplete="off"></label>
+        <label class="f"><span>Password</span><input type="password" id="upass" autocomplete="off"></label>
+      </div>
+
+      <div class="row" style="margin-top:18px">
+        <button class="btn pri" id="btnAuth">Get token</button>
+        <button class="btn" id="btnRoles" disabled>Load roles</button>
+        <button class="btn" id="btnPing" disabled>Test endpoint read</button>
+        <div class="spacer"></div>
+        <button class="btn danger sm" id="btnClearTok">Drop token</button>
+      </div>
+      <div class="stats">
+        <span>Token <b id="tokState">none</b></span>
+        <span>Expires <b id="tokExp">—</b></span>
+        <span>TIPS roles <b id="nTips">0</b></span>
+        <span>Guest roles <b id="nGuest">0</b></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="panel">
+      <div class="phead"><div class="icb pm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg></div>
+        <h2>TIPS roles</h2><span class="note">GET /api/role</span></div>
+      <div class="pbody"><div class="tw" style="max-height:230px"><table><thead><tr><th>Name</th><th>ID</th><th>Description</th></tr></thead><tbody id="tbTips"><tr><td colspan="3" class="empty">Not loaded yet</td></tr></tbody></table></div></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><div class="icb gd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 9h.01M8 13h.01M13 9h5M13 13h5"/></svg></div>
+        <h2>Guest roles</h2><span class="note">From the [Guest Roles] role mapping</span></div>
+      <div class="pbody">
+        <div class="tw" style="max-height:230px"><table><thead><tr><th>Guest Role ID</th><th>TIPS Role</th></tr></thead><tbody id="tbGuest"><tr><td colspan="2" class="empty">Not loaded yet</td></tr></tbody></table></div>
+        <div class="hint" style="margin-top:8px">Read from <code>GET /api/role-mapping/name/[Guest Roles]</code> — each rule pairs a <code>GuestUser:Role ID</code> with the TIPS role it assigns. This is the only list the guest device repository can use.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><div class="icb n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-16 2 10h6"/></svg></div>
+      <h2>Activity</h2><div class="spacer"></div><button class="btn sm" id="btnClearLog">Clear</button></div>
+    <div class="pbody"><div id="log"></div></div>
+  </div>
+</section>
+
+<!-- ============ BULK ============ -->
+<section class="view" id="v-bulk" hidden>
+  <div class="panel">
+    <div class="phead"><div class="stepno">1</div><h2>Source data</h2><span class="note">CSV or TSV, first row is the header</span></div>
+    <div class="pbody">
+      <div class="row" style="margin-bottom:12px">
+        <input type="file" id="file" accept=".csv,.tsv,.txt" style="display:none">
+        <button class="btn" id="btnFile">Choose file</button>
+        <button class="btn" id="btnTemplate">Download template</button>
+        <button class="btn" id="btnSample">Load sample</button>
+        <div class="spacer"></div>
+        <span class="tdim" id="fileName" style="font-family:var(--mono);font-size:11.5px"></span>
+      </div>
+      <textarea id="csv" rows="8" spellcheck="false" placeholder="mac,status,description,Department,Owner,guest_role,mpsk,expire_time&#10;a4:5e:60:11:22:33,Known,Ricoh MP C4504,Facilities,jdoe,[Guest],Spring2026Printer,2026-12-31 23:59:59"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn pri" id="btnParse">Parse rows</button>
+        <span class="tdim" id="parseInfo" style="font-size:12px"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><div class="stepno">2</div><h2>Destination</h2><span class="note">Pick one repository or both</span></div>
+    <div class="pbody">
+      <div class="grid g2">
+        <label class="togcard pm on" id="togEpW">
+          <div class="icb pm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg></div>
+          <div><b>Policy Manager endpoint repository</b><small>POST /api/endpoint · PATCH /api/endpoint/mac-address/{mac}</small></div>
+          <span class="switch"><input type="checkbox" id="tgtEp" checked><span class="track"><span class="knob"></span></span></span>
+        </label>
+        <label class="togcard gd" id="togGdW">
+          <div class="icb gd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 9h.01M8 13h.01M13 9h5M13 13h5"/></svg></div>
+          <div><b>Guest device repository</b><small>POST /api/device · PATCH /api/device/mac/{mac} — needed for MPSK</small></div>
+          <span class="switch gd"><input type="checkbox" id="tgtGd"><span class="track"><span class="knob"></span></span></span>
+        </label>
+      </div>
+
+      <div class="grid g4" style="margin-top:16px">
+        <label class="f"><span>Write mode</span>
+          <select id="mode">
+            <option value="upsert">Update, create if missing</option>
+            <option value="create">Create only</option>
+            <option value="update">Update only</option>
+          </select>
+        </label>
+        <label class="f"><span>MAC format sent</span>
+          <select id="macFmt">
+            <option value="bare">aabbccddeeff</option>
+            <option value="colon">aa:bb:cc:dd:ee:ff</option>
+            <option value="dash">aa-bb-cc-dd-ee-ff</option>
+          </select>
+        </label>
+        <label class="f"><span>Concurrent requests</span><input type="number" id="conc" value="3" min="1" max="10"></label>
+        <label class="f"><span>Guest MPSK field name</span><input type="text" id="mpskField" value="mpsk" spellcheck="false">
+          <div class="hint">Check <code>/api-docs</code> for your build.</div></label>
+      </div>
+
+      <div class="grid g3" style="margin-top:14px">
+        <label class="toglet"><input type="checkbox" id="optCoa" style="width:auto"><span><b>Send change_of_authorization</b><small>Bounces the session on guest writes</small></span></label>
+        <label class="toglet"><input type="checkbox" id="optMpskEnable" checked style="width:auto"><span><b>Set mpsk_enable = 1</b><small>Only when a passphrase is present</small></span></label>
+        <label class="toglet"><input type="checkbox" id="optStopErr" style="width:auto"><span><b>Stop on first failure</b><small>Otherwise every row is attempted</small></span></label>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><div class="stepno">3</div><h2>Column mapping</h2><span class="note">Unrecognised columns default to endpoint attributes</span>
+      <div class="spacer"></div><button class="btn sm" id="btnAutomap">Re-run automap</button></div>
+    <div class="pbody">
+      <div class="tw" style="max-height:340px"><table>
+        <thead><tr><th>CSV column</th><th>Sample value</th><th>Maps to</th><th>Field / attribute name</th></tr></thead>
+        <tbody id="tbMap"><tr><td colspan="4" class="empty">Parse rows to build the mapping</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><div class="stepno">4</div><h2>Payload preview</h2><span class="note">Row <span id="prevIdx" class="tdim" style="font-family:var(--mono)">1</span> of <span id="prevTot" class="tdim" style="font-family:var(--mono)">0</span></span>
+      <div class="spacer"></div>
+      <button class="btn sm" id="prevPrev">Prev</button><button class="btn sm" id="prevNext">Next</button>
+      <button class="btn sm" id="btnCurl">Copy as curl</button>
+    </div>
+    <div class="pbody">
+      <div class="rail">
+        <div class="jbox ep"><header><span class="lbl"><span class="dotm"></span>Endpoint repository</span><span class="m" id="epMeta">—</span></header><pre id="epJson">No rows parsed yet.</pre></div>
+        <div class="jbox gd"><header><span class="lbl"><span class="dotm"></span>Guest device repository</span><span class="m" id="gdMeta">—</span></header><pre id="gdJson">No rows parsed yet.</pre><div class="hint" id="gdRoleHint" style="padding:0 13px 11px"></div></div>
+      </div>
+      <div id="rowErr" class="callout err" style="margin-top:14px;display:none">
+        <div class="icb n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <div><b>This row will be skipped</b><span id="rowErrTxt"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><div class="stepno">5</div><h2>Run</h2><span class="note">Dry run builds every payload without sending anything</span></div>
+    <div class="pbody">
+      <div class="row">
+        <button class="btn" id="btnDry">Dry run</button>
+        <button class="btn pri" id="btnRun" disabled>Push to ClearPass</button>
+        <button class="btn danger" id="btnAbort" disabled>Abort</button>
+      </div>
+      <div class="bar"><i id="prog"></i></div>
+      <div class="stats">
+        <span>Queued <b id="sQ">0</b></span><span>Sent <b id="sS">0</b></span>
+        <span>Succeeded <b id="sOk">0</b></span><span>Failed <b id="sF">0</b></span><span>Skipped <b id="sSk">0</b></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MANUAL ============ -->
+<section class="view" id="v-man" hidden>
+  <div class="panel">
+    <div class="phead"><div class="icb n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg></div>
+      <h2>Device</h2><span class="note">Add one device, or paste a block of MACs to fan the same settings across many</span></div>
+    <div class="pbody">
+      <label class="f"><span>Destination</span></label>
+      <div class="grid g2">
+        <label class="togcard pm on" id="mTogEpW">
+          <div class="icb pm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg></div>
+          <div><b>Policy Manager endpoint repository</b><small>Status, description, and attributes go to /api/endpoint</small></div>
+          <span class="switch"><input type="checkbox" id="mTgtEp" checked><span class="track"><span class="knob"></span></span></span>
+        </label>
+        <label class="togcard gd" id="mTogGdW">
+          <div class="icb gd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 9h.01M8 13h.01M13 9h5M13 13h5"/></svg></div>
+          <div><b>Guest device repository</b><small>Role, MPSK, and visitor fields go to /api/device</small></div>
+          <span class="switch gd"><input type="checkbox" id="mTgtGd"><span class="track"><span class="knob"></span></span></span>
+        </label>
+      </div>
+      <div class="hint" style="margin-top:9px">Pick one or both before adding to the queue. Switch it between additions to send different devices to different repositories.</div>
+
+      <div class="grid g3" style="margin-top:16px">
+        <label class="f"><span>MAC address</span><input type="text" id="mMac" placeholder="a4:5e:60:11:22:33" spellcheck="false"></label>
+        <label class="f"><span>Endpoint status</span>
+          <select id="mStatus"><option value="">— leave unchanged —</option><option>Known</option><option>Unknown</option><option>Disabled</option></select></label>
+        <label class="f"><span>Description</span><input type="text" id="mDesc"></label>
+      </div>
+
+      <div class="grid g2" style="margin-top:14px">
+        <label class="f"><span>Guest role</span>
+          <select id="mGuestRole"><option value="">— none —</option></select>
+          <div class="hint">Loaded from <code>/api/role</code>. Written as <code>role_id</code> — only if Guest is on above.</div>
+          <div class="hint" id="mRoleHint" style="color:var(--pm-text)"></div>
+        </label>
+        <label class="f"><span>MPSK passphrase</span>
+          <div class="row" style="flex-wrap:nowrap">
+            <input type="text" id="mMpsk" spellcheck="false" placeholder="8–63 characters">
+            <button class="btn sm" id="btnGenMpsk" style="flex:none">Generate</button>
+          </div>
+          <div class="hint">Only sent if Guest device repository is on above.</div>
+        </label>
+      </div>
+
+      <div class="grid g3" style="margin-top:14px">
+        <label class="f"><span>Visitor name</span><input type="text" id="mVisitor"></label>
+        <label class="f"><span>Sponsor</span><input type="text" id="mSponsor"></label>
+        <label class="f"><span>Expires</span><input type="text" id="mExpire" placeholder="2026-12-31 23:59:59" spellcheck="false"></label>
+      </div>
+
+      <div class="grid g3" style="margin-top:14px">
+        <label class="f"><span>Activates</span><input type="text" id="mStart" placeholder="leave blank to activate immediately" spellcheck="false"></label>
+        <label class="f"><span>On expiry</span>
+          <select id="mDoExpire">
+            <option value="">— leave default —</option>
+            <option value="0">Never expire</option>
+            <option value="1">Disable</option>
+            <option value="2">Disable and log out active sessions</option>
+            <option value="3">Delete</option>
+            <option value="4">Delete and log out active sessions</option>
+          </select>
+        </label>
+        <label class="f"><span>Enabled</span>
+          <div class="toglet" style="margin-top:0">
+            <span class="switch"><input type="checkbox" id="mEnabled" checked><span class="track"><span class="knob"></span></span></span>
+            <span><b>Active on creation</b><small>Turn off to stage the device disabled</small></span>
+          </div>
+        </label>
+      </div>
+
+      <div style="margin-top:20px" id="mEpAttrBlock">
+        <label class="f"><span>Endpoint attributes</span></label>
+        <div id="kvList"></div>
+        <div class="row">
+          <button class="btn sm" id="btnAddKv">Add attribute</button>
+          <button class="btn sm" id="btnKvFromTips">Insert TIPS role as attribute</button>
+        </div>
+        <div class="hint" style="margin-top:8px">Policy Manager has no role field on an endpoint record. To drive a TIPS role, write the value into an attribute and match it in a role-mapping policy.</div>
+      </div>
+      <div style="margin-top:20px;display:none" id="mEpAttrOff">
+        <label class="f"><span>Endpoint attributes</span></label>
+        <div class="hint">Only applies when Policy Manager endpoint repository is selected above.</div>
+      </div>
+
+      <div style="margin-top:20px">
+        <label class="f"><span>Fan out across multiple MACs</span>
+          <textarea id="mBulkMacs" rows="3" spellcheck="false" placeholder="One MAC per line — every device gets the settings above. Leave empty to queue just the single MAC."></textarea>
+        </label>
+      </div>
+
+      <div class="row" style="margin-top:16px">
+        <button class="btn pri" id="btnQueue">Add to queue</button>
+        <button class="btn" id="btnResetForm">Reset form</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><div class="icb n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+      <h2>Queue</h2><span class="note">Write mode, MAC format, and CoA/MPSK options come from Bulk import — destination is per device below</span>
+      <div class="spacer"></div>
+      <button class="btn sm" id="btnQClear">Clear queue</button>
+      <button class="btn gd" id="btnQRun" disabled>Push queue</button>
+    </div>
+    <div class="pbody">
+      <div class="tw"><table>
+        <thead><tr><th>MAC</th><th>Destination</th><th>Status</th><th>Guest role</th><th>MPSK</th><th>Attributes</th><th></th></tr></thead>
+        <tbody id="tbQueue"><tr><td colspan="7" class="empty">Queue is empty</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<section class="view" id="v-res" hidden>
+  <div class="panel">
+    <div class="phead"><div class="icb n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <h2>Run results</h2>
+      <div class="spacer"></div>
+      <button class="btn sm" id="btnExport">Export CSV</button>
+      <button class="btn sm danger" id="btnClearRes">Clear</button>
+    </div>
+    <div class="pbody">
+      <div class="tw" style="max-height:600px"><table>
+        <thead><tr><th>#</th><th>MAC</th><th>Repo</th><th>Action</th><th>HTTP</th><th>Result</th><th>Detail</th></tr></thead>
+        <tbody id="tbRes"><tr><td colspan="7" class="empty">Nothing has been run yet</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+</main>
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ========== state ========== */
+const S = {
+  token:null, tokenExp:0, tips:[], guest:[],
+  headers:[], rows:[], map:[], preview:0,
+  queue:[], results:[], running:false, abort:false
+};
+
+const $  = id => document.getElementById(id);
+const el = (t,c,x) => { const n=document.createElement(t); if(c) n.className=c; if(x!=null) n.textContent=x; return n; };
+const esc = s => String(s==null?'':s);
+
+/* ========== log + toast ========== */
+function log(msg, kind){
+  const box=$('log'), d=el('div');
+  d.appendChild(el('span','t',new Date().toTimeString().slice(0,8)));
+  d.appendChild(el('span',kind||'in',msg));
+  box.appendChild(d); box.scrollTop=box.scrollHeight;
+  while(box.children.length>500) box.removeChild(box.firstChild);
+}
+function toast(msg, kind){
+  const t=el('div','toast'+(kind?' '+kind:''),msg);
+  $('toast').appendChild(t);
+  setTimeout(()=>t.remove(), 4200);
+}
+
+/* ========== tabs ========== */
+document.querySelectorAll('.tab').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected', String(x===b)));
+    document.querySelectorAll('.view').forEach(v=>{ v.hidden = (v.id !== b.dataset.view); });
+  });
+});
+function go(id){ const b=document.querySelector('.tab[data-view="'+id+'"]'); if(b) b.click(); }
+
+/* ========== api ========== */
+function base(){
+  const ov = $('baseOv').value.trim();
+  if(ov) return ov.replace(/\/+$/,'');
+  const h = $('host').value.trim().replace(/^https?:\/\//,'').replace(/\/+$/,'');
+  return h ? 'https://'+h : '';
+}
+function tokenAlive(){ return !!S.token && Date.now() < S.tokenExp; }
+
+function paintConn(){
+  const dot=$('dot'), txt=$('connTxt');
+  dot.className='dot'+(tokenAlive()?' live':(S.token?' stale':''));
+  txt.textContent = tokenAlive() ? (base().replace(/^https?:\/\//,'')||'connected')
+                  : (S.token ? 'Token expired' : 'Not connected');
+  $('tokState').textContent = tokenAlive()?'active':(S.token?'expired':'none');
+  $('tokExp').textContent = S.token ? new Date(S.tokenExp).toTimeString().slice(0,8) : '—';
+  const on = tokenAlive();
+  ['btnRoles','btnPing'].forEach(i=>$(i).disabled=!on);
+  $('btnRun').disabled = !(on && S.rows.length);
+  $('btnQRun').disabled = !(on && S.queue.length);
+}
+
+async function api(path, opts){
+  opts = opts||{};
+  const url = base()+path;
+  const headers = Object.assign({'Accept':'application/json'}, opts.headers||{});
+  if(S.token) headers['Authorization']='Bearer '+S.token;
+  if(opts.body) headers['Content-Type']='application/json';
+  let res;
+  try{
+    res = await fetch(url,{method:opts.method||'GET',headers,body:opts.body?JSON.stringify(opts.body):undefined});
+  }catch(e){
+    throw {status:0, msg:'Network or CORS failure — '+e.message, url};
+  }
+  const text = await res.text();
+  let data=null; try{ data = text?JSON.parse(text):null; }catch(_){ data = {raw:text}; }
+  if(!res.ok){
+    const m = (data && (data.detail || data.title || data.message ||
+              (data.validation_messages && JSON.stringify(data.validation_messages)))) || res.statusText;
+    throw {status:res.status, msg:m, url, data};
+  }
+  return {status:res.status, data};
+}
+
+async function getToken(){
+  const b = base();
+  if(!b) return toast('Enter a CPPM host first','er');
+  const body = {grant_type:$('grant').value, client_id:$('cid').value.trim()};
+  const sec = $('csec').value; if(sec) body.client_secret = sec;
+  if(body.grant_type==='password'){ body.username=$('uname').value.trim(); body.password=$('upass').value; }
+  log('POST /api/oauth ('+body.grant_type+')');
+  try{
+    const r = await api('/api/oauth',{method:'POST',body});
+    S.token = r.data.access_token;
+    S.tokenExp = Date.now() + ((r.data.expires_in||28800)*1000) - 30000;
+    paintConn(); log('Token acquired, good for '+Math.round((r.data.expires_in||0)/60)+' min','ok');
+    toast('Connected to ClearPass');
+    loadRoles();
+  }catch(e){
+    S.token=null; paintConn();
+    log('Auth failed ['+e.status+'] '+e.msg,'er'); toast('Auth failed: '+e.msg,'er');
+  }
+}
+
+async function pageAll(path){
+  let out=[], offset=0;
+  for(let i=0;i<20;i++){
+    const r = await api(path+(path.indexOf('?')<0?'?':'&')+'limit=100&offset='+offset);
+    const items = (r.data && r.data._embedded && r.data._embedded.items) || [];
+    out = out.concat(items);
+    if(items.length<100) break;
+    offset += 100;
+  }
+  return out;
+}
+
+const GUEST_ROLE_MAPPING = '[Guest Roles]';
+
+async function loadRoles(){
+  // TIPS roles (Policy Manager role policy elements) — this is /api/role, NOT /api/config/role.
+  try{
+    S.tips = await pageAll('/api/role');
+    log('Loaded '+S.tips.length+' TIPS roles','ok');
+  }catch(e){ S.tips=[]; log('TIPS roles failed ['+e.status+'] '+e.msg,'er'); }
+
+  // Guest roles are NOT a standalone endpoint. They exist only as rules inside the
+  // [Guest Roles] role-mapping policy: each rule matches a GuestUser:Role ID and
+  // assigns a TIPS role. That rule set is the authoritative guest role list.
+  try{
+    const r = await api('/api/role-mapping/name/'+encodeURIComponent(GUEST_ROLE_MAPPING));
+    S.guest = parseGuestRoles(r.data);
+    log('Loaded '+S.guest.length+' guest roles from '+GUEST_ROLE_MAPPING,
+        S.guest.length?'ok':'wa');
+  }catch(e){
+    S.guest=[];
+    log('Guest roles failed ['+e.status+'] '+e.msg+' — is the policy named '+GUEST_ROLE_MAPPING+'?','er');
+  }
+  paintRoles();
+  if(S.rows.length) renderPreview();
+  if(S.queue.length) renderQueue();
+}
+
+// Schema (confirmed against a live CPPM response):
+//   { name, default_role_name, rules: [ { role_name, condition: [ {type,name,oper,value} ] } ] }
+// A guest role rule is one whose condition matches on a "Role ID" attribute.
+function parseGuestRoles(data){
+  const rules = (data && data.rules) || [];
+  const out = [];
+  rules.forEach(rule=>{
+    const conds = rule.condition || rule.conditions || [];
+    const hit = conds.find(c => c && /role\s*id/i.test(String(c.name||'')));
+    if(!hit) return;
+    const id = parseInt(hit.value,10);
+    if(isNaN(id)) return;
+    out.push({id:id, name:rule.role_name || ''});
+  });
+  return out.sort((a,b)=>a.id-b.id);
+}
+
+function paintRoles(){
+  $('nTips').textContent = S.tips.length;
+  $('nGuest').textContent = S.guest.length;
+
+  const t=$('tbTips'); t.innerHTML='';
+  if(!S.tips.length) t.innerHTML='<tr><td colspan="3" class="empty">Not loaded yet</td></tr>';
+  else S.tips.forEach(r=>{
+    const tr=el('tr');
+    tr.appendChild(el('td',null,r.name||''));
+    tr.appendChild(el('td','tdim',String(r.id!=null?r.id:'')));
+    tr.appendChild(el('td','tdim wrap',r.description||''));
+    t.appendChild(tr);
+  });
+
+  const g=$('tbGuest'); g.innerHTML='';
+  if(!S.guest.length) g.innerHTML='<tr><td colspan="2" class="empty">Not loaded yet</td></tr>';
+  else S.guest.forEach(r=>{
+    const tr=el('tr');
+    tr.appendChild(el('td',null,String(r.id)));
+    tr.appendChild(el('td',null,r.name||''));
+    g.appendChild(tr);
+  });
+
+  const sel=$('mGuestRole'), keep=sel.value;
+  sel.innerHTML='<option value="">— none —</option>';
+  S.guest.forEach(r=>{ const o=el('option',null,r.name+'  ('+r.id+')'); o.value=String(r.id); sel.appendChild(o); });
+  sel.value=keep;
+  updateRoleHint();
+  renderMap();
+}
+
+function updateRoleHint(){
+  const id = $('mGuestRole').value;
+  const out = $('mRoleHint');
+  if(!id || !S.guest.length){ out.textContent=''; return; }
+  const hit = S.guest.find(r=>String(r.id)===String(id));
+  out.textContent = hit ? ('role_id '+hit.id+' → assigns TIPS role '+hit.name) : '';
+}
+
+/* ========== mac ========== */
+function normMac(v){
+  const hex = String(v||'').replace(/[^0-9a-fA-F]/g,'').toLowerCase();
+  return hex.length===12 ? hex : null;
+}
+function fmtMac(hex){
+  const f=$('macFmt').value;
+  if(f==='bare') return hex;
+  const p = hex.match(/.{2}/g);
+  return p.join(f==='dash'?'-':':');
+}
+
+/* ========== csv ========== */
+function parseDelimited(text){
+  text = text.replace(/\r\n?/g,'\n').replace(/\n+$/,'');
+  if(!text.trim()) return [];
+  const first = text.split('\n')[0];
+  const d = (first.split('\t').length > first.split(',').length) ? '\t' : ',';
+  const out=[]; let row=[], cell='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; }
+      else cell+=c;
+    } else if(c==='"'){ q=true; }
+    else if(c===d){ row.push(cell); cell=''; }
+    else if(c==='\n'){ row.push(cell); out.push(row); row=[]; cell=''; }
+    else cell+=c;
+  }
+  row.push(cell); out.push(row);
+  return out.filter(r=>r.some(c=>String(c).trim()!==''));
+}
+
+/* mapping targets */
+const TARGETS = [
+  ['ignore',      'Ignore'],
+  ['mac',         'MAC address'],
+  ['ep.status',   'Endpoint · status'],
+  ['ep.desc',     'Endpoint · description'],
+  ['ep.attr',     'Endpoint · attribute'],
+  ['gd.role',     'Guest · role (name or id)'],
+  ['gd.mpsk',     'Guest · MPSK passphrase'],
+  ['gd.start',    'Guest · activates (start_time)'],
+  ['gd.enabled',  'Guest · enabled'],
+  ['gd.doexpire', 'Guest · on expiry (do_expire)'],
+  ['gd.visitor',  'Guest · visitor_name'],
+  ['gd.sponsor',  'Guest · sponsor_name'],
+  ['gd.notes',    'Guest · notes'],
+  ['gd.expire',   'Guest · expire_time'],
+  ['gd.field',    'Guest · custom field']
+];
+const RESERVED = {
+  mac:'mac', mac_address:'mac', macaddress:'mac', 'mac address':'mac',
+  status:'ep.status', description:'ep.desc', desc:'ep.desc',
+  guest_role:'gd.role', role:'gd.role', role_id:'gd.role', guest_role_id:'gd.role',
+  mpsk:'gd.mpsk', mpsk_password:'gd.mpsk', passphrase:'gd.mpsk',
+  start_time:'gd.start', activate_time:'gd.start', activation_time:'gd.start', activates:'gd.start',
+  enabled:'gd.enabled', active:'gd.enabled',
+  do_expire:'gd.doexpire', expire_action:'gd.doexpire', on_expiry:'gd.doexpire',
+  visitor_name:'gd.visitor', visitor:'gd.visitor',
+  sponsor_name:'gd.sponsor', sponsor:'gd.sponsor',
+  notes:'gd.notes', expire_time:'gd.expire', expires:'gd.expire'
+};
+
+const DO_EXPIRE_WORDS = {never:0, none:0, disable:1, disable_logout:2, 'disable+logout':2, delete:3, delete_logout:4, 'delete+logout':4};
+function parseDoExpire(raw){
+  const key = String(raw).trim().toLowerCase();
+  if(key in DO_EXPIRE_WORDS) return DO_EXPIRE_WORDS[key];
+  const n = parseInt(raw,10);
+  return (n>=0 && n<=4) ? n : null;
+}
+
+function automap(){
+  S.map = S.headers.map(h=>{
+    const key = String(h).trim().toLowerCase();
+    const t = RESERVED[key] || 'ep.attr';
+    return {target:t, name:String(h).trim()};
+  });
+  if(!S.map.some(m=>m.target==='mac')){
+    const i = S.headers.findIndex(h=>/mac/i.test(h));
+    if(i>=0) S.map[i] = {target:'mac', name:S.headers[i]};
+  }
+  renderMap(); renderPreview();
+}
+
+function renderMap(){
+  const tb=$('tbMap'); tb.innerHTML='';
+  if(!S.headers.length){ tb.innerHTML='<tr><td colspan="4" class="empty">Parse rows to build the mapping</td></tr>'; return; }
+  S.headers.forEach((h,i)=>{
+    const m = S.map[i] || {target:'ignore', name:h};
+    const tr = el('tr');
+    tr.appendChild(el('td',null,h));
+    const sv = S.rows.length ? esc(S.rows[0][i]) : '';
+    tr.appendChild(el('td','tdim', sv.length>34 ? sv.slice(0,34)+'…' : sv));
+
+    const td3=el('td'), sel=el('select');
+    TARGETS.forEach(([v,l])=>{ const o=el('option',null,l); o.value=v; sel.appendChild(o); });
+    sel.value=m.target;
+    sel.addEventListener('change',()=>{ S.map[i].target=sel.value; renderMap(); renderPreview(); });
+    td3.appendChild(sel); tr.appendChild(td3);
+
+    const td4=el('td');
+    if(m.target==='ep.attr' || m.target==='gd.field'){
+      const inp=el('input'); inp.type='text'; inp.value=m.name;
+      inp.addEventListener('input',()=>{ S.map[i].name=inp.value; renderPreview(); });
+      td4.appendChild(inp);
+    } else {
+      td4.appendChild(el('span','tdim', m.target==='ignore' ? '—' :
+        (TARGETS.find(t=>t[0]===m.target)||[,''])[1]));
+    }
+    tr.appendChild(td4);
+
+    if(m.target.startsWith('ep.')||m.target==='mac') tr.style.boxShadow='inset 3px 0 0 var(--pm)';
+    else if(m.target.startsWith('gd.')) tr.style.boxShadow='inset 3px 0 0 var(--gd)';
+    tb.appendChild(tr);
+  });
+}
+
+/* ========== payload build ========== */
+function resolveGuestRole(v){
+  const s=String(v||'').trim();
+  if(!s) return null;
+  if(/^\d+$/.test(s)) return parseInt(s,10);
+  const hit = S.guest.find(r=>String(r.name).toLowerCase()===s.toLowerCase());
+  return hit ? hit.id : null;
+}
+
+function buildFromRow(vals){
+  const out = {mac:null, ep:{attributes:{}}, gd:{}, errs:[], epOn:$('tgtEp').checked, gdOn:$('tgtGd').checked};
+  S.map.forEach((m,i)=>{
+    const raw = vals[i]==null ? '' : String(vals[i]).trim();
+    if(m.target==='ignore') return;
+    if(m.target==='mac'){
+      const h = normMac(raw);
+      if(!h) out.errs.push('MAC "'+raw+'" is not 12 hex digits');
+      else out.mac = h;
+      return;
+    }
+    if(raw==='') return;
+    switch(m.target){
+      case 'ep.status':  out.ep.status = raw; break;
+      case 'ep.desc':    out.ep.description = raw; break;
+      case 'ep.attr':    out.ep.attributes[m.name] = raw; break;
+      case 'gd.role': {
+        const id = resolveGuestRole(raw);
+        if(id==null) out.errs.push('Guest role "'+raw+'" not found — load roles or use the numeric id');
+        else out.gd.role_id = id;
+        break;
+      }
+      case 'gd.mpsk':
+        if(raw.length<8 || raw.length>63) out.errs.push('MPSK must be 8–63 characters (got '+raw.length+')');
+        out.gd.__mpsk = raw; break;
+      case 'gd.start':   out.gd.start_time = raw; break;
+      case 'gd.enabled': out.gd.enabled = /^(1|true|yes|y|enabled)$/i.test(raw); break;
+      case 'gd.doexpire': {
+        const de = parseDoExpire(raw);
+        if(de==null) out.errs.push('do_expire "'+raw+'" not recognized — use never/disable/disable_logout/delete/delete_logout or 0-4');
+        else out.gd.do_expire = de;
+        break;
+      }
+      case 'gd.visitor': out.gd.visitor_name = raw; break;
+      case 'gd.sponsor': out.gd.sponsor_name = raw; break;
+      case 'gd.notes':   out.gd.notes = raw; break;
+      case 'gd.expire':  out.gd.expire_time = raw; break;
+      case 'gd.field':   out.gd[m.name] = raw; break;
+    }
+  });
+  if(!out.mac && !out.errs.length) out.errs.push('No column is mapped to MAC address');
+  return finish(out);
+}
+
+function buildFromQueueItem(q){
+  const out = {mac:q.mac, ep:{attributes:Object.assign({},q.attrs)}, gd:{}, errs:[], epOn:q.epOn, gdOn:q.gdOn};
+  if(q.status) out.ep.status = q.status;
+  if(q.desc) out.ep.description = q.desc;
+  if(q.roleId) out.gd.role_id = parseInt(q.roleId,10);
+  if(q.mpsk) out.gd.__mpsk = q.mpsk;
+  if(q.visitor) out.gd.visitor_name = q.visitor;
+  if(q.sponsor) out.gd.sponsor_name = q.sponsor;
+  if(q.start) out.gd.start_time = q.start;
+  if(q.expire) out.gd.expire_time = q.expire;
+  if(q.doExpire!=='') out.gd.do_expire = parseInt(q.doExpire,10);
+  out.gd.enabled = q.enabled;
+  return finish(out);
+}
+
+function finish(out){
+  const mpsk = out.gd.__mpsk; delete out.gd.__mpsk;
+  if(mpsk){
+    out.gd[$('mpskField').value.trim()||'mpsk'] = mpsk;
+    if($('optMpskEnable').checked) out.gd.mpsk_enable = 1;
+  }
+  if(out.mac){
+    out.ep.mac_address = fmtMac(out.mac);
+    out.gd.mac = fmtMac(out.mac);
+  }
+  if(!Object.keys(out.ep.attributes).length) delete out.ep.attributes;
+  const epKeys = Object.keys(out.ep).filter(k=>k!=='mac_address');
+  const gdKeys = Object.keys(out.gd).filter(k=>k!=='mac');
+  out.epEmpty = epKeys.length===0;
+  out.gdEmpty = gdKeys.length===0;
+  if(out.gdOn && !out.gdEmpty && out.gd.role_id==null && $('mode').value!=='update'){
+    out.errs.push('Guest device create needs a role_id');
+  }
+  return out;
+}
+
+function renderPreview(){
+  const n = S.rows.length;
+  $('prevTot').textContent = n;
+  if(!n){
+    $('epJson').textContent='No rows parsed yet.'; $('gdJson').textContent='No rows parsed yet.';
+    $('epMeta').textContent='—'; $('gdMeta').textContent='—'; $('gdRoleHint').textContent='';
+    $('prevIdx').textContent='0'; $('rowErr').style.display='none'; return;
+  }
+  if(S.preview>=n) S.preview=0;
+  $('prevIdx').textContent = S.preview+1;
+  const b = buildFromRow(S.rows[S.preview]);
+
+  const epOn=$('tgtEp').checked, gdOn=$('tgtGd').checked;
+  $('epJson').textContent = !epOn ? 'This destination is off.' : (b.epEmpty ? 'No endpoint fields mapped — this row would be skipped for this repo.' : JSON.stringify(b.ep,null,2));
+  $('gdJson').textContent = !gdOn ? 'This destination is off.' : (b.gdEmpty ? 'No guest fields mapped — this row would be skipped for this repo.' : JSON.stringify(b.gd,null,2));
+
+  const mode=$('mode').value, mac=b.mac?fmtMac(b.mac):'{mac}';
+  $('epMeta').textContent = !epOn||b.epEmpty ? '—' : (mode==='create' ? 'POST /api/endpoint' : 'PATCH /api/endpoint/mac-address/'+mac);
+  $('gdMeta').textContent = !gdOn||b.gdEmpty ? '—' : (mode==='create' ? 'POST /api/device' : 'PATCH /api/device/mac/'+mac);
+
+  const rh=$('gdRoleHint');
+  if(gdOn && !b.gdEmpty && b.gd.role_id!=null){
+    if(S.guest.length){
+      const hit = S.guest.find(r=>String(r.id)===String(b.gd.role_id));
+      rh.textContent = hit ? ('role_id '+b.gd.role_id+' → assigns TIPS role '+hit.name)
+                            : ('role_id '+b.gd.role_id+' — not present in '+GUEST_ROLE_MAPPING);
+    } else {
+      rh.textContent = 'Connect and load roles to see what this role_id assigns.';
+    }
+  } else {
+    rh.textContent = '';
+  }
+
+  if(b.errs.length){ $('rowErr').style.display='flex'; $('rowErrTxt').textContent=b.errs.join(' · '); }
+  else $('rowErr').style.display='none';
+  $('cBulk').textContent = n?('· '+n):'';
+}
+
+/* ========== requests ========== */
+function epPaths(mac){ return {create:'/api/endpoint', update:'/api/endpoint/mac-address/'+mac}; }
+function gdPaths(mac){
+  const coa = $('optCoa').checked;
+  const q = '?change_of_authorization='+(coa?'true':'false');
+  return {create:'/api/device'+q, update:'/api/device/mac/'+mac+q};
+}
+
+async function writeOne(repo, mac, body){
+  const mode=$('mode').value;
+  const P = repo==='ep' ? epPaths(mac) : gdPaths(mac);
+  if(mode==='create'){
+    const r = await api(P.create,{method:'POST',body}); return {action:'create', status:r.status};
+  }
+  if(mode==='update'){
+    const r = await api(P.update,{method:'PATCH',body}); return {action:'update', status:r.status};
+  }
+  try{
+    const r = await api(P.update,{method:'PATCH',body}); return {action:'update', status:r.status};
+  }catch(e){
+    if(e.status===404){
+      const r = await api(P.create,{method:'POST',body}); return {action:'create', status:r.status};
+    }
+    throw e;
+  }
+}
+
+/* ========== run engine ========== */
+function resetStats(q){ ['sS','sOk','sF','sSk'].forEach(i=>$(i).textContent='0'); $('sQ').textContent=q; $('prog').style.width='0%'; }
+function bump(id){ $(id).textContent = String(parseInt($(id).textContent,10)+1); }
+
+function pushResult(r){
+  S.results.push(r);
+  const tb=$('tbRes');
+  if(S.results.length===1) tb.innerHTML='';
+  const tr=el('tr');
+  tr.appendChild(el('td','tdim',String(S.results.length)));
+  tr.appendChild(el('td',null,r.mac));
+  const td=el('td'); const p=el('span','pill '+(r.repo==='ep'?'p-ep':'p-gd'), r.repo==='ep'?'Endpoint':'Guest'); td.appendChild(p); tr.appendChild(td);
+  tr.appendChild(el('td','tdim',r.action||'—'));
+  tr.appendChild(el('td','tdim',String(r.http==null?'—':r.http)));
+  const td2=el('td'); const cls = r.ok?'p-ok':(r.skip?'p-warn':'p-err');
+  td2.appendChild(el('span','pill '+cls, r.ok?'ok':(r.skip?'skipped':'failed'))); tr.appendChild(td2);
+  tr.appendChild(el('td','tdim wrap',r.detail||''));
+  tb.appendChild(tr);
+  $('cRes').textContent = '· '+S.results.length;
+}
+
+async function runItems(items, dry){
+  if(S.running) return;
+  S.running=true; S.abort=false;
+  $('btnAbort').disabled=false; $('btnRun').disabled=true; $('btnQRun').disabled=true; $('btnDry').disabled=true;
+
+  const jobs=[], skipped=[];
+  items.forEach(b=>{
+    if(b.errs.length){
+      skipped.push({mac:b.mac?fmtMac(b.mac):'(invalid)', repo:'ep', detail:b.errs.join(' · ')});
+      return;
+    }
+    let any=false;
+    if(b.epOn && !b.epEmpty){ jobs.push({repo:'ep', mac:fmtMac(b.mac), body:b.ep}); any=true; }
+    if(b.gdOn && !b.gdEmpty){ jobs.push({repo:'gd', mac:fmtMac(b.mac), body:b.gd}); any=true; }
+    if(!any){
+      const why = (!b.epOn && !b.gdOn) ? 'No destination selected' : 'No fields to write for the selected destination';
+      skipped.push({mac:fmtMac(b.mac), repo:(b.epOn?'ep':'gd'), detail:why});
+    }
+  });
+
+  resetStats(jobs.length);
+  $('sSk').textContent = String(skipped.length);
+  skipped.forEach(s=>pushResult({mac:s.mac, repo:s.repo, skip:true, detail:s.detail}));
+  log((dry?'Dry run: ':'Run: ')+jobs.length+' request(s) across '+items.length+' device(s)'+(skipped.length?(', '+skipped.length+' skipped'):''));
+
+  if(dry){
+    jobs.forEach(j=>{
+      pushResult({mac:j.mac, repo:j.repo, action:'dry-run', http:null, ok:true, detail:JSON.stringify(j.body)});
+      bump('sS'); bump('sOk');
+    });
+    $('prog').style.width='100%';
+    finishRun(true); go('v-res'); return;
+  }
+
+  if(!jobs.length){
+    toast('Nothing to send — check destinations and required fields','er');
+    finishRun(false); go('v-res'); return;
+  }
+
+  const width = Math.max(1, Math.min(10, parseInt($('conc').value,10)||3));
+  let idx=0, done=0;
+  async function worker(){
+    while(idx<jobs.length && !S.abort){
+      const j = jobs[idx++];
+      try{
+        const r = await writeOne(j.repo, j.mac, j.body);
+        pushResult({mac:j.mac, repo:j.repo, action:r.action, http:r.status, ok:true, detail:''});
+        bump('sOk');
+      }catch(e){
+        pushResult({mac:j.mac, repo:j.repo, action:'error', http:e.status, ok:false, detail:e.msg});
+        bump('sF'); log(j.mac+' '+j.repo+' failed ['+e.status+'] '+e.msg,'er');
+        if($('optStopErr').checked){ S.abort=true; }
+      }
+      bump('sS'); done++;
+      $('prog').style.width = Math.round(done/jobs.length*100)+'%';
+    }
+  }
+  await Promise.all(Array.from({length:width}, worker));
+  finishRun(false);
+  go('v-res');
+}
+
+function finishRun(dry){
+  S.running=false; S.abort=false;
+  $('btnAbort').disabled=true; $('btnDry').disabled=false;
+  paintConn();
+  const ok=$('sOk').textContent, f=$('sF').textContent;
+  log((dry?'Dry run':'Run')+' complete — '+ok+' ok, '+f+' failed', f==='0'?'ok':'wa');
+  toast((dry?'Dry run':'Run')+' complete: '+ok+' ok, '+f+' failed', f==='0'?'':'wa');
+}
+
+/* ========== manual ========== */
+function addKv(k,v){
+  const wrap=el('div','kv');
+  const a=el('input'); a.type='text'; a.placeholder='Attribute name'; a.value=k||'';
+  const b=el('input'); b.type='text'; b.placeholder='Value'; b.value=v||'';
+  const x=el('button','btn sm danger','Remove'); x.type='button';
+  x.addEventListener('click',()=>wrap.remove());
+  wrap.appendChild(a); wrap.appendChild(b); wrap.appendChild(x);
+  $('kvList').appendChild(wrap);
+}
+function readKv(){
+  const o={};
+  $('kvList').querySelectorAll('.kv').forEach(r=>{
+    const i=r.querySelectorAll('input');
+    const k=i[0].value.trim(); if(k) o[k]=i[1].value;
+  });
+  return o;
+}
+function renderQueue(){
+  const tb=$('tbQueue'); tb.innerHTML='';
+  $('cMan').textContent = S.queue.length?('· '+S.queue.length):'';
+  if(!S.queue.length){ tb.innerHTML='<tr><td colspan="7" class="empty">Queue is empty</td></tr>'; $('btnQRun').disabled=true; return; }
+  S.queue.forEach((q,i)=>{
+    const tr=el('tr');
+    tr.appendChild(el('td',null,fmtMac(q.mac)));
+    const tdd=el('td');
+    if(q.epOn) tdd.appendChild(el('span','pill p-ep','Endpoint'));
+    if(q.gdOn){
+      if(q.epOn) tdd.appendChild(document.createTextNode(' '));
+      tdd.appendChild(el('span','pill p-gd','Guest'));
+      if(q.enabled===false){ tdd.appendChild(document.createTextNode(' ')); tdd.appendChild(el('span','pill p-warn','disabled')); }
+    }
+    tr.appendChild(tdd);
+    tr.appendChild(el('td','tdim',q.status||'—'));
+    const gr = q.roleId ? S.guest.find(r=>String(r.id)===String(q.roleId)) : null;
+    tr.appendChild(el('td','tdim', q.roleId ? (q.roleId + (gr ? ' · '+gr.name : '')) : '—'));
+    tr.appendChild(el('td','tdim',q.mpsk?'set ('+q.mpsk.length+')':'—'));
+    const td=el('td','wrap'); const c=el('div','chips');
+    const ks=Object.keys(q.attrs);
+    if(!ks.length) c.appendChild(el('span','tdim','—'));
+    ks.forEach(k=>{ const ch=el('span','chip'); ch.appendChild(el('b',null,k)); ch.appendChild(document.createTextNode(' = '+q.attrs[k])); c.appendChild(ch); });
+    td.appendChild(c); tr.appendChild(td);
+    const tdx=el('td'); const x=el('button','btn sm danger','Remove');
+    x.addEventListener('click',()=>{ S.queue.splice(i,1); renderQueue(); });
+    tdx.appendChild(x); tr.appendChild(tdx);
+    tb.appendChild(tr);
+  });
+  $('btnQRun').disabled = !tokenAlive();
+}
+
+function genMpsk(){
+  const cs='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const a=new Uint32Array(16); crypto.getRandomValues(a);
+  return Array.from(a,n=>cs[n%cs.length]).join('');
+}
+
+/* ========== templates ========== */
+const TEMPLATE = 'mac,status,description,guest_role,mpsk,start_time,expire_time,do_expire,visitor_name,sponsor_name,Department,Owner,AssetTag\n';
+const SAMPLE =
+'mac,status,description,guest_role,mpsk,expire_time,Department,Owner,AssetTag\n'+
+'a4:5e:60:11:22:33,Known,Ricoh MP C4504,[Guest],Spring2026Printer,2026-12-31 23:59:59,Facilities,jdoe,AST-10441\n'+
+'b8:27:eb:aa:bb:cc,Known,Rachio controller,[Guest],Irrigation!2026x,2026-12-31 23:59:59,Grounds,mrivera,AST-10442\n'+
+'00-1a-2b-3c-4d-5e,Known,Elmo doc cam,[Guest],ClassroomDoc2026,2026-12-31 23:59:59,Instruction,kpatel,AST-10443\n';
+
+function download(name, text){
+  const b=new Blob([text],{type:'text/csv'}), u=URL.createObjectURL(b);
+  const a=el('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u);
+}
+
+/* ========== wiring ========== */
+$('grant').addEventListener('change',()=>{ $('pwFields').style.display = $('grant').value==='password' ? 'grid':'none'; });
+$('btnAuth').addEventListener('click',getToken);
+$('btnRoles').addEventListener('click',loadRoles);
+$('mGuestRole').addEventListener('change',updateRoleHint);
+$('btnClearTok').addEventListener('click',()=>{ S.token=null; S.tokenExp=0; paintConn(); log('Token dropped','wa'); });
+$('btnClearLog').addEventListener('click',()=>{ $('log').innerHTML=''; });
+$('btnPing').addEventListener('click',async()=>{
+  try{ const r=await api('/api/endpoint?limit=1');
+    log('Endpoint read ok — '+((r.data&&r.data.count)||0)+' item(s) in page, total '+((r.data&&r.data.total)!=null?r.data.total:'?'),'ok');
+    toast('Endpoint repository is readable');
+  }catch(e){ log('Endpoint read failed ['+e.status+'] '+e.msg,'er'); toast('Read failed: '+e.msg,'er'); }
+});
+
+$('btnFile').addEventListener('click',()=>$('file').click());
+$('file').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ $('csv').value=r.result; $('fileName').textContent=f.name; doParse(); };
+  r.readAsText(f);
+});
+$('btnTemplate').addEventListener('click',()=>download('clearpass-import-template.csv',TEMPLATE));
+$('btnSample').addEventListener('click',()=>{ $('csv').value=SAMPLE; $('fileName').textContent='sample'; doParse(); });
+$('btnParse').addEventListener('click',doParse);
+
+function doParse(){
+  const grid = parseDelimited($('csv').value);
+  if(grid.length<2){ toast('Need a header row plus at least one data row','er'); return; }
+  S.headers = grid[0].map(h=>String(h).trim());
+  S.rows = grid.slice(1);
+  S.preview = 0;
+  automap();
+  $('parseInfo').textContent = S.rows.length+' row(s), '+S.headers.length+' column(s)';
+  log('Parsed '+S.rows.length+' row(s)','ok');
+  paintConn();
+}
+
+$('btnAutomap').addEventListener('click',automap);
+$('prevPrev').addEventListener('click',()=>{ if(!S.rows.length)return; S.preview=(S.preview-1+S.rows.length)%S.rows.length; renderPreview(); });
+$('prevNext').addEventListener('click',()=>{ if(!S.rows.length)return; S.preview=(S.preview+1)%S.rows.length; renderPreview(); });
+$('btnCurl').addEventListener('click',()=>{
+  if(!S.rows.length) return toast('Parse rows first','er');
+  const b=buildFromRow(S.rows[S.preview]); if(!b.mac) return toast('Row has no valid MAC','er');
+  const mac=fmtMac(b.mac), mode=$('mode').value, out=[];
+  if($('tgtEp').checked && !b.epEmpty){
+    const p=epPaths(mac), m = mode==='create'?'POST':'PATCH', u = base()+(mode==='create'?p.create:p.update);
+    out.push("curl -sk -X "+m+" '"+u+"' -H 'Authorization: Bearer $TOKEN' -H 'Content-Type: application/json' -d '"+JSON.stringify(b.ep)+"'");
+  }
+  if($('tgtGd').checked && !b.gdEmpty){
+    const p=gdPaths(mac), m = mode==='create'?'POST':'PATCH', u = base()+(mode==='create'?p.create:p.update);
+    out.push("curl -sk -X "+m+" '"+u+"' -H 'Authorization: Bearer $TOKEN' -H 'Content-Type: application/json' -d '"+JSON.stringify(b.gd)+"'");
+  }
+  if(!out.length) return toast('Nothing to send for this row','er');
+  navigator.clipboard.writeText(out.join('\n\n')).then(()=>toast('curl copied')).catch(()=>toast('Clipboard blocked','er'));
+});
+
+['tgtEp','tgtGd'].forEach(id=>$(id).addEventListener('change',()=>{
+  $('togEpW').classList.toggle('on',$('tgtEp').checked);
+  $('togGdW').classList.toggle('on',$('tgtGd').checked);
+  renderPreview();
+}));
+['mTgtEp','mTgtGd'].forEach(id=>$(id).addEventListener('change',()=>{
+  $('mTogEpW').classList.toggle('on',$('mTgtEp').checked);
+  $('mTogGdW').classList.toggle('on',$('mTgtGd').checked);
+  syncEpAttrVisibility();
+}));
+function syncEpAttrVisibility(){
+  const on = $('mTgtEp').checked;
+  $('mEpAttrBlock').style.display = on ? '' : 'none';
+  $('mEpAttrOff').style.display = on ? 'none' : '';
+}
+syncEpAttrVisibility();
+['mode','macFmt','mpskField','optMpskEnable','optCoa'].forEach(id=>$(id).addEventListener('change',renderPreview));
+
+$('btnDry').addEventListener('click',()=>{
+  if(!S.rows.length) return toast('Parse rows first','er');
+  runItems(S.rows.map(buildFromRow), true);
+});
+$('btnRun').addEventListener('click',()=>{
+  if(!tokenAlive()) return toast('Get a token first','er');
+  if(!S.rows.length) return toast('Parse rows first','er');
+  if(!confirm('Push '+S.rows.length+' device(s) to ClearPass?')) return;
+  runItems(S.rows.map(buildFromRow), false);
+});
+$('btnAbort').addEventListener('click',()=>{ S.abort=true; log('Abort requested','wa'); });
+
+$('btnAddKv').addEventListener('click',()=>addKv('',''));
+$('btnKvFromTips').addEventListener('click',()=>{
+  if(!S.tips.length) return toast('Load roles first','er');
+  const names = S.tips.map(r=>r.name).join(', ');
+  const pick = prompt('TIPS role to write as an attribute value:\n\n'+names, S.tips[0].name);
+  if(pick) addKv('TIPS Role', pick);
+});
+$('btnGenMpsk').addEventListener('click',()=>{ $('mMpsk').value=genMpsk(); });
+$('btnResetForm').addEventListener('click',()=>{
+  ['mMac','mDesc','mMpsk','mVisitor','mSponsor','mExpire','mStart','mBulkMacs'].forEach(i=>$(i).value='');
+  $('mStatus').value=''; $('mGuestRole').value=''; $('mDoExpire').value=''; $('mEnabled').checked=true; $('kvList').innerHTML='';
+});
+$('btnQueue').addEventListener('click',()=>{
+  const epOn=$('mTgtEp').checked, gdOn=$('mTgtGd').checked;
+  if(!epOn && !gdOn) return toast('Pick at least one destination','er');
+  const list=[];
+  const bulk=$('mBulkMacs').value.split(/[\s,;]+/).filter(Boolean);
+  const src = bulk.length ? bulk : [$('mMac').value];
+  const attrs=readKv();
+  let bad=0;
+  src.forEach(v=>{
+    const h=normMac(v); if(!h){ if(String(v).trim()) bad++; return; }
+    list.push({mac:h, epOn, gdOn, status:$('mStatus').value, desc:$('mDesc').value.trim(),
+      roleId:$('mGuestRole').value, mpsk:$('mMpsk').value.trim(),
+      visitor:$('mVisitor').value.trim(), sponsor:$('mSponsor').value.trim(),
+      start:$('mStart').value.trim(), expire:$('mExpire').value.trim(),
+      doExpire:$('mDoExpire').value, enabled:$('mEnabled').checked,
+      attrs:Object.assign({},attrs)});
+  });
+  if(!list.length) return toast('No valid MAC addresses found','er');
+  const m=$('mMpsk').value.trim();
+  if(m && (m.length<8||m.length>63)) return toast('MPSK must be 8–63 characters','er');
+  if(gdOn && !$('mGuestRole').value && $('mode').value!=='update') return toast('Guest destination needs a guest role selected (unless write mode is Update only)','er');
+  S.queue = S.queue.concat(list);
+  renderQueue();
+  toast('Queued '+list.length+' device(s)'+(bad?' — '+bad+' invalid skipped':''), bad?'wa':'');
+});
+$('btnQClear').addEventListener('click',()=>{ S.queue=[]; renderQueue(); });
+$('btnQRun').addEventListener('click',()=>{
+  if(!tokenAlive()) return toast('Get a token first','er');
+  if(!S.queue.length) return;
+  if(!confirm('Push '+S.queue.length+' queued device(s) to ClearPass?')) return;
+  runItems(S.queue.map(buildFromQueueItem), false);
+});
+
+$('btnClearRes').addEventListener('click',()=>{
+  S.results=[]; $('tbRes').innerHTML='<tr><td colspan="7" class="empty">Nothing has been run yet</td></tr>'; $('cRes').textContent='';
+});
+$('btnExport').addEventListener('click',()=>{
+  if(!S.results.length) return toast('No results to export','er');
+  const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+  const lines=['mac,repository,action,http,result,detail'];
+  S.results.forEach(r=>lines.push([q(r.mac),q(r.repo==='ep'?'endpoint':'guest_device'),q(r.action),q(r.http),
+    q(r.ok?'ok':(r.skip?'skipped':'failed')),q(r.detail)].join(',')));
+  download('clearpass-import-results.csv', lines.join('\n'));
+});
+
+/* ========== init ========== */
+addKv('',''); paintConn(); renderQueue();
+log('Ready when you are — nothing here is saved after you close the tab.');
+</script>
+</body>
+</html>

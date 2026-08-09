@@ -1,0 +1,70 @@
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code / agents
+.claude/
+.continue/
+graphify-out/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Cloudflare Workers
+node_modules/
+.wrangler/
+.dev.vars
+dist/
+
+# Env and secrets
+.env
+.env.*
+*.pem
+!clearpass-certkit/Root X1 Cert.pem
+
+# Tool-specific runtime / local config
+**/.netwatch.conf
+**/config.ini
+**/.central_token*.json
+**/backup_config.json
+**/switch_status.json
+**/encryption_key.key
+**/switches.csv
+**/backups/
+**/*.log
+**/raw.json
+**/ap_license_report.html
+**/*.pcap
+**/*.pcapng
+
+# Build artifacts (use Releases for binaries)
+**/build/
+# keep aos-cx packaging helpers under .build/
+!aos-cx-config-backup/.build/
+*.exe
+*.dmg
+*.app
+!aos-cx-config-backup/.build/**

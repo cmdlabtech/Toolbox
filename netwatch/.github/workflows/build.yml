@@ -1,0 +1,147 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pyinstaller anthropic flask
+
+      - name: Build binary
+        # Produces a plain Unix executable — NOT a .app bundle.
+        # A .app bundle requires Apple code-signing and notarization to pass
+        # Gatekeeper without prompts; an unsigned .app forces users through
+        # System Settings → Privacy & Security. A raw binary launched from
+        # the terminal skips that entirely. Users only need to run:
+        #   xattr -d com.apple.quarantine ./netwatch
+        # once after downloading, which is far simpler than approving a
+        # quarantined .app.
+        run: |
+          pyinstaller \
+            --onefile \
+            --name netwatch \
+            --icon icon.icns \
+            --strip \
+            --clean \
+            netwatch.py
+
+      - name: Set executable bit
+        run: chmod +x dist/netwatch
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netwatch-macos
+          path: dist/netwatch
+          if-no-files-found: error
+
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    env:
+      NPCAP_VERSION: "1.79"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Wireshark
+        # build.bat harvests tshark.exe + DLLs from this install to bundle
+        # into the netwatch.exe so end users don't need Wireshark installed.
+        # winget is pre-installed on windows-latest and more reliable than
+        # chocolatey community for large packages like Wireshark.
+        run: |
+          winget install WiresharkFoundation.Wireshark --silent --accept-package-agreements --accept-source-agreements
+          # Refresh PATH so build.bat can locate tshark.exe via %ProgramFiles%\Wireshark
+          echo "$env:ProgramFiles\Wireshark" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Download Npcap installer
+        # Bundled inside netwatch.exe and silently installed on the user's
+        # machine on first launch. Update NPCAP_VERSION when a new stable
+        # release is available at https://npcap.com/#download.
+        run: |
+          New-Item -ItemType Directory -Force -Path tools | Out-Null
+          Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-${{ env.NPCAP_VERSION }}.exe" -OutFile "tools\npcap-installer.exe"
+
+      - name: Build binary (bundles tshark + Npcap installer)
+        run: .\build.bat
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netwatch-windows
+          path: dist\netwatch.exe
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS binary
+        uses: actions/download-artifact@v4
+        with:
+          name: netwatch-macos
+          path: release/
+
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: netwatch-windows
+          path: release/
+
+      - name: Rename binaries
+        run: |
+          mv release/netwatch release/netwatch-macos || true
+          chmod +x release/netwatch-macos
+          mv release/netwatch.exe release/netwatch-windows.exe || true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "NetWatch ${{ github.ref_name }}"
+          body: |
+            ## NetWatch ${{ github.ref_name }}
+
+            ### Downloads
+            | Platform | File |
+            |---|---|
+            | macOS (Intel + Apple Silicon) | `netwatch-macos` |
+            | Windows (x64) | `netwatch-windows.exe` |
+
+            ### macOS — first run
+            Remove the quarantine flag before running:
+            ```bash
+            xattr -d com.apple.quarantine ./netwatch-macos
+            chmod +x ./netwatch-macos
+            sudo ./netwatch-macos
+            ```
+
+            ### Windows — first run
+            The `.exe` bundles tshark and the Npcap packet-capture driver — **no Wireshark install needed**.
+
+            Right-click → **Run as administrator** on first launch so the bundled Npcap driver can install silently. After that, packet capture works without admin.
+
+            See the [README](https://github.com/${{ github.repository }}/blob/main/README.md) for full setup instructions.
+          files: |
+            release/netwatch-macos
+            release/netwatch-windows.exe
+          draft: false
+          prerelease: false

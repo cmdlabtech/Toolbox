@@ -1,0 +1,61 @@
+# ClearPass CertKit setup notes
+
+Ops checklist for using **CertKit** (or a similar ACME/agent workflow) to create and deploy TLS certificates onto **ClearPass Policy Manager** via the ClearPass REST API.
+
+This folder is documentation plus the public **ISRG Root X1** trust anchor PEM — not a runnable installer.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| [`setup-notes.txt`](setup-notes.txt) | Step-by-step ClearPass + CertKit configuration notes |
+| [`Root X1 Cert.pem`](Root%20X1%20Cert.pem) | ISRG Root X1 (`CN=ISRG Root X1,O=Internet Security Research Group,C=US`) to add to the ClearPass trust list when using Let's Encrypt–style chains |
+
+## High-level flow
+
+### 1. ClearPass operator profile + API client
+
+1. Create a **Guest / Operator profile** (example name: `Certificate Manager`) with:
+   - **API Services** — allow API access (custom as needed)
+   - **Platform → Import Configuration** — Read Only (if your workflow needs it)
+   - **Policy Manager → Certificates** — Read, Write
+2. Create an **API client**:
+   - Operating mode: **ClearPass REST API**
+   - Operator profile: the profile above
+   - Grant type: **`client_credentials`**
+   - Note the **client ID** and **client secret**
+
+### 2. Trust the public CA root
+
+Add **ISRG Root X1** to the ClearPass trust list if your issued chain depends on it. You can import [`Root X1 Cert.pem`](Root%20X1%20Cert.pem) from this folder.
+
+### 3. CertKit (or agent) deployment
+
+Typical CertKit-side steps (names vary by product version):
+
+1. Create the certificate in CertKit
+2. Add an agent / deployment target for ClearPass
+3. Deploy using a **ClearPass** deployment template
+4. Configure:
+   - Certificate chosen earlier
+   - ClearPass hostname (FQDN)
+   - API client ID and secret
+   - Optional deploy window
+5. Save and deploy
+
+See [`setup-notes.txt`](setup-notes.txt) for the condensed checklist.
+
+## Security
+
+- Treat API client secrets like admin passwords; do not commit them to git.
+- Scope the operator profile to certificate (and required API) operations only.
+- The Root X1 PEM here is a **public** CA certificate, not a private key.
+
+## Related
+
+- Browser bulk endpoint import: [ClearPass Endpoint Console](../clearpass-endpoint-console/)
+- ClearPass API docs on your appliance: `https://<cppm-fqdn>/api-docs`
+
+## License
+
+MIT — see the [repository LICENSE](../LICENSE). The ISRG Root X1 certificate is published by the Internet Security Research Group for public use as a trust anchor.

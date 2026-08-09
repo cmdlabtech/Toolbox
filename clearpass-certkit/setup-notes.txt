@@ -1,0 +1,36 @@
+Create Guest Profile
+	Name - Certificate Manager
+	Permissions
+		- API Services -- Custom
+			- Allow API Access - Allow Access
+		- Platform
+			- Import Configuration - Read Only
+		- Policy Manager
+			- Certificates - Read,Write
+Create API Client
+	Name - [Agent] ## Note This
+	Operating Mode: ClearPass REST API
+	Operator Profile: Certificate Manager
+	Grant Type: client_credentials ## Note This
+
+Add CN=ISRG Root X1,O=Internet Security Research Group,C=US to Trust List
+
+=================
+
+CertKit
+
+- Create Certificate
+- Add Agent
+- Deploy a Certificate
+- Choose a Deployment Template
+	- Search "clearpass"
+- Choose which cert you need
+- Configure Template
+	- Certificate - Choose certificate that was generated earlier
+- ClearPass hostname (FQDN)
+- ClearPass API client ID ## Name you noted during API Client generation
+- ClearPAss API client secret ## Secret you noted during API Client generation
+- Adjust Deploy Window ## Optional
+- Save & Deploy Config
+
+

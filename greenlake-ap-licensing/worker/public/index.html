@@ -1,0 +1,1444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GreenLake × Central Bridge</title>
+<style>
+  /* light is the default theme; the ☾ toggle stamps data-theme="dark" */
+  :root {
+    color-scheme: light;
+    --page: #f4f4f1; --surface: #ffffff;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e4e3dc; --ring: rgba(11,11,11,0.08);
+    --good: #0ca30c; --crit: #d03b3b; --warn-text: #7a5200;
+    --accent: #2a78d6;          /* New Central identity */
+    --accent-2: #4a3aa7;        /* Classic Central identity */
+    --shadow: 0 1px 2px rgba(20,20,15,0.05), 0 1px 6px rgba(20,20,15,0.04);
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --ring: rgba(255,255,255,0.10);
+    --warn-text: #fab219;
+    --accent: #3987e5; --accent-2: #9085e9;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+         -webkit-font-smoothing: antialiased;
+         transition: background-color 0.2s, color 0.2s; }
+  .wrap { max-width: 2400px; margin: 0 auto;
+          padding: 0 clamp(16px, 2.5vw, 40px) 64px; }
+
+  /* Only the title + tool switcher stay locked while scrolling */
+  header.page {
+    position: sticky; top: 0; z-index: 30;
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: center; gap: 10px 16px;
+    margin: 0 calc(-1 * clamp(16px, 2.5vw, 40px)) 16px;
+    padding: 14px clamp(16px, 2.5vw, 40px);
+    background: var(--page);
+    border-bottom: 1px solid var(--grid);
+  }
+  header.page .header-left {
+    display: flex; align-items: center; gap: 12px; min-width: 0;
+  }
+  header.page .header-right {
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  }
+  header.page .titles { min-width: 0; }
+  header.page h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header.page .sub { display: none; }
+  #theme-toggle {
+    flex: none; width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--grid); background: var(--surface); color: var(--ink-2);
+    font: 15px/1 system-ui; cursor: pointer;
+  }
+  #theme-toggle:hover { color: var(--ink); border-color: var(--muted); }
+  #help-btn {
+    flex: none; width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--grid); background: var(--surface); color: var(--ink-2);
+    font: 600 16px/1 system-ui; cursor: pointer;
+  }
+  #help-btn:hover { color: var(--ink); border-color: var(--muted); }
+  #sidebar-toggle {
+    flex: none; width: 34px; height: 34px; border-radius: 8px;
+    border: 1px solid var(--grid); background: var(--surface); color: var(--ink-2);
+    font: 15px/1 system-ui; cursor: pointer;
+  }
+  #sidebar-toggle:hover { color: var(--ink); border-color: var(--muted); }
+  @media (max-width: 800px) {
+    header.page { grid-template-columns: 1fr auto; }
+    header.page .tool-bar { grid-column: 1 / -1; justify-self: center; order: 3; }
+    header.page .header-right { grid-column: 2; grid-row: 1; }
+  }
+
+  /* ---------- layout: sidebar + main ---------- */
+  /* Main takes all remaining width so the report tables can go full-bleed
+     of the content area; form cards still self-center via max-width. */
+  .layout { display: grid;
+            grid-template-columns: 240px minmax(0, 1fr);
+            gap: 20px; align-items: start; }
+  .layout > aside { grid-column: 1; }
+  .layout > main  { grid-column: 2; min-width: 0; width: 100%; }
+  /* collapsed: sidebar hidden, main takes the full width */
+  .layout.sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
+  .layout.sidebar-collapsed > aside { display: none; }
+  .layout.sidebar-collapsed > main  { grid-column: 1; }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+    .layout > aside, .layout > main { grid-column: auto; }
+  }
+
+  aside {
+    background: var(--surface); border: 1px solid var(--ring);
+    border-radius: 12px; padding: 12px; position: sticky; top: 16px;
+    box-shadow: var(--shadow);
+  }
+  @media (max-width: 800px) { aside { position: static; } }
+  .side-head { display: flex; align-items: center; margin: 2px 4px 10px; }
+  .side-head b { font-size: 13px; flex: 1; }
+  #add-profile {
+    width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--grid);
+    background: var(--page); color: var(--ink-2); font: 600 15px/1 system-ui;
+    cursor: pointer;
+  }
+  #add-profile:hover { color: var(--ink); border-color: var(--muted); }
+  #profile-list { list-style: none; margin: 0; padding: 0; }
+  #profile-list li {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    border-radius: 7px; cursor: pointer; border: 1px solid transparent;
+    margin-bottom: 2px;
+  }
+  #profile-list li:hover { background: var(--page); }
+  #profile-list li.on { background: var(--page); border-color: var(--grid); }
+  #profile-list .pname {
+    flex: 1; font-size: 13px; font-weight: 550; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ptag { flex: none; font-size: 10px; font-weight: 700; color: #fff;
+          border-radius: 999px; padding: 1px 7px; letter-spacing: 0.02em; }
+  .ptag.new { background: var(--accent); }
+  .ptag.classic { background: var(--accent-2); }
+  #profile-list .del {
+    flex: none; visibility: hidden; border: none; background: none;
+    color: var(--muted); font-size: 13px; cursor: pointer; padding: 2px 4px;
+  }
+  #profile-list li:hover .del { visibility: visible; }
+  #profile-list .del:hover { color: var(--crit); }
+  .side-note { color: var(--muted); font-size: 11.5px; margin: 10px 4px 2px; }
+
+  /* ---------- collapsible credentials card ---------- */
+  /* form stays at a comfortable reading width; the report below fills the
+     full main column so its tables get as much width as the screen allows */
+  .card { background: var(--surface); border: 1px solid var(--ring);
+          border-radius: 12px; max-width: 1100px; width: 100%;
+          margin-left: auto; margin-right: auto; box-shadow: var(--shadow); }
+  .card + .card { margin-top: 16px; }
+  .card-head { display: flex; align-items: center; gap: 10px;
+               padding: 14px 18px; user-select: none; }
+  .card-head h2 { font-size: 15px; margin: 0; flex: 1; }
+  .card-body { padding: 0 18px 18px; border-top: 1px solid var(--grid); }
+  .card-body h2 { font-size: 15px; margin: 18px 0 12px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 3px; }
+
+  /* two tools centered in the header mid section */
+  .tool-bar {
+    display: flex; align-items: center; gap: 0; justify-self: center;
+  }
+  .tool-bar .tool {
+    font: 550 13px/1 system-ui; color: var(--ink-2); background: transparent;
+    border: none; border-radius: 0; padding: 8px 16px; cursor: pointer;
+  }
+  .tool-bar .tool:hover { color: var(--ink); }
+  .tool-bar .tool.on { color: var(--accent); font-weight: 650; }
+  .tool-bar .tool-divider {
+    flex: none; width: 1px; height: 18px; background: var(--grid);
+    margin: 0 2px;
+  }
+  /* panels fill the main column so the report iframe can use full width;
+     inventory form still caps itself via .card max-width */
+  .tool-panel { display: none; width: 100%; min-width: 0; }
+  .tool-panel.on { display: block; }
+  .tool-actions {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .empty-hint { color: var(--ink-2); font-size: 13px; margin: 8px 0 0;
+                text-align: center; }
+  #result { display: none; margin-top: 0; width: 100%; }
+  #download.ghost.mini,
+  #run-header.primary.mini { padding: 6px 10px; font-size: 12.5px; }
+  #frame { width: 100%; height: 78vh; border: 1px solid var(--ring);
+           border-radius: 10px; background: var(--surface); display: block; }
+
+  /* After a report is generated: drop Generate chrome and size the iframe
+     to the remaining viewport under the sticky header. */
+  body.report-open {
+    height: 100dvh; overflow: hidden;
+  }
+  body.report-open .tool-actions { display: none; }
+  body.report-open .empty-hint { display: none; }
+  body.report-open .wrap {
+    height: 100dvh; max-height: 100dvh;
+    display: flex; flex-direction: column;
+    padding-bottom: 10px; box-sizing: border-box;
+  }
+  body.report-open .layout {
+    flex: 1 1 0; min-height: 0; align-items: stretch;
+  }
+  body.report-open .layout > main {
+    min-height: 0; display: flex; flex-direction: column;
+  }
+  body.report-open #panel-report.on {
+    display: flex !important; flex-direction: column;
+    flex: 1 1 0; min-height: 0;
+  }
+  body.report-open #result {
+    display: flex !important; flex-direction: column;
+    flex: 1 1 0; min-height: 0;
+  }
+  /* iframes ignore flex height unless they get an explicit height */
+  body.report-open #frame {
+    flex: none;
+    width: 100%;
+    height: calc(100dvh - var(--app-header-h, 64px) - 26px);
+    min-height: 50vh;
+  }
+  body.report-open #panel-inventory.on {
+    display: block; flex: none;
+  }
+
+  /* credentials always open as a modal (edit via sidebar ✎ only) */
+  #cred-shell {
+    display: none; position: fixed; inset: 0; z-index: 25;
+    background: rgba(0,0,0,0.45);
+    align-items: flex-start; justify-content: center;
+    padding: 4vh 16px;
+  }
+  #cred-shell.open { display: flex; }
+  #cred-shell #cred-card {
+    max-width: 720px; width: 100%; max-height: 88vh; overflow-y: auto;
+    margin: 0; position: relative;
+  }
+  #cred-close {
+    flex: none; width: 30px; height: 30px; border-radius: 50%;
+    border: 1px solid var(--grid); background: var(--page); color: var(--ink-2);
+    cursor: pointer; font-size: 14px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  #cred-close:hover { color: var(--ink); border-color: var(--muted); }
+  #profile-list .edit {
+    flex: none; border: none; background: none;
+    color: var(--muted); font-size: 13px; cursor: pointer; padding: 2px 4px;
+  }
+  #profile-list .edit:hover { color: var(--accent); }
+
+  label.f { display: block; margin-bottom: 12px; font-size: 13px;
+            color: var(--ink-2); }
+  label.f b { display: block; color: var(--ink); font-weight: 600;
+              margin-bottom: 4px; }
+  input[type=text], input[type=password], input[type=number], textarea {
+    width: 100%; padding: 8px 10px; font: inherit; color: var(--ink);
+    background: var(--page); border: 1px solid var(--grid); border-radius: 7px;
+    transition: border-color 0.12s;
+  }
+  textarea { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
+             resize: vertical; }
+  input:focus, textarea:focus { outline: 2px solid var(--accent);
+                                outline-offset: -1px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+           margin-bottom: 16px; }
+  @media (max-width: 640px) { .modes { grid-template-columns: 1fr; } }
+  .mode { position: relative; border: 1px solid var(--grid); border-radius: 8px;
+          padding: 12px 14px; cursor: pointer; background: var(--page); }
+  .mode input { position: absolute; opacity: 0; }
+  .mode .tag { display: inline-block; font-size: 11px; font-weight: 650;
+               padding: 1px 8px; border-radius: 999px; color: #fff;
+               margin-bottom: 6px; }
+  .mode.new .tag { background: var(--accent); }
+  .mode.classic .tag { background: var(--accent-2); }
+  .mode b { display: block; font-size: 13.5px; }
+  .mode small { color: var(--ink-2); font-size: 12px; }
+  .mode.on.new { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .mode.on.classic { border-color: var(--accent-2);
+                     box-shadow: 0 0 0 1px var(--accent-2); }
+
+  .mode-panel { display: none; border-left: 3px solid var(--grid);
+                padding-left: 14px; margin: 4px 0 6px; }
+  .mode-panel.on { display: block; }
+  #panel-new.on { border-left-color: var(--accent); }
+  #panel-classic.on { border-left-color: var(--accent-2); }
+
+  .authpick { display: flex; gap: 16px; margin-bottom: 12px; font-size: 13px;
+              flex-wrap: wrap; }
+  .authpick label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 13px;
+           margin-bottom: 12px; cursor: pointer; }
+
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 6px;
+             flex-wrap: wrap; }
+  button.primary {
+    font: 600 14px/1 system-ui; color: #fff; background: var(--accent);
+    border: none; border-radius: 8px; padding: 11px 18px; cursor: pointer;
+    transition: filter 0.12s;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button.primary:disabled { opacity: 0.55; cursor: wait; }
+  button.primary.mini { padding: 8px 14px; font-size: 13px; }
+  button.ghost {
+    font: inherit; color: var(--ink-2); background: none;
+    border: 1px solid var(--grid); border-radius: 7px; padding: 10px 14px;
+    cursor: pointer;
+  }
+  button.ghost:hover { color: var(--ink); border-color: var(--muted); }
+  button.ghost.mini { padding: 6px 10px; font-size: 12.5px; }
+  .inv-csv-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .inv-csv-row a.sample-link {
+    font-size: 12px; color: var(--accent); text-decoration: none;
+  }
+  .inv-csv-row a.sample-link:hover { text-decoration: underline; }
+  #status, #inv-status { font-size: 13px; color: var(--ink-2); }
+  #error, #inv-error { display: none; margin: 12px 0;
+           border: 1px solid var(--crit);
+           border-radius: 7px; padding: 10px 12px; font-size: 13px;
+           color: var(--crit); white-space: pre-wrap; }
+  #cred-card #error { margin: 12px 18px 18px; }
+
+  /* ---------- credential wizard ---------- */
+  .wiz-steps { display: flex; gap: 4px; padding: 12px 18px 0; }
+  .wiz-steps button {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    font: 550 12.5px/1 system-ui; padding: 9px 6px; border-radius: 8px;
+    border: 1px solid transparent; background: none; color: var(--muted); cursor: pointer;
+  }
+  .wiz-steps button:hover { color: var(--ink-2); }
+  .wiz-steps button .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%; font-size: 11px; font-weight: 700;
+    background: var(--grid); color: var(--ink-2); flex: none;
+  }
+  .wiz-steps button.on { color: var(--ink); background: var(--page); }
+  .wiz-steps button.on .num { background: var(--accent); color: #fff; }
+  .wiz-step { display: none; }
+  .wiz-step.on { display: block; }
+  .wiz-nav { display: flex; align-items: center; justify-content: space-between;
+             gap: 10px; padding: 14px 18px; border-top: 1px solid var(--grid); }
+  .wiz-nav .hint { margin: 0; }
+  button.ghost:disabled { opacity: 0.4; cursor: default; }
+  button.ghost:disabled:hover { color: var(--ink-2); border-color: var(--grid); }
+
+  /* ---------- help modal ---------- */
+  #overlay { display: none; position: fixed; inset: 0;
+             background: rgba(0,0,0,0.45); z-index: 20; }
+  #overlay.on { display: flex; align-items: flex-start; justify-content: center;
+                padding: 4vh 16px; }
+  #help {
+    background: var(--surface); color: var(--ink); border-radius: 12px;
+    max-width: 680px; width: 100%; max-height: 88vh; overflow-y: auto;
+    padding: 24px 26px; border: 1px solid var(--ring); position: relative;
+  }
+  #help h2 { margin: 0 0 4px; font-size: 17px; }
+  #help > p:first-of-type { margin-top: 0; }
+  #help p, #help li { font-size: 13.5px; color: var(--ink-2); }
+  #help li { margin-bottom: 4px; }
+  #help code { font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+               background: var(--page); border: 1px solid var(--grid);
+               border-radius: 4px; padding: 0 4px; }
+  #help .note { border-left: 3px solid var(--warn-text); padding: 2px 0 2px 10px;
+                margin: 14px 0; }
+  #help .tag { display: inline-block; font-size: 11px; font-weight: 650;
+               padding: 1px 8px; border-radius: 999px; color: #fff; }
+  #help .tag.new { background: var(--accent); }
+  #help .tag.classic { background: var(--accent-2); }
+
+  /* ---------- help accordion (native <details>, one topic at a time) ---------- */
+  #help details.help-sec { border-top: 1px solid var(--grid); padding: 10px 0; }
+  #help details.help-sec:first-of-type { border-top: none; padding-top: 4px; }
+  #help details.help-sec summary {
+    cursor: pointer; font-size: 14px; font-weight: 650; color: var(--ink);
+    list-style: none; display: flex; align-items: center; gap: 8px; padding: 6px 0;
+  }
+  #help details.help-sec summary::-webkit-details-marker { display: none; }
+  #help details.help-sec summary::before {
+    content: '\203a'; display: inline-block; width: 12px; flex: none;
+    color: var(--muted); font-size: 16px; transition: transform 0.12s;
+  }
+  #help details.help-sec[open] summary::before { transform: rotate(90deg); }
+  #help details.help-sec summary .hint-req {
+    font-size: 10.5px; font-weight: 650; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.02em; margin-left: auto;
+  }
+  #help details.help-sec .sec-body { padding: 4px 0 2px 20px; }
+  #help-close { position: absolute; top: 14px; right: 14px; width: 30px;
+                height: 30px; border-radius: 50%; border: 1px solid var(--grid);
+                background: var(--page); color: var(--ink-2); cursor: pointer;
+                font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <div class="header-left">
+      <button id="sidebar-toggle" title="Show or hide the Instances sidebar"
+              aria-label="Toggle instances sidebar">☰</button>
+      <div class="titles">
+        <h1 id="page-title">GreenLake × Central Bridge</h1>
+        <div class="sub">Licensing report and inventory tools for the selected
+          instance.</div>
+      </div>
+    </div>
+    <div class="tool-bar">
+      <button type="button" class="tool on" id="tool-report"
+              data-tool="report">Licensing report</button>
+      <span class="tool-divider" aria-hidden="true"></span>
+      <button type="button" class="tool" id="tool-inventory"
+              data-tool="inventory">Add inventory</button>
+    </div>
+    <div class="header-right">
+      <button type="button" class="primary mini" id="run-header" hidden
+              title="Regenerate report">Generate</button>
+      <button type="button" class="ghost mini" id="download" hidden
+              title="Download standalone report">Download</button>
+      <button id="theme-toggle" title="Switch light / dark theme"
+              aria-label="Toggle theme">☾</button>
+      <button id="help-btn" title="Setup instructions" aria-label="Help">?</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <div class="side-head">
+        <b>Instances</b>
+        <button id="add-profile" title="Add instance"
+                aria-label="Add instance">+</button>
+      </div>
+      <ul id="profile-list"></ul>
+      <div class="side-note">Instances (including credentials) are saved only
+        in this browser.</div>
+    </aside>
+
+    <main>
+      <section id="panel-report" class="tool-panel on">
+        <div class="tool-actions">
+          <button type="button" class="primary" id="run">Generate report</button>
+          <span id="status"></span>
+        </div>
+        <p class="empty-hint" id="need-creds" hidden>Edit the instance in the
+          sidebar (✎) to add credentials, then generate a report.</p>
+        <div id="error"></div>
+        <div id="result">
+          <iframe id="frame" title="AP licensing report"></iframe>
+        </div>
+      </section>
+
+      <section id="panel-inventory" class="tool-panel">
+      <form class="card" id="addinv-card" autocomplete="off">
+        <div class="card-body" style="border-top:none;padding-top:18px">
+          <p class="hint" style="margin-top:0">Adds subscription keys and
+            devices to the GreenLake workspace of the <b>current instance</b>.
+            Uses that instance’s GreenLake credentials (Operator role or
+            higher). Leave either box empty to add just the other.</p>
+          <div class="grid2">
+            <label class="f"><b>Subscription keys</b>
+              <textarea id="inv-keys" rows="5"
+                placeholder="One key per line, e.g.&#10;E1234567890"></textarea>
+            </label>
+            <label class="f"><b>Devices (APs)</b>
+              <textarea id="inv-devices" rows="5"
+                placeholder="serial,mac — one per line, e.g.&#10;CN12345678,aa:bb:cc:dd:ee:f0"></textarea>
+              <div class="inv-csv-row">
+                <input type="file" id="inv-csv" accept=".csv,text/csv,text/plain"
+                       hidden>
+                <button type="button" class="ghost" id="inv-csv-btn">Upload
+                  GreenLake CSV…</button>
+                <a class="sample-link" href="/sample_file.csv"
+                   download="sample_file.csv">Download sample CSV</a>
+                <span class="hint" id="inv-csv-status"></span>
+              </div>
+            </label>
+          </div>
+          <div class="actions">
+            <button type="submit" class="primary" id="inv-run">Add to
+              GreenLake</button>
+            <span id="inv-status"></span>
+          </div>
+        </div>
+        <div id="inv-error"></div>
+      </form>
+      </section>
+
+      <div id="cred-shell">
+      <form class="card" id="cred-card" autocomplete="off">
+        <div class="card-head" id="card-head">
+          <h2 id="cred-title">Edit instance</h2>
+          <button type="button" id="cred-close" aria-label="Close">✕</button>
+        </div>
+        <div class="wiz-steps" id="wiz-steps">
+          <button type="button" data-step="0"><span class="num">1</span> Basics</button>
+          <button type="button" data-step="1"><span class="num">2</span> Central</button>
+          <button type="button" data-step="2"><span class="num">3</span> Options</button>
+        </div>
+        <div class="card-body">
+          <div class="wiz-step" data-step="0">
+            <label class="f" style="margin-top:16px;max-width:340px">
+              <b>Instance name</b>
+              <input type="text" id="p-name" placeholder="e.g. Acme Corp — US"
+                     spellcheck="false">
+            </label>
+
+            <h2 style="margin-top:22px">HPE GreenLake credentials</h2>
+            <div class="grid2">
+              <label class="f"><b>Client ID</b>
+                <input type="text" id="gl-id" spellcheck="false">
+              </label>
+              <label class="f"><b>Client Secret</b>
+                <input type="password" id="gl-secret">
+              </label>
+            </div>
+            <div class="hint" style="margin-top:-6px">Created in GreenLake:
+              Manage Workspace → API → Create Credentials. Used for device
+              inventory and subscriptions — needed for both Central types.</div>
+          </div>
+
+          <div class="wiz-step" data-step="1">
+            <h2 style="margin-top:16px">Which Central runs your APs?</h2>
+            <div class="modes">
+              <label class="mode new" id="mode-new-card">
+                <input type="radio" name="mode" value="new" id="mode-new">
+                <span class="tag">New Central</span>
+                <b>GreenLake-native Central</b>
+                <small>Opened from the GreenLake portal. API base like
+                  <em>us1.api.central.arubanetworks.com</em>. Uses GreenLake
+                  tokens.</small>
+              </label>
+              <label class="mode classic" id="mode-classic-card">
+                <input type="radio" name="mode" value="classic" id="mode-classic">
+                <span class="tag">Classic Central</span>
+                <b>Classic Aruba Central</b>
+                <small>Own login at <em>central.arubanetworks.com</em>. API
+                  gateway like <em>apigw-prod2…</em>. Uses Central tokens.</small>
+              </label>
+            </div>
+
+            <div class="mode-panel" id="panel-new">
+              <label class="f"><b>New Central base URL</b>
+                <input type="text" id="nc-base" list="nc-clusters" spellcheck="false"
+                       placeholder="https://us1.api.central.arubanetworks.com">
+                <datalist id="nc-clusters">
+                  <option value="https://us1.api.central.arubanetworks.com">
+                  <option value="https://eu1.api.central.arubanetworks.com">
+                  <option value="https://de1.api.central.arubanetworks.com">
+                  <option value="https://apac1.api.central.arubanetworks.com">
+                </datalist>
+                <div class="hint">Shown in New Central under API → documentation,
+                  or derive it from your account's region (see Help ?).</div>
+              </label>
+              <label class="check">
+                <input type="checkbox" id="nc-usegl" checked>
+                Use my GreenLake credentials above (recommended)
+              </label>
+              <div class="grid2" id="nc-creds" style="display:none">
+                <label class="f"><b>API client ID</b>
+                  <input type="text" id="nc-id" spellcheck="false">
+                </label>
+                <label class="f"><b>API client secret</b>
+                  <input type="password" id="nc-secret">
+                </label>
+              </div>
+            </div>
+
+            <div class="mode-panel" id="panel-classic">
+              <label class="f"><b>API gateway base URL</b>
+                <input type="text" id="cc-base" list="cc-gateways" spellcheck="false"
+                       placeholder="https://apigw-prod2.central.arubanetworks.com">
+                <datalist id="cc-gateways">
+                  <option value="https://app1-apigw.central.arubanetworks.com" label="US-1">
+                  <option value="https://apigw-prod2.central.arubanetworks.com" label="US-2">
+                  <option value="https://apigw-uswest4.central.arubanetworks.com" label="US-West-4">
+                  <option value="https://eu-apigw.central.arubanetworks.com" label="EU-1">
+                  <option value="https://apigw-eucentral3.central.arubanetworks.com" label="EU-Central-3">
+                  <option value="https://api-ap.central.arubanetworks.com" label="APAC-1">
+                </datalist>
+                <div class="hint">Central UI → Organization → Platform Integration
+                  → REST API shows your gateway.</div>
+              </label>
+              <div class="authpick">
+                <label><input type="radio" name="cc-auth" value="token" checked>
+                  Access token <span class="hint">(quick — valid ~2 h)</span></label>
+                <label><input type="radio" name="cc-auth" value="oauth">
+                  OAuth app + refresh token <span class="hint">(repeat runs)</span></label>
+              </div>
+              <div id="cc-token-fields">
+                <label class="f"><b>Access token</b>
+                  <input type="password" id="cc-token">
+                </label>
+              </div>
+              <div id="cc-oauth-fields" style="display:none">
+                <div class="grid2">
+                  <label class="f"><b>Client ID</b>
+                    <input type="text" id="cc-id" spellcheck="false">
+                  </label>
+                  <label class="f"><b>Client secret</b>
+                    <input type="password" id="cc-secret">
+                  </label>
+                </div>
+                <label class="f"><b>Refresh token</b>
+                  <input type="password" id="cc-refresh">
+                  <div class="hint">Central rotates refresh tokens on every use;
+                    the tool stores the newest one back into this instance
+                    automatically so later runs keep working.</div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="wiz-step" data-step="2">
+            <label class="f" style="margin-top:16px;max-width:240px"><b>Flag subscriptions
+              expiring within</b>
+              <input type="number" id="exp-days" value="90" min="1" max="730">
+              <div class="hint">days</div>
+            </label>
+            <div class="hint" style="margin-top:8px">That's everything — changes
+              save automatically to this browser as you go.</div>
+          </div>
+        </div>
+        <div class="wiz-nav">
+          <button type="button" class="ghost mini" id="wiz-back">Back</button>
+          <span class="hint" id="wiz-hint">Changes save automatically to this browser.</span>
+          <button type="button" class="primary mini" id="wiz-next">Next</button>
+          <button type="button" class="primary mini" id="cred-save" hidden>Done</button>
+        </div>
+        <div id="cred-error"></div>
+      </form>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="help" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <button id="help-close" aria-label="Close">✕</button>
+    <h2 id="help-title">Setting up credentials</h2>
+    <p>The report needs two data sources: <b>HPE GreenLake</b> (device
+      inventory + subscription keys) and <b>Aruba Central</b> (AP up/down
+      status and names). Everything is read-only. Use the <b>Instances</b>
+      sidebar to keep one credential set per customer, workspace, or region.
+      Open a section below for the part you need.</p>
+
+    <details class="help-sec" open>
+      <summary>HPE GreenLake credentials <span class="hint-req">Always required</span></summary>
+      <div class="sec-body">
+        <ol>
+          <li>Sign in at <code>common.cloud.hpe.com</code> and pick the workspace
+            that owns your devices.</li>
+          <li>Go to <b>Manage Workspace → API → Create Credentials</b>.</li>
+          <li>Choose the workspace, name the credential, and copy the
+            <b>Client ID</b> and <b>Client Secret</b> into the Basics step.</li>
+          <li>The credential needs read access to <i>Devices</i> and
+            <i>Subscriptions</i> (Observer role is enough — but Detach needs
+            Operator; see below).</li>
+        </ol>
+      </div>
+    </details>
+
+    <details class="help-sec">
+      <summary><span class="tag new">New Central</span> GreenLake-native Central</summary>
+      <div class="sec-body">
+        <p><b>Is this me?</b> You open Central from the GreenLake portal
+          (<code>common.cloud.hpe.com</code>) and your Central has the new
+          left-hand navigation. Your API base URL looks like
+          <code>https://us1.api.central.arubanetworks.com</code>.</p>
+        <ol>
+          <li>Find your cluster: in New Central go to the API documentation page
+            (or check the region shown for your Central service in GreenLake) —
+            the base URL is <code>https://&lt;cluster&gt;.api.central.arubanetworks.com</code>,
+            e.g. <code>us1</code>, <code>eu1</code>, <code>de1</code>.</li>
+          <li>Leave <i>“Use my GreenLake credentials”</i> ticked — New Central
+            accepts GreenLake platform tokens, so no extra setup is needed.</li>
+          <li>Alternatively, create a dedicated API client in New Central
+            (<b>Global Settings → API</b> → Create personal API client) and enter
+            its ID/secret instead.</li>
+        </ol>
+      </div>
+    </details>
+
+    <details class="help-sec">
+      <summary><span class="tag classic">Classic Central</span> Classic Aruba Central</summary>
+      <div class="sec-body">
+        <p><b>Is this me?</b> You sign in directly at
+          <code>central.arubanetworks.com</code>. Your API gateway looks like
+          <code>https://apigw-prod2.central.arubanetworks.com</code>.</p>
+        <ol>
+          <li>Find your gateway: Central UI → <b>Organization → Platform
+            Integration → REST API</b> (the datalist in the form has common
+            regions).</li>
+          <li><b>Quick test:</b> API Gateway → <b>System Apps &amp; Tokens</b> →
+            Generate Token → paste it as the access token. It expires after
+            ~2 hours.</li>
+          <li><b>Repeat runs:</b> API Gateway → <b>My Apps &amp; Tokens</b> →
+            add an app, then copy its <b>Client ID</b>, <b>Client Secret</b>, and
+            the <b>refresh token</b>. The tool refreshes automatically and stores
+            the rotated token back into this instance.</li>
+        </ol>
+      </div>
+    </details>
+
+    <details class="help-sec">
+      <summary>Detaching subscriptions &amp; ignoring APs</summary>
+      <div class="sec-body">
+        <p>In the <b>Action needed</b> tab of a generated report, each Down AP
+          holding a subscription has two buttons:</p>
+        <ol>
+          <li><b>Detach</b> removes the subscription assignment in GreenLake
+            (after a confirmation), freeing the seat. Your GreenLake credential
+            needs write access to Devices (Operator role or higher) — an
+            Observer credential can only read. GreenLake processes the change
+            asynchronously, so allow a minute before it shows in a fresh
+            report.</li>
+          <li><b>Ignore</b> marks the AP as <i>down temporarily</i> for the
+            current instance: it moves to an “Ignored” list and stops being
+            counted as a detach candidate in future reports, until you
+            Unignore it. The ignore list is saved with the instance in this
+            browser.</li>
+        </ol>
+        <p>The Detach button also appears in <b>Mismatches → In GreenLake but
+          not in Central</b> for devices that hold a subscription even though
+          Central has never seen them (spares, RMA'd units).</p>
+        <p>These buttons only exist in the app — a downloaded report is a
+          static snapshot and cannot change anything.</p>
+      </div>
+    </details>
+
+    <details class="help-sec">
+      <summary>Adding subscription keys &amp; devices</summary>
+      <div class="sec-body">
+        <p>The <b>Add inventory</b> tool registers new subscription keys and
+          new devices in the current instance's GreenLake workspace in one
+          action — keys one per line, devices as <code>serial,mac</code>
+          lines, or upload the same CSV GreenLake provides for device import
+          (<code>Serial_No,MAC_Address,…</code>). GreenLake processes
+          additions asynchronously and accepts up to five devices per API
+          call (the tool batches larger lists automatically), so give a large
+          batch a minute before regenerating the report. The GreenLake
+          credential needs Operator role or higher.</p>
+      </div>
+    </details>
+
+    <details class="help-sec">
+      <summary>Where do credentials go?</summary>
+      <div class="sec-body">
+        <div class="note">
+          <p>Saved instances — including their secrets — live unencrypted in
+            <i>this browser's</i> local storage on this device, so anyone who
+            can open this browser profile could read them; delete an instance
+            (🗙 in the sidebar) to remove it. When you generate a report,
+            credentials are sent to this app's server (a Cloudflare Worker)
+            over HTTPS, used for the HPE/Aruba API calls, and discarded —
+            nothing is stored server-side. Each person uses their own
+            credentials, so another visitor to this URL cannot see your data
+            or act on your workspace. This is a shared public URL: don't
+            paste credentials on a device or browser profile you don't
+            trust.</p>
+        </div>
+        <p>The generated report is a self-contained HTML file with the data
+          baked in — no credentials inside — so <i>that</i> file is safe to
+          share.</p>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* ================= instance profiles ================= */
+const STORE = 'glc-instances';
+const FIELDS = {           // profile.data key -> element id
+  glId: 'gl-id', glSecret: 'gl-secret',
+  ncBase: 'nc-base', ncId: 'nc-id', ncSecret: 'nc-secret',
+  ccBase: 'cc-base', ccToken: 'cc-token', ccId: 'cc-id',
+  ccSecret: 'cc-secret', ccRefresh: 'cc-refresh', expDays: 'exp-days',
+};
+let store = {activeId: null, profiles: []};
+let loading = false;       // suppress saves while filling the form
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function blankProfile(name) {
+  return {id: uid(), name: name || 'New instance',
+          data: {mode: 'new', ncUsegl: true, ccAuth: 'token', expDays: '90'}};
+}
+
+function loadStore() {
+  try { store = JSON.parse(localStorage.getItem(STORE)) || store; }
+  catch (e) {}
+  if (!store.profiles || !store.profiles.length) {
+    // migrate pre-sidebar settings if present
+    let old = {};
+    try { old = JSON.parse(localStorage.getItem('glc-settings')) || {}; }
+    catch (e) {}
+    const p = blankProfile('My instance');
+    if (old.mode) p.data.mode = old.mode;
+    if (old.auth) p.data.ccAuth = old.auth;
+    if (old.usegl === false) p.data.ncUsegl = false;
+    if (old['gl-id']) p.data.glId = old['gl-id'];
+    if (old['nc-base']) p.data.ncBase = old['nc-base'];
+    if (old['cc-base']) p.data.ccBase = old['cc-base'];
+    if (old['exp-days']) p.data.expDays = old['exp-days'];
+    localStorage.removeItem('glc-settings');
+    store = {activeId: p.id, profiles: [p]};
+  }
+  if (!store.profiles.some(p => p.id === store.activeId))
+    store.activeId = store.profiles[0].id;
+}
+const saveStore = () => localStorage.setItem(STORE, JSON.stringify(store));
+const active = () => store.profiles.find(p => p.id === store.activeId);
+
+function hasCredentials(p) {
+  p = p || active();
+  const d = (p && p.data) || {};
+  return !!(d.glId && String(d.glId).trim());
+}
+
+function modeLabel(p) {
+  return (p.data && p.data.mode === 'classic') ? 'Classic' : 'New';
+}
+
+function renderSidebar() {
+  const ul = $('profile-list');
+  ul.innerHTML = '';
+  store.profiles.forEach(p => {
+    const li = document.createElement('li');
+    li.className = p.id === store.activeId ? 'on' : '';
+    const name = document.createElement('span');
+    name.className = 'pname';
+    name.textContent = p.name || 'Untitled';
+    const tag = document.createElement('span');
+    tag.className = 'ptag ' + (p.data.mode === 'classic' ? 'classic' : 'new');
+    tag.textContent = modeLabel(p);
+    const edit = document.createElement('button');
+    edit.type = 'button'; edit.className = 'edit'; edit.textContent = '✎';
+    edit.title = 'Edit credentials';
+    edit.onclick = e => {
+      e.stopPropagation();
+      if (store.activeId !== p.id) resetReportView();
+      store.activeId = p.id;
+      saveStore(); renderSidebar(); fillForm();
+      openCredModal();
+    };
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'del'; del.textContent = '🗙';
+    del.title = 'Delete instance';
+    del.onclick = e => {
+      e.stopPropagation();
+      if (!confirm(`Delete instance “${p.name}” and its saved credentials?`))
+        return;
+      const wasActive = store.activeId === p.id;
+      store.profiles = store.profiles.filter(x => x.id !== p.id);
+      if (!store.profiles.length) store.profiles = [blankProfile('My instance')];
+      if (wasActive) {
+        store.activeId = store.profiles[0].id;
+        resetReportView();
+      }
+      saveStore(); renderSidebar(); fillForm();
+    };
+    li.append(name, tag, edit, del);
+    li.onclick = () => {
+      if (store.activeId !== p.id) resetReportView();
+      store.activeId = p.id;
+      saveStore(); renderSidebar(); fillForm();
+    };
+    ul.appendChild(li);
+  });
+}
+
+function updateNeedCreds() {
+  const need = $('need-creds');
+  if (need) need.hidden = hasCredentials();
+  const run = $('run');
+  if (run) run.disabled = false; // still clickable — prompts for credentials
+}
+
+function updatePageTitle() {
+  const p = active();
+  const name = (p && p.name && p.name.trim()) || 'Untitled';
+  const label = 'GreenLake × Central Bridge — ' + name;
+  const h1 = $('page-title');
+  if (h1) h1.textContent = label;
+  document.title = label;
+}
+
+/* ---------- credential modal: 3-step wizard (Basics / Central / Options) ---------- */
+const wizSteps = [...document.querySelectorAll('#wiz-steps button')];
+const wizPanels = [...document.querySelectorAll('.wiz-step')];
+let wizIndex = 0;
+function showWizStep(i) {
+  wizIndex = Math.max(0, Math.min(wizPanels.length - 1, i));
+  wizSteps.forEach((b, j) => b.classList.toggle('on', j === wizIndex));
+  wizPanels.forEach((p, j) => p.classList.toggle('on', j === wizIndex));
+  $('wiz-back').disabled = wizIndex === 0;
+  const last = wizIndex === wizPanels.length - 1;
+  $('wiz-next').hidden = last;
+  $('cred-save').hidden = !last;
+}
+wizSteps.forEach((b, j) => b.onclick = () => showWizStep(j));
+$('wiz-back').onclick = () => showWizStep(wizIndex - 1);
+$('wiz-next').onclick = () => showWizStep(wizIndex + 1);
+
+/* Credentials: edit only via sidebar ✎ / + (always a modal) */
+function openCredModal() {
+  $('cred-shell').classList.add('open');
+  $('cred-title').textContent = 'Edit instance';
+  showWizStep(0);
+  setTimeout(() => $('p-name').focus(), 0);
+}
+
+function closeCredModal() {
+  $('cred-shell').classList.remove('open');
+  updateNeedCreds();
+}
+
+function setStatus(t) {
+  $('status').textContent = t;
+}
+
+function setRunning(on) {
+  ['run', 'run-header'].forEach(id => {
+    const el = $(id);
+    if (el) el.disabled = on;
+  });
+}
+
+function startReport() {
+  setTool('report');
+  if (!hasCredentials()) {
+    openCredModal();
+    return;
+  }
+  run(reportPayload());
+}
+
+/** Size the report iframe to the viewport under the sticky header. */
+function sizeReportFrame() {
+  if (!document.body.classList.contains('report-open')) return;
+  const hdr = document.querySelector('header.page');
+  const frame = $('frame');
+  if (!hdr || !frame) return;
+  const top = hdr.getBoundingClientRect().bottom;
+  const bottomPad = 10;
+  const h = Math.max(320, window.innerHeight - top - bottomPad);
+  document.documentElement.style.setProperty('--app-header-h',
+    hdr.getBoundingClientRect().height + 'px');
+  frame.style.height = h + 'px';
+}
+window.addEventListener('resize', sizeReportFrame);
+
+function setTool(name) {
+  document.querySelectorAll('.tool-bar .tool').forEach(btn => {
+    btn.classList.toggle('on', btn.dataset.tool === name);
+  });
+  $('panel-report').classList.toggle('on', name === 'report');
+  $('panel-inventory').classList.toggle('on', name === 'inventory');
+  if (name === 'report') requestAnimationFrame(sizeReportFrame);
+}
+
+/* ---------- form <-> profile ---------- */
+function fillForm() {
+  loading = true;
+  const p = active();
+  $('p-name').value = p.name || '';
+  for (const [key, id] of Object.entries(FIELDS)) $(id).value = p.data[key] || '';
+  if (!$('exp-days').value) $('exp-days').value = '90';
+  $('nc-usegl').checked = p.data.ncUsegl !== false;
+  document.querySelector(
+    `input[name=cc-auth][value=${p.data.ccAuth === 'oauth' ? 'oauth' : 'token'}]`
+  ).checked = true;
+  applyVisibility();
+  updateNeedCreds();
+  updatePageTitle();
+  loading = false;
+}
+
+function collectForm() {
+  const p = active();
+  p.name = $('p-name').value.trim() || 'Untitled';
+  for (const [key, id] of Object.entries(FIELDS)) p.data[key] = $(id).value;
+  p.data.mode = $('mode-new').checked ? 'new' : 'classic';
+  p.data.ncUsegl = $('nc-usegl').checked;
+  p.data.ccAuth = document.querySelector('input[name=cc-auth]:checked').value;
+}
+
+function applyVisibility() {
+  const p = active();
+  const mode = p.data.mode === 'classic' ? 'classic' : 'new';
+  $('mode-new').checked = mode === 'new';
+  $('mode-classic').checked = mode === 'classic';
+  $('mode-new-card').classList.toggle('on', mode === 'new');
+  $('mode-classic-card').classList.toggle('on', mode === 'classic');
+  $('panel-new').classList.toggle('on', mode === 'new');
+  $('panel-classic').classList.toggle('on', mode === 'classic');
+  $('nc-creds').style.display = $('nc-usegl').checked ? 'none' : '';
+  const oauth = document.querySelector('input[name=cc-auth]:checked').value === 'oauth';
+  $('cc-token-fields').style.display = oauth ? 'none' : '';
+  $('cc-oauth-fields').style.display = oauth ? '' : 'none';
+}
+
+function onFormChange() {
+  if (loading) return;
+  collectForm();
+  applyVisibility();
+  saveStore();
+  renderSidebar();
+  updateNeedCreds();
+  updatePageTitle();
+}
+document.querySelectorAll('#cred-card input').forEach(el => {
+  el.addEventListener('input', onFormChange);
+  el.addEventListener('change', onFormChange);
+});
+
+$('add-profile').onclick = () => {
+  const p = blankProfile();
+  store.profiles.push(p);
+  resetReportView();
+  store.activeId = p.id;
+  saveStore(); renderSidebar(); fillForm();
+  openCredModal();
+  $('p-name').select();
+};
+
+$('cred-close').onclick = e => { e.stopPropagation(); closeCredModal(); };
+$('cred-save').onclick = e => { e.preventDefault(); closeCredModal(); };
+$('cred-shell').addEventListener('click', e => {
+  if (e.target === $('cred-shell')) closeCredModal();
+});
+
+document.querySelectorAll('.tool-bar .tool').forEach(btn => {
+  btn.onclick = () => setTool(btn.dataset.tool);
+});
+
+loadStore();
+renderSidebar();
+fillForm();
+
+/* ================= sidebar collapse ================= */
+const SIDEBAR_KEY = 'glc-sidebar-collapsed';
+const layoutEl = document.querySelector('.layout');
+function applySidebarState() {
+  layoutEl.classList.toggle('sidebar-collapsed',
+    localStorage.getItem(SIDEBAR_KEY) === '1');
+}
+$('sidebar-toggle').onclick = () => {
+  const collapsed = layoutEl.classList.toggle('sidebar-collapsed');
+  localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
+  requestAnimationFrame(sizeReportFrame);
+};
+applySidebarState();
+
+/* ================= theme (light is the default) ================= */
+const THEME_KEY = 'glc-theme';
+const theme = () => localStorage.getItem(THEME_KEY) || 'light';
+function applyTheme(t) {
+  if (t === 'dark') document.documentElement.dataset.theme = 'dark';
+  else delete document.documentElement.dataset.theme;
+  $('theme-toggle').textContent = t === 'dark' ? '☀' : '☾';
+  const fw = $('frame').contentWindow;   // keep an open report in sync
+  if (fw) fw.postMessage({glc: 'theme', theme: t}, '*');
+}
+$('theme-toggle').onclick = () => {
+  const t = theme() === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, t);
+  applyTheme(t);
+};
+applyTheme(theme());
+
+/* ================= help modal ================= */
+$('help-btn').onclick = () => $('overlay').classList.add('on');
+$('help-close').onclick = () => $('overlay').classList.remove('on');
+$('overlay').addEventListener('click', e => {
+  if (e.target === $('overlay')) $('overlay').classList.remove('on');
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if ($('cred-shell').classList.contains('open')) { closeCredModal(); return; }
+  $('overlay').classList.remove('on');
+});
+
+/* ================= run ================= */
+let reportHtml = null;
+
+/** Clear a previously-generated report when the active instance changes —
+ * otherwise the iframe keeps showing the old instance's data. */
+function resetReportView() {
+  reportHtml = null;
+  $('frame').srcdoc = '';
+  $('result').style.display = 'none';
+  $('download').hidden = true;
+  $('run-header').hidden = true;
+  document.body.classList.remove('report-open');
+  $('error').style.display = 'none';
+  setStatus('');
+}
+
+function reportPayload() {
+  const p = active();
+  return {
+    greenlake: {client_id: $('gl-id').value, client_secret: $('gl-secret').value},
+    central_mode: p.data.mode === 'classic' ? 'classic' : 'new',
+    new: {
+      base_url: $('nc-base').value,
+      use_gl_creds: $('nc-usegl').checked,
+      client_id: $('nc-id').value,
+      client_secret: $('nc-secret').value,
+    },
+    classic: {
+      base_url: $('cc-base').value,
+      auth: document.querySelector('input[name=cc-auth]:checked').value,
+      access_token: $('cc-token').value,
+      client_id: $('cc-id').value,
+      client_secret: $('cc-secret').value,
+      refresh_token: $('cc-refresh').value,
+    },
+    expiring_days: $('exp-days').value,
+  };
+}
+
+async function run(payload) {
+  payload.ignored_serials = Object.keys(active().data.ignored || {});
+  $('error').style.display = 'none';
+  setRunning(true);
+  setStatus('Fetching from APIs… this can take a minute on large estates.');
+  try {
+    const res = await fetch('/api/report', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const ctype = res.headers.get('Content-Type') || '';
+    if (!res.ok || !ctype.includes('text/html')) {
+      let msg = 'Request failed (HTTP ' + res.status + ')';
+      try { msg = (await res.json()).error || msg; } catch (e) {}
+      throw new Error(msg);
+    }
+    // Classic Central may have rotated the refresh token; persist the new one.
+    const rotated = res.headers.get('X-Central-Refresh-Token');
+    if (rotated) {
+      active().data.ccRefresh = rotated;
+      saveStore();
+      if (document.querySelector('input[name=cc-auth]:checked').value === 'oauth')
+        $('cc-refresh').value = rotated;
+    }
+    reportHtml = await res.text();
+    // the iframe copy gets Detach/Ignore buttons and the app's theme; the
+    // downloadable copy stays static and light (it has no server to call)
+    let framed = reportHtml.replace('<body>',
+      '<body><script>window.GLC_INTERACTIVE=true<\/script>');
+    if (theme() === 'dark')
+      framed = framed.replace('<html lang="en">',
+        '<html lang="en" data-theme="dark">');
+    $('frame').srcdoc = framed;
+    $('result').style.display = ''; // shown via body.report-open CSS
+    $('download').hidden = false;
+    $('run-header').hidden = false;
+    document.body.classList.add('report-open');
+    sizeReportFrame();
+    setStatus('');
+    closeCredModal();
+  } catch (err) {
+    $('error').textContent = err.message;
+    $('error').style.display = 'block';
+    setStatus('');
+  } finally {
+    setRunning(false);
+  }
+}
+
+$('run').onclick = startReport;
+$('run-header').onclick = startReport;
+$('cred-card').addEventListener('submit', e => {
+  e.preventDefault();
+  closeCredModal();
+});
+$('download').onclick = () => {
+  if (!reportHtml) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([reportHtml], {type: 'text/html'}));
+  a.download = 'ap_license_report.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+/* ================= add to GreenLake inventory ================= */
+/** Split one CSV line, honoring double-quoted fields. */
+function parseCsvLine(line) {
+  const out = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = false;
+      } else cur += c;
+    } else if (c === '"') {
+      inQ = true;
+    } else if (c === ',') {
+      out.push(cur); cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+}
+
+/**
+ * Parse device list text: plain "serial,mac" lines and/or the GreenLake
+ * web-UI import CSV (Serial_No,MAC_Address,tag:…,Location_Name,…).
+ * Strips a UTF-8 BOM and skips the header row when present.
+ */
+function parseDeviceText(text) {
+  text = String(text || '').replace(/^\uFEFF/, '');
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return {devices: [], bad: []};
+
+  let serialIdx = 0, macIdx = 1, start = 0;
+  const header = parseCsvLine(lines[0]).map(h =>
+    h.toLowerCase().replace(/\s+/g, '_'));
+  const sIdx = header.findIndex(h =>
+    /^(serial_no|serial|serial_number|serialnumber)$/.test(h));
+  const mIdx = header.findIndex(h =>
+    /^(mac_address|mac|macaddress)$/.test(h));
+  if (sIdx >= 0 && mIdx >= 0) {
+    serialIdx = sIdx;
+    macIdx = mIdx;
+    start = 1;
+  } else if (header[0] && /serial/i.test(header[0]) &&
+             header[1] && /mac/i.test(header[1])) {
+    start = 1; // generic "Serial*,Mac*" header without exact names
+  }
+
+  const devices = [], bad = [], seen = new Set();
+  for (let i = start; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i]);
+    // also accept semicolon/tab-separated plain lines
+    let serial = (cols[serialIdx] || '').trim();
+    let mac = (cols[macIdx] || '').trim();
+    if (cols.length < 2 && /[;\t]/.test(lines[i])) {
+      const parts = lines[i].split(/[;\t]+/).map(s => s.trim());
+      serial = parts[0] || '';
+      mac = parts[1] || '';
+    }
+    if (!serial && !mac) continue;
+    if (!serial || !mac || serial === '<blank>' || mac === '<blank>') {
+      bad.push(lines[i]);
+      continue;
+    }
+    const key = serial.toUpperCase() + '|' + mac.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    devices.push({serial, mac});
+  }
+  return {devices, bad};
+}
+
+function parseInventory() {
+  const keys = $('inv-keys').value.split('\n')
+    .map(s => s.trim()).filter(Boolean);
+  return {keys, ...parseDeviceText($('inv-devices').value)};
+}
+
+function applyDevicesToTextarea(devices) {
+  $('inv-devices').value = devices.map(d => d.serial + ',' + d.mac).join('\n');
+}
+
+$('inv-csv-btn').onclick = () => $('inv-csv').click();
+$('inv-csv').addEventListener('change', async () => {
+  const file = $('inv-csv').files && $('inv-csv').files[0];
+  $('inv-csv').value = ''; // allow re-uploading the same file
+  const errEl = $('inv-error');
+  const st = $('inv-csv-status');
+  errEl.style.display = 'none';
+  st.textContent = '';
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const {devices, bad} = parseDeviceText(text);
+    if (!devices.length) {
+      errEl.textContent = bad.length
+        ? 'No valid devices in CSV. Problem rows:\n' + bad.slice(0, 8).join('\n')
+        : 'No devices found. Expected columns Serial_No and MAC_Address ' +
+          '(GreenLake import CSV), or plain serial,mac lines.';
+      errEl.style.display = 'block';
+      return;
+    }
+    applyDevicesToTextarea(devices);
+    st.textContent = bad.length
+      ? `Loaded ${devices.length} device(s) from ${file.name} ` +
+        `(${bad.length} row(s) skipped)`
+      : `Loaded ${devices.length} device(s) from ${file.name}`;
+    if (bad.length) {
+      errEl.textContent = 'Skipped unparseable row(s):\n' +
+        bad.slice(0, 12).join('\n') +
+        (bad.length > 12 ? `\n…and ${bad.length - 12} more` : '');
+      errEl.style.display = 'block';
+    }
+  } catch (err) {
+    errEl.textContent = 'Could not read CSV: ' + err.message;
+    errEl.style.display = 'block';
+  }
+});
+
+async function addInventory() {
+  if (!hasCredentials()) {
+    openCredModal();
+    return;
+  }
+  const {keys, devices, bad} = parseInventory();
+  const errEl = $('inv-error'), stEl = $('inv-status');
+  errEl.style.display = 'none';
+  if (bad.length) {
+    errEl.textContent = 'Could not parse device line(s):\n' + bad.join('\n') +
+      '\nUse "serial,mac" lines, or upload a GreenLake import CSV ' +
+      '(Serial_No,MAC_Address,…).';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!keys.length && !devices.length) {
+    errEl.textContent = 'Enter at least one subscription key or one device.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!confirm(
+      `Add ${keys.length} subscription key(s) and ${devices.length} ` +
+      `device(s) to the GreenLake workspace of “${active().name}”?`))
+    return;
+  $('inv-run').disabled = true;
+  stEl.textContent = 'Adding to GreenLake…';
+  try {
+    const res = await fetch('/api/add-inventory', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        greenlake: {client_id: $('gl-id').value,
+                    client_secret: $('gl-secret').value},
+        subscription_keys: keys,
+        devices,
+      }),
+    });
+    const body = await res.json();
+    if (!res.ok || body.error) throw new Error(body.error || 'HTTP ' + res.status);
+    const errs = [], okParts = [];
+    for (const part of ['subscriptions', 'devices']) {
+      const r = body[part];
+      if (!r) continue;
+      if (r.error) errs.push(`${part}: ${r.error}`);
+      else okParts.push(`${r.count} ${part} ` +
+        (r.status === 'SUCCEEDED' ? 'added ✓' : 'accepted (processing)'));
+    }
+    if (errs.length) {
+      errEl.textContent = errs.join('\n');
+      errEl.style.display = 'block';
+    }
+    stEl.textContent = okParts.length
+      ? okParts.join(' · ') + ' — regenerate the report to see them.'
+      : '';
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+    stEl.textContent = '';
+  } finally {
+    $('inv-run').disabled = false;
+  }
+}
+$('addinv-card').addEventListener('submit', e => {
+  e.preventDefault();
+  addInventory();
+});
+
+/* ================= detach & ignore requests from the report ================= */
+// Detach has no bulk endpoint in GreenLake — one PATCH per device — so a
+// multi-select "detach selected" run is just this same call made in a
+// strict sequence (never parallel, to avoid hammering the API), with a
+// cancel flag the report can trip between devices.
+let bulkDetachCancelled = false;
+
+async function doDetach(serial, deviceId) {
+  try {
+    const res = await fetch('/api/detach', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        greenlake: {client_id: $('gl-id').value,
+                    client_secret: $('gl-secret').value},
+        device_id: deviceId,
+        serial,
+      }),
+    });
+    const body = await res.json();
+    if (!res.ok || body.error)
+      throw new Error(body.error || 'HTTP ' + res.status);
+    return {ok: true, status: body.status};
+  } catch (err) {
+    return {ok: false, error: err.message};
+  }
+}
+
+window.addEventListener('message', async ev => {
+  if (ev.source !== $('frame').contentWindow) return;
+  const m = ev.data;
+  if (!m || !m.glc) return;
+  const reply = msg => $('frame').contentWindow.postMessage(msg, '*');
+
+  if (m.glc === 'ignore' || m.glc === 'unignore') {
+    const p = active();
+    p.data.ignored = p.data.ignored || {};
+    if (m.glc === 'ignore')
+      p.data.ignored[m.serial] = {name: m.name || '', at: new Date().toISOString()};
+    else
+      delete p.data.ignored[m.serial];
+    saveStore();
+    reply({glc: 'ignore-applied', serial: m.serial, ignored: m.glc === 'ignore'});
+
+  } else if (m.glc === 'detach') {
+    const label = m.name ? `“${m.name}” (${m.serial})` : m.serial;
+    const keys = (m.keys && m.keys.length) ? m.keys.join(', ') : 'its subscription';
+    if (!confirm(`Detach ${keys} from AP ${label}?\n\nThis removes the ` +
+                 `subscription assignment in GreenLake and frees the seat. ` +
+                 `You can re-license the device later if it comes back.`))
+      return;
+    reply({glc: 'detach-pending', serial: m.serial});
+    const result = await doDetach(m.serial, m.gl_id);
+    reply({glc: 'detach-result', serial: m.serial, ...result});
+
+  } else if (m.glc === 'bulk-detach') {
+    // the report already confirmed with the user before sending this
+    const items = Array.isArray(m.items) ? m.items : [];
+    bulkDetachCancelled = false;
+    for (const it of items) {
+      if (bulkDetachCancelled) break;
+      reply({glc: 'detach-pending', serial: it.serial});
+      const result = await doDetach(it.serial, it.gl_id);
+      reply({glc: 'detach-result', serial: it.serial, ...result});
+    }
+    reply({glc: 'bulk-detach-done'});
+
+  } else if (m.glc === 'bulk-detach-cancel') {
+    bulkDetachCancelled = true;
+  }
+});
+</script>
+</body>
+</html>

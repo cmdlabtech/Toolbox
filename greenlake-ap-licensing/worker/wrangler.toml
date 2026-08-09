@@ -1,0 +1,21 @@
+name = "ap-license-report"
+main = "src/index.ts"
+compatibility_date = "2024-11-06"
+
+# Import the report HTML template as a string module in the Worker bundle.
+# (public/index.html is served as an asset, never imported, so this rule
+# doesn't touch it.) Must stay a top-level key, above the [tables] below.
+rules = [
+  { type = "Text", globs = ["**/*.html"], fallthrough = false }
+]
+
+# Serve the browser UI (public/) as static assets; the Worker handles /api/*.
+# Static-asset GETs are free; only /api/* requests bill as Worker invocations.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# The report pull can fan out across many API pages. Raise the CPU ceiling
+# (paid plans allow up to 5 min; the free tier caps at 10ms per request).
+[limits]
+cpu_ms = 300000

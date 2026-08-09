@@ -1,0 +1,8 @@
+config.ini
+.central_token*.json
+# generated CLI reports (root level only — don't catch worker/ source HTML)
+/*.html
+raw.json
+__pycache__/
+*.pyc
+.venv/

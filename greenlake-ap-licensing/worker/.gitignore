@@ -1,0 +1,6 @@
+node_modules/
+.wrangler/
+.dev.vars
+# root .gitignore ignores *.html for generated reports; these are source:
+!public/index.html
+!src/report-template.html
