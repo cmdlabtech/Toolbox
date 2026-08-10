@@ -8,7 +8,12 @@
   <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
 </p>
 
-> **Part of [Toolbox](../README.md)** — open network utilities by [cmdlabtech](https://github.com/cmdlabtech).
+<p align="center">
+  <a href="../README.md"><img src="../branding/cmdlab-wordmark.png" alt="CMDLAB" width="280"/></a>
+</p>
+
+
+> **Part of [Toolbox](../README.md)** — open network utilities by **CMDLAB** / [cmdlabtech](https://github.com/cmdlabtech).
 
 AI-powered network monitor. Detects packet loss via ICMP ping, triggers automatic packet captures, and uses Claude or Grok to diagnose the root cause and suggest remediation.
 
@@ -181,6 +186,6 @@ MIT — see the [Toolbox LICENSE](../LICENSE).
     <a href="../README.md">Toolbox</a>
     · <a href="../SECURITY.md">Security</a>
     · <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">Donate</a>
-    · <a href="https://github.com/cmdlabtech">cmdlabtech</a>
+    · <a href="https://github.com/cmdlabtech">CMDLAB</a>
   </sub>
 </p>

@@ -1039,7 +1039,7 @@ _HTML = r"""<!DOCTYPE html>
     <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEg0lEQVR4nI1Xz28cNRT+7PHsJrshaZM0SZN2I1VIpFIFSKhS/6feuXFGHDlzQuLCnROiB1TEgRsXJI4cgqr8VlLazWZnXD3bz372zK4YaZOJ1+/5e9/74S9q//FTq6DQeawFlF+3oHf6U8HSOvx7YRDWydRCKd1xmb5T0V47z/7r9BrdeSty5kC6RdoUgIVNSsXdAhyv2fju97OtdR/DZ7sPbVDCSYySnTFXKdrkWOxh5hhhHlIGwmSeejLBYERGYG0JTGfR5gd3H/+992FQ0Jei6DMsI+lGl9KyFEO0McsOToF0D1iegkVAu4/meomkBmd9h3disBJQXpxtW9bAAgAIbRbqNBxOUVC79Bv1r3cLjvwsAsHgTWc1UNJnx85SEWaweoD4dVkXZR3p7KCYu9TDjNStaBobYnQsiHxROyU2EihDVOfRqm670NC4mwNNA0tFVhv/ofZsmr6jhA85mFL/cxpNRBSGTD5utfdQG+i9BzDrH0HdzdGenGF2corGWui1MbSpAhA5AfNAZN3IMW7gCi4hlEXj3poGevs+9IsvoJ8cYvj4AOO1MdSbU7z/9XdcvXqN2eUVzL0NkSsJxHtKTNCnjQDVweRpCJeMPRNZQigD1FPGoDp4iOrJBPrwEVaeHWHtk49RX17j6vsfcf7Tz1DDAXRt0DZtcVlxXaWZ779WHgC3oF/UPdOMUDTOh97bQbW7DbV1H3p3B6NPj7D+2TPM//gTx19/i/nNDfRoFWgoSmaD37uXltqfHIVVRpiuUW4bz5xyTLgoH2xDr69Bb21Ab26ieriLjeefo57OcPzVN7j9940HQcxl6bCdiam7VFExkSHnk4eG+Hs6RXvzFs3FNeYn55j/c4yLX37D28trbH35EvXOFuz0FtBVilSVaQgw9rkGIk0cvTdmAO4HzYHxCpSpoAcD2NEq1GgVejyC3liHHo1QH06AZo6b736A/e8d1MqQiqiTAmZWpRSUOaqignGIjQaGA6CqoLQC6to5twSmHqCig+raAdOTR7C2xfTVa9jTcw881hkPIV9zJp9aQpG4ftBQlUZba9iq8vpJAS2hv53Bvnvv2pRSTWs0oYkd9dffwOY9qIM9d7g9u+Cmy2ogCBKiR/crllAH6q4FZqkuVJzP/hpNrWthpyFlZ5ce7cowXC+yzZOuNAlV3qdxXrv8sR4UBGWSTbBH6XFPoH0+F4or0BQ1QwtDA9hfxnJKlSlhwVC2lEQkK7ZMp9hH17wQt1ra8iDKWQnUF7fk/3v4+k627sYRisnE/wkybRhKJuBIDJV93K8nl13LKUgPyliXF6+Ceh/nTxJlhYM+mxxkrg/TOTwATTokVaaMJL8XenJaiNJk38dOitwPIhs0oSiKZJzTKEUqDRm5zzfEMjVc+k3+TSkaZcF073WxL0qYMt+LbFMgPGGdKGVqSxp9rvzolE7iGM1SQPe/vMYXg+b/nDgFxkvwZJS0fmohVkxSVLrCDQXHMs79Fj3j7ftZjJrQH8y9z9dmDiDPEsuXfpEZp65jT4sLTaaHi1XjA2RIWr2VveTUAAAAAElFTkSuQmCC">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NetWatch</title>
+<title>NetWatch · CMDLAB</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
@@ -1060,11 +1060,16 @@ _HTML = r"""<!DOCTYPE html>
 
   <!-- Header -->
   <header class="flex flex-wrap justify-between items-center gap-3 mb-5">
-    <h1 class="text-2xl font-bold flex items-center gap-3">
-      <span id="statusDot" class="text-slate-600 text-3xl leading-none">●</span>
-      NetWatch
-      <span class="text-xs font-normal text-slate-500">browser-controlled network monitor</span>
-    </h1>
+    <div class="flex flex-col gap-2 min-w-0">
+      <a href="https://github.com/cmdlabtech/Toolbox" class="inline-flex w-fit opacity-90 hover:opacity-100" title="CMDLAB Toolbox">
+        <img style="height:22px;width:auto;display:block" src="/branding/cmdlab-wordmark.png" alt="CMDLAB" width="140" height="32">
+      </a>
+      <h1 class="text-2xl font-bold flex items-center gap-3">
+        <span id="statusDot" class="text-slate-600 text-3xl leading-none">●</span>
+        NetWatch
+        <span class="text-xs font-normal text-slate-500">browser-controlled network monitor</span>
+      </h1>
+    </div>
     <div class="flex gap-2">
       <button id="toggleBtn" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded font-bold transition">Start</button>
       <button id="clearBtn" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded transition">✕ Clear</button>
@@ -1751,6 +1756,14 @@ refresh();
 setInterval(refresh, 1000);
 setInterval(() => fetch('/api/heartbeat', {method:'POST'}), 5000);
 </script>
+
+<footer class="max-w-7xl mx-auto px-4 lg:px-6 pb-6 mt-8 pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+  <a href="https://github.com/cmdlabtech/Toolbox" class="inline-flex items-center gap-2 hover:text-slate-300" title="CMDLAB">
+    <img style="height:16px;width:auto;opacity:0.85" src="/branding/cmdlab-wordmark.png" alt="CMDLAB">
+    <span>Toolbox</span>
+  </a>
+  <span>MIT · local-first network tools</span>
+</footer>
 </body>
 </html>
 """
@@ -1765,6 +1778,21 @@ def create_app(controller: Controller) -> Flask:
     @app.route("/")
     def index():
         return _HTML
+
+    @app.route("/branding/<path:name>")
+    def branding_asset(name):
+        """Serve CMDLAB wordmark from monorepo or local netwatch/branding."""
+        from flask import send_from_directory
+        here = Path(__file__).resolve().parent
+        candidates = [
+            here / "branding",
+            here.parent / "branding",
+        ]
+        for brand_dir in candidates:
+            target = brand_dir / name
+            if target.is_file():
+                return send_from_directory(brand_dir, name)
+        return ("", 404)
 
     @app.route("/api/status")
     def status():

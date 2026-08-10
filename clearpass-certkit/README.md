@@ -8,7 +8,12 @@
   <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
 </p>
 
-> **Part of [Toolbox](../README.md)** — open network utilities by [cmdlabtech](https://github.com/cmdlabtech).
+<p align="center">
+  <a href="../README.md"><img src="../branding/cmdlab-wordmark.png" alt="CMDLAB" width="280"/></a>
+</p>
+
+
+> **Part of [Toolbox](../README.md)** — open network utilities by **CMDLAB** / [cmdlabtech](https://github.com/cmdlabtech).
 
 Ops checklist for using **CertKit** (or a similar ACME/agent workflow) to create and deploy TLS certificates onto **ClearPass Policy Manager** via the ClearPass REST API.
 
@@ -96,6 +101,6 @@ MIT — see the [Toolbox LICENSE](../LICENSE). The ISRG Root X1 certificate is p
     · <a href="../clearpass-endpoint-console/">Endpoint console</a>
     · <a href="../SECURITY.md">Security</a>
     · <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">Donate</a>
-    · <a href="https://github.com/cmdlabtech">cmdlabtech</a>
+    · <a href="https://github.com/cmdlabtech">CMDLAB</a>
   </sub>
 </p>

@@ -99,6 +99,13 @@ def index():
     return render_template("index.html")
 
 
+@app.get("/branding/<path:name>")
+def branding_asset(name):
+    """Serve CMDLAB wordmark and related brand assets (local UI only)."""
+    brand_dir = _ROOT / "static" / "branding"
+    return send_from_directory(brand_dir, name)
+
+
 @app.get("/sample_file.csv")
 def sample_csv():
     """GreenLake device-import sample CSV (same format the UI accepts)."""

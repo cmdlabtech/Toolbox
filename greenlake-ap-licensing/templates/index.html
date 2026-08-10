@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GreenLake × Central Bridge</title>
+<title>GreenLake × Central Bridge · CMDLAB</title>
 <style>
   /* light is the default theme; the ☾ toggle stamps data-theme="dark" */
   :root {
@@ -51,6 +51,12 @@
     display: flex; align-items: center; justify-content: flex-end; gap: 8px;
   }
   header.page .titles { min-width: 0; }
+  header.page .cmdlab-wordmark {
+    height: 18px; width: auto; display: block; margin-bottom: 6px;
+    border-radius: 2px;
+  }
+  header.page .brand-link { display: inline-flex; text-decoration: none; }
+
   header.page h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em;
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   header.page .sub { display: none; }
@@ -397,6 +403,9 @@
       <button id="sidebar-toggle" title="Show or hide the Instances sidebar"
               aria-label="Toggle instances sidebar">☰</button>
       <div class="titles">
+        <a class="brand-link" href="https://github.com/cmdlabtech/Toolbox" title="CMDLAB Toolbox" target="_blank" rel="noopener">
+          <img class="cmdlab-wordmark" src="/branding/cmdlab-wordmark.png" alt="CMDLAB" width="120" height="27">
+        </a>
         <h1 id="page-title">GreenLake × Central Bridge</h1>
         <div class="sub">Licensing report and inventory tools for the selected
           instance.</div>

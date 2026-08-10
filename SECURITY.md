@@ -6,7 +6,12 @@
   <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
 </p>
 
-> Security policy for **[Toolbox](README.md)** by [cmdlabtech](https://github.com/cmdlabtech).
+<p align="center">
+  <a href="README.md"><img src="branding/cmdlab-wordmark.png" alt="CMDLAB" width="280"/></a>
+</p>
+
+
+> Security policy for **[Toolbox](README.md)** by **CMDLAB** / [cmdlabtech](https://github.com/cmdlabtech).
 
 This document describes what is (and is not) in the public Toolbox repository, and how each tool handles credentials.
 

@@ -7,6 +7,11 @@
   <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
 </p>
 
+<p align="center">
+  <a href="../../README.md"><img src="../../branding/cmdlab-wordmark.png" alt="CMDLAB" width="280"/></a>
+</p>
+
+
 > **Part of [Toolbox](../../README.md)** · parent tool docs: [GreenLake AP Licensing](../README.md)
 
 A public, hosted version of the GreenLake × Aruba Central AP licensing tool.

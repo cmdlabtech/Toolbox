@@ -1,8 +1,12 @@
 # Toolbox
 
 <p align="center">
-  <strong>Open-source network utilities for HPE Aruba, ClearPass &amp; GreenLake</strong><br/>
-  <sub>Maintained by <a href="https://github.com/cmdlabtech">cmdlabtech</a> · MIT License</sub>
+  <img src="branding/cmdlab-wordmark.png" alt="CMDLAB" width="360" />
+</p>
+
+<p align="center">
+  <strong>CMDLAB Toolbox</strong><br/>
+  <sub>Open-source network utilities for HPE Aruba, ClearPass &amp; GreenLake</sub>
 </p>
 
 <p align="center">
@@ -16,7 +20,7 @@
 
 ## Overview
 
-**Toolbox** is a curated collection of small, production-minded tools for network engineers. Each project lives in its own folder, runs independently, and keeps **your credentials on your machine** (or in your browser)—not in a third-party SaaS account.
+**CMDLAB Toolbox** is a curated collection of small, production-minded tools for network engineers. Each project lives in its own folder, runs independently, and keeps **your credentials on your machine** (or in your browser)—not in a third-party SaaS account.
 
 | | |
 |---|---|
@@ -111,14 +115,16 @@ These tools are free to use and share. If they save you time in the field or the
 
 ## License
 
-Distributed under the [MIT License](LICENSE). Copyright © 2026 [cmdlabtech](https://github.com/cmdlabtech).
+Distributed under the [MIT License](LICENSE). Copyright © 2026 **CMDLAB** / [cmdlabtech](https://github.com/cmdlabtech).
 
 ---
 
 <p align="center">
   <sub>
+    <img src="branding/cmdlab-wordmark.png" alt="CMDLAB" height="18"/><br/><br/>
     <a href="https://github.com/cmdlabtech/Toolbox">Toolbox</a>
     · <a href="SECURITY.md">Security</a>
+    · <a href="branding/">Branding</a>
     · <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">Donate</a>
     · <a href="https://github.com/cmdlabtech">cmdlabtech</a>
   </sub>
