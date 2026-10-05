@@ -103,7 +103,7 @@ If this tool saves you from a bad change window, consider supporting continued d
 
 ## License
 
-MIT License — Copyright © 2026 [cmdlabtech](https://github.com/cmdlabtech). See the [Toolbox LICENSE](../LICENSE).
+MIT License — Copyright © 2026 CMDLAB LLC. See the [Toolbox LICENSE](../LICENSE).
 
 ---
 
