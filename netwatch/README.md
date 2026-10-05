@@ -5,7 +5,7 @@
   <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7B3E?style=flat-square" alt="MIT"/></a>
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"/>
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-555?style=flat-square" alt="Platform"/>
-  <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
+  <a href="https://cmdlab.tech/donate"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
 </p>
 
 <p align="center">
@@ -173,7 +173,7 @@ Both `tools\wireshark\` and `tools\npcap-installer.exe` are gitignored — they 
 
 If NetWatch helps you catch outages faster, consider supporting continued development:
 
-[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS)
+[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://cmdlab.tech/donate)
 
 ## License
 
@@ -185,7 +185,7 @@ MIT — see the [Toolbox LICENSE](../LICENSE).
   <sub>
     <a href="../README.md">Toolbox</a>
     · <a href="../SECURITY.md">Security</a>
-    · <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS">Donate</a>
+    · <a href="https://cmdlab.tech/donate">Donate</a>
     · <a href="https://github.com/cmdlabtech">CMDLAB</a>
   </sub>
 </p>

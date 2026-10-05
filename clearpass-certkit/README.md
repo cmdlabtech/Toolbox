@@ -5,7 +5,7 @@
   <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7B3E?style=flat-square" alt="MIT"/></a>
   <img src="https://img.shields.io/badge/Type-Ops%20guide-555?style=flat-square" alt="Ops guide"/>
   <img src="https://img.shields.io/badge/ClearPass-Certificates-00ADEF?style=flat-square" alt="ClearPass"/>
-  <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
+  <a href="https://cmdlab.tech/donate"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
 </p>
 
 <p align="center">
@@ -87,7 +87,7 @@ See also [Toolbox SECURITY.md](../SECURITY.md).
 
 If these notes saved you a certificate renewal scramble, consider supporting continued Toolbox development:
 
-[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS)
+[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://cmdlab.tech/donate)
 
 ## License
 
@@ -100,7 +100,7 @@ MIT — see the [Toolbox LICENSE](../LICENSE). The ISRG Root X1 certificate is p
     <a href="../README.md">Toolbox</a>
     · <a href="../clearpass-endpoint-console/">Endpoint console</a>
     · <a href="../SECURITY.md">Security</a>
-    · <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS">Donate</a>
+    · <a href="https://cmdlab.tech/donate">Donate</a>
     · <a href="https://github.com/cmdlabtech">CMDLAB</a>
   </sub>
 </p>

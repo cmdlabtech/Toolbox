@@ -5,7 +5,7 @@
   <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7B3E?style=flat-square" alt="MIT"/></a>
   <img src="https://img.shields.io/badge/Type-Single--file%20HTML-E34F26?style=flat-square" alt="HTML"/>
   <img src="https://img.shields.io/badge/ClearPass-REST%20API-00ADEF?style=flat-square" alt="ClearPass"/>
-  <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
+  <a href="https://cmdlab.tech/donate"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
 </p>
 
 <p align="center">
@@ -102,7 +102,7 @@ Then set **API base override** to that proxy origin + path prefix (for example `
 
 If this console shortens your MAC import fire drills, consider supporting continued development:
 
-[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS)
+[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://cmdlab.tech/donate)
 
 ## License
 
@@ -115,7 +115,7 @@ MIT — see the [Toolbox LICENSE](../LICENSE).
     <a href="../README.md">Toolbox</a>
     · <a href="../clearpass-certkit/">CertKit notes</a>
     · <a href="../SECURITY.md">Security</a>
-    · <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS">Donate</a>
+    · <a href="https://cmdlab.tech/donate">Donate</a>
     · <a href="https://github.com/cmdlabtech">CMDLAB</a>
   </sub>
 </p>
