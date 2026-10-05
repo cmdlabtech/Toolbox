@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7B3E?style=flat-square" alt="MIT License"/></a>
   <a href="https://github.com/cmdlabtech/Toolbox"><img src="https://img.shields.io/badge/GitHub-cmdlabtech%2FToolbox-181717?style=flat-square&logo=github" alt="Repository"/></a>
   <a href="SECURITY.md"><img src="https://img.shields.io/badge/Security-policy-0B5FFF?style=flat-square" alt="Security"/></a>
-  <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate with PayPal"/></a>
+  <a href="https://cmdlab.tech/donate"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate with PayPal"/></a>
 </p>
 
 ---
@@ -95,13 +95,13 @@ This monorepo is the **central public home**. Prefer issues and pull requests he
 These tools are free to use and share. If they save you time in the field or the lab, consider a donation—it helps fund hosting, continued development, and new utilities.
 
 <p align="center">
-  <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS">
+  <a href="https://cmdlab.tech/donate">
     <img src="https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate with PayPal"/>
   </a>
 </p>
 
 <p align="center">
-  <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS"><strong>paypal.com/donate</strong></a>
+  <a href="https://cmdlab.tech/donate"><strong>cmdlab.tech/donate</strong></a>
   · one-time or recurring · USD
 </p>
 
@@ -125,7 +125,7 @@ Distributed under the [MIT License](LICENSE). Copyright © 2026 **CMDLAB LLC**.
     <a href="https://github.com/cmdlabtech/Toolbox">Toolbox</a>
     · <a href="SECURITY.md">Security</a>
     · <a href="branding/">Branding</a>
-    · <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS">Donate</a>
+    · <a href="https://cmdlab.tech/donate">Donate</a>
     · <a href="https://github.com/cmdlabtech">cmdlabtech</a>
   </sub>
 </p>
