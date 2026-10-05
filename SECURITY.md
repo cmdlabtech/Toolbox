@@ -3,7 +3,7 @@
 <p align="left">
   <a href="README.md"><img src="https://img.shields.io/badge/Toolbox-cmdlabtech-181717?style=flat-square&logo=github" alt="Toolbox"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7B3E?style=flat-square" alt="MIT"/></a>
-  <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
+  <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
 </p>
 
 <p align="center">
@@ -74,7 +74,7 @@ If you believe a secret was committed or a vulnerability exists:
 
 Toolbox is free and open source. Optional donations help cover hosting and continued security work:
 
-[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD)
+[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS)
 
 ---
 
@@ -82,6 +82,6 @@ Toolbox is free and open source. Optional donations help cover hosting and conti
   <sub>
     <a href="README.md">Toolbox</a>
     · <a href="LICENSE">License</a>
-    · <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">Donate</a>
+    · <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS">Donate</a>
   </sub>
 </p>

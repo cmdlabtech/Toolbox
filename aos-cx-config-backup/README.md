@@ -5,7 +5,7 @@
   <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-0A7B3E?style=flat-square" alt="MIT"/></a>
   <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows"/>
   <img src="https://img.shields.io/badge/AOS--CX-10.04%2B-FF8300?style=flat-square" alt="AOS-CX"/>
-  <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
+  <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate"/></a>
 </p>
 
 <p align="center">
@@ -99,7 +99,7 @@ Run the EXE directly. If Windows Defender warns you, click "More info" → "Run 
 
 If this tool saves you from a bad change window, consider supporting continued development:
 
-[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD)
+[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS)
 
 ## License
 
@@ -111,7 +111,7 @@ MIT License — Copyright © 2026 [cmdlabtech](https://github.com/cmdlabtech). S
   <sub>
     <a href="../README.md">Toolbox</a>
     · <a href="../SECURITY.md">Security</a>
-    · <a href="https://www.paypal.com/donate/?business=8E4EWZ3QJ3CML&no_recurring=0&currency_code=USD">Donate</a>
+    · <a href="https://www.paypal.com/donate/?hosted_button_id=Z5SDZULELYGNS">Donate</a>
     · <a href="https://github.com/cmdlabtech">CMDLAB</a>
   </sub>
 </p>
