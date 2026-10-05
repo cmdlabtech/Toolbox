@@ -101,7 +101,7 @@ These tools are free to use and share. If they save you time in the field or the
 </p>
 
 <p align="center">
-  <a href="https://cmdlab.tech/donate"><strong>paypal.com/donate</strong></a>
+  <a href="https://cmdlab.tech/donate"><strong>cmdlab.tech/donate</strong></a>
   · one-time or recurring · USD
 </p>
 
