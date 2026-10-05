@@ -115,7 +115,7 @@ These tools are free to use and share. If they save you time in the field or the
 
 ## License
 
-Distributed under the [MIT License](LICENSE). Copyright © 2026 **CMDLAB** / [cmdlabtech](https://github.com/cmdlabtech).
+Distributed under the [MIT License](LICENSE). Copyright © 2026 **CMDLAB LLC**.
 
 ---
 
