@@ -27,16 +27,20 @@ export function layoutById(id, model) {
   return { ...LAYOUT_FNS[spec.id](model), id: spec.id };
 }
 
-// On-screen px per user unit. Never below the left-to-right tree fitted into
-// the same pane, so a wide layout scrolls instead of shrinking its labels.
-// `bounds` and `reference` are {w, h}. The SVG width/height attributes stay
+// On-screen px per user unit. `bounds` and `reference` are {w, h}.
+// The floor (how the left-to-right tree fits this pane) applies only when
+// fit-to-canvas would drop below it, and only when that larger scale still
+// fits the card's height. A tall diagram that already fits, such as radial
+// rings, stays fitted inside the card. The SVG width/height attributes stay
 // in user units; only the display size uses this scale.
 export function displayScale(bounds, avail, reference) {
   const fitOf = (b) => Math.min(avail.w / b.w, avail.h / b.h);
   const fit = fitOf(bounds);
   const floor = reference ? fitOf(reference) : fit;
-  if (!Number.isFinite(fit) || !Number.isFinite(floor)) return 1;
-  return Math.max(fit, floor);
+  if (!Number.isFinite(fit) || fit <= 0) return 1;
+  if (!Number.isFinite(floor) || fit >= floor) return fit;
+  if (bounds.h * floor <= avail.h) return floor;
+  return fit;
 }
 
 // Radial hub-and-spoke: district core in the middle, one sector per building
@@ -393,15 +397,21 @@ export function layoutForce(model) {
   for (const id of ids) pos.set(id, { x: Math.round(P.get(id).x), y: Math.round(P.get(id).y) });
   for (const e of exts) extPos.set(e.id, { x: Math.round(P.get(e.id).x), y: Math.round(P.get(e.id).y) });
   // Rounding can close a 1px gap. Push apart on the integer grid.
-  separate(pos, [...pos.keys()], () => ({ w: 168, h: 58 }));
+  separate(pos, [...pos.keys()], () => forceBox(false));
   const both = new Map([...pos, ...extPos]);
-  const gapOf = (id) => (extPos.has(id) && !pos.has(id) ? { w: 136, h: 46 } : { w: 168, h: 58 });
+  const gapOf = (id) => forceBox(extPos.has(id) && !pos.has(id));
   separate(both, [...both.keys()], gapOf);
-  // The repulsion pass leaves large gaps. Pull inward and separate again so
-  // the settled graph fills its frame instead of sitting in a sparse box.
+  // The repulsion pass leaves large gaps. Pull inward until boxes keep a
+  // 16px gap, then separate again so the picture stays compact and clear.
   compact(both, [...both.keys()], gapOf);
-  for (const id of ids) pos.set(id, { x: Math.round(both.get(id).x), y: Math.round(both.get(id).y) });
-  for (const e of exts) extPos.set(e.id, { x: Math.round(both.get(e.id).x), y: Math.round(both.get(e.id).y) });
+  for (const id of [...both.keys()]) {
+    const p = both.get(id);
+    p.x = Math.round(p.x);
+    p.y = Math.round(p.y);
+  }
+  separate(both, [...both.keys()], gapOf);
+  for (const id of ids) pos.set(id, { x: both.get(id).x, y: both.get(id).y });
+  for (const e of exts) extPos.set(e.id, { x: both.get(e.id).x, y: both.get(e.id).y });
   frameSettled(pos, extPos);
   return pack(pos, extPos, []);
 }
@@ -685,6 +695,16 @@ function hits(p, w, h, obstacles) {
     if (Math.abs(p.x - o.p.x) < (w + o.w) / 2 && Math.abs(p.y - o.p.y) < (h + o.h) / 2) return true;
   }
   return false;
+}
+
+// Collision box. Switches include the warning badge that hangs off the corner
+// so a ghost cannot sit under it. The 16px is the gap between the real boxes.
+const FORCE_GAP = 16;
+const BADGE_OUTSET = 10;
+
+function forceBox(ghost) {
+  if (ghost) return { w: 120 + FORCE_GAP, h: 30 + FORCE_GAP };
+  return { w: GEOM.nodeW + FORCE_GAP + BADGE_OUTSET, h: GEOM.nodeH + FORCE_GAP + BADGE_OUTSET };
 }
 
 function compact(points, ids, sizeOf) {

@@ -213,18 +213,23 @@ test("mock trees have no crossing links and no link through another node", () =>
   }
 });
 
-test("display scale stays finite and does not shrink below the left-to-right tree", () => {
+test("display scale uses the floor only when fit-to-canvas would drop below it", () => {
   const avail = { w: 1055, h: 740 };
   const lr = layoutById("tree-lr", model).bounds;
   const floor = Math.min(avail.w / lr.w, avail.h / lr.h);
   assert.equal(Number.isFinite(floor) && floor > 0, true);
   for (const spec of LAYOUTS) {
     const lay = layoutById(spec.id, model);
-    const scale = displayScale(lay.bounds, avail, lr);
     const fit = Math.min(avail.w / lay.bounds.w, avail.h / lay.bounds.h);
+    const scale = displayScale(lay.bounds, avail, lr);
     assert.equal(Number.isFinite(scale) && scale > 0, true, spec.id);
-    assert.ok(scale + 1e-9 >= floor, `${spec.id} scale ${scale} below ${floor}`);
-    assert.ok(scale + 1e-9 >= fit, spec.id);
+    const floorFitsHeight = lay.bounds.h * floor <= avail.h;
+    if (fit + 1e-9 >= floor || !floorFitsHeight) {
+      assert.ok(Math.abs(scale - fit) < 1e-9, `${spec.id} scale ${scale} fit ${fit}`);
+    } else {
+      assert.ok(Math.abs(scale - floor) < 1e-9, `${spec.id} scale ${scale} floor ${floor}`);
+    }
+    assert.ok(lay.bounds.h * scale <= avail.h + 0.5, `${spec.id} taller than the card`);
     for (const n of model.nodes) {
       const p = lay.pos.get(n.serial);
       assert.equal(Number.isFinite(p.x) && Number.isFinite(p.y), true, spec.id);
@@ -234,8 +239,17 @@ test("display scale stays finite and does not shrink below the left-to-right tre
     assert.match(svg, new RegExp(`height="${Math.round(lay.bounds.h)}"`), `${spec.id} export height`);
     for (const n of model.nodes) assert.ok(svg.includes(n.name), `${spec.id} export ${n.name}`);
   }
-  const wide = displayScale({ w: 4000, h: 400 }, avail, lr);
-  assert.ok(wide > Math.min(avail.w / 4000, avail.h / 400));
+  const radial = layoutById("radial", model);
+  const radialFit = Math.min(avail.w / radial.bounds.w, avail.h / radial.bounds.h);
+  const radialScale = displayScale(radial.bounds, avail, lr);
+  assert.ok(Math.abs(radialScale - radialFit) < 1e-9, "radial stays fitted");
+  assert.ok(radial.bounds.w * radialScale <= avail.w + 0.5);
+  assert.ok(radial.bounds.h * radialScale <= avail.h + 0.5);
+  const wide = { w: 4000, h: 400 };
+  const wideFit = Math.min(avail.w / wide.w, avail.h / wide.h);
+  const wideScale = displayScale(wide, avail, lr);
+  assert.ok(wideFit < floor);
+  assert.ok(Math.abs(wideScale - floor) < 1e-9);
 });
 
 test("force-directed graph is centered, with every node inside the frame", () => {
@@ -262,6 +276,31 @@ test("force-directed graph is centered, with every node inside the frame", () =>
   }
   assert.ok(bottom <= lay.bounds.y + lay.bounds.h - 20);
   assert.equal(Number.isFinite(lay.bounds.w + lay.bounds.h), true);
+  const gap = 16;
+  const nodeRects = model.nodes.map((n) => {
+    const p = lay.pos.get(n.serial);
+    return { id: n.name, flags: n.flags.length, x: p.x - GEOM.nodeW / 2, y: p.y - GEOM.nodeH / 2, w: GEOM.nodeW, h: GEOM.nodeH, p };
+  });
+  const ghosts = [...lay.extPos].map(([id, p]) => ({
+    id: model.externals.find((e) => e.serial === id)?.name ?? id,
+    x: p.x - 60, y: p.y - 15, w: 120, h: 30,
+  }));
+  const padded = (r) => ({ x: r.x - gap / 2, y: r.y - gap / 2, w: r.w + gap, h: r.h + gap });
+  const boxes = [...nodeRects, ...ghosts];
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      assert.equal(intersects(padded(boxes[i]), padded(boxes[j])), false, `${boxes[i].id} is within ${gap}px of ${boxes[j].id}`);
+    }
+  }
+  for (const ghost of ghosts) {
+    for (const node of nodeRects) {
+      if (!node.flags) continue;
+      const c = { x: node.p.x + GEOM.nodeW / 2 - 2, y: node.p.y - GEOM.nodeH / 2 + 2 };
+      const nearestX = Math.max(ghost.x, Math.min(c.x, ghost.x + ghost.w));
+      const nearestY = Math.max(ghost.y, Math.min(c.y, ghost.y + ghost.h));
+      assert.ok(Math.hypot(nearestX - c.x, nearestY - c.y) >= 9, `${ghost.id} sits on ${node.id}'s badge`);
+    }
+  }
 });
 
 test("site ghosts sit fully inside their box with a gap, and tree ghosts sit off other links", () => {

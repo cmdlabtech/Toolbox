@@ -119,30 +119,90 @@ function paint() {
   const mgmtLabel = opts.find((o) => o.id === state.mgmt)?.label ?? state.mgmt;
   const layoutLabel = LAYOUTS.find((l) => l.id === state.layout)?.label ?? "Hub and spoke";
   const lay = (state.lay = applyPositionOverrides(layoutById(state.layout, model), state.positions[state.layout]));
+  const subtitle = `${model.nodes.length} switches · ${model.buildings.length} buildings · ${layoutLabel} · Mgmt: ${mgmtLabel} · ${state.data.mock ? "MOCK DATA · " : ""}${new Date(state.data.generatedAt).toLocaleString()}`;
   state.svg = renderSvg(model, lay, {
-    tokens: readTokens(), mgmt: state.mgmt, title: "Switch topology",
-    subtitle: `${model.nodes.length} switches · ${model.buildings.length} buildings · ${layoutLabel} · Mgmt: ${mgmtLabel} · ${state.data.mock ? "MOCK DATA · " : ""}${new Date(state.data.generatedAt).toLocaleString()}`,
+    tokens: readTokens(), mgmt: state.mgmt, title: "Switch topology", subtitle,
   });
-  $("diagram").innerHTML = state.svg;
-  fitDiagram();
+  state.subtitle = subtitle;
+  mountDiagram();
 }
 
-// Size the SVG in px. The width and height attributes stay in user units so
-// SVG, PNG, and JSON exports still hold the whole graph.
-function fitDiagram() {
-  const svg = $("diagram")?.querySelector("svg");
+// Title band drawn above the graph in the SVG. A scrolling layout lifts this
+// band out of the scroller so it stays on screen.
+const HEADER_BAND = 72;
+
+function paneSize(host) {
+  const padX = 32;
+  const padY = 32;
+  let w = host.clientWidth - padX;
+  let h = host.clientHeight - padY;
+  if (h < 200) h = window.innerHeight - host.getBoundingClientRect().top - padY - 8;
+  return { w: Math.max(280, w), h: Math.max(280, h) };
+}
+
+function legendHtml(T) {
+  const chip = (style, label) => `<span class="lg"><i style="${style}"></i>${esc(label)}</span>`;
+  return `<div class="diagram-legend">${[
+    chip(`background:${T["--node-core"]}`, "District core"),
+    chip(`background:${T["--node-bcore"]}`, "Building core"),
+    chip(`background:${T["--node-access"]}`, "Access"),
+    chip(`background:${T["--node-ext"]}`, "Other device"),
+    chip(`background:transparent;border:1.5px dashed ${T["--warn"]}`, "IP fallback"),
+    chip(`background:${T["--edge"]}`, "LLDP fill-in"),
+    chip(`background:${T["--edge-inferred"]}`, "Inferred"),
+  ].join("")}</div>`;
+}
+
+function mountDiagram() {
+  const host = $("diagram");
   const lay = state.lay;
   const model = state.model;
-  if (!svg || !lay?.bounds || !model) return;
-  const host = $("diagram");
-  const availW = Math.max(280, host.clientWidth - 32);
-  const availH = Math.max(280, window.innerHeight - host.getBoundingClientRect().top - 12);
+  if (!host || !lay?.bounds || !model || !state.svg) return;
+  const avail = paneSize(host);
   const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
-  const scale = displayScale(lay.bounds, { w: availW, h: availH }, reference);
-  svg.style.width = `${Math.max(1, Math.round(lay.bounds.w * scale))}px`;
-  svg.style.height = `${Math.max(1, Math.round(lay.bounds.h * scale))}px`;
+  const scale = displayScale(lay.bounds, avail, reference);
+  const fullW = lay.bounds.w * scale;
+  const fullH = lay.bounds.h * scale;
+  const overflows = fullW > avail.w + 1 || fullH > avail.h + 1;
+  const tokens = readTokens();
+  const head = overflows
+    ? `<div class="diagram-head"><div><div class="diagram-title">Switch topology</div><div class="diagram-sub">${esc(state.subtitle ?? "")}</div></div>${legendHtml(tokens)}</div>`
+    : "";
+  host.innerHTML = `<div class="diagram-card${overflows ? " scrolls" : ""}">${head}<div class="diagram-scroll">${state.svg}</div></div>`;
+  const svg = host.querySelector("svg");
+  if (!svg) return;
+  const { x, y, w, h } = lay.bounds;
+  let drawW = fullW;
+  let drawH = fullH;
+  if (overflows && h > HEADER_BAND) {
+    svg.setAttribute("viewBox", `${x} ${y + HEADER_BAND} ${w} ${h - HEADER_BAND}`);
+    drawH = (h - HEADER_BAND) * scale;
+  }
+  svg.style.width = `${Math.max(1, Math.round(drawW))}px`;
+  svg.style.height = `${Math.max(1, Math.round(drawH))}px`;
   svg.style.maxWidth = "none";
   svg.style.maxHeight = "none";
+  centerOpeningScroll();
+}
+
+// Size the SVG in px. The width and height attributes on the export string
+// stay in user units, so SVG, PNG, and JSON downloads still hold the whole graph.
+function fitDiagram() {
+  if (!state.svg || !state.lay) return;
+  mountDiagram();
+}
+
+function centerOpeningScroll() {
+  const scroller = document.querySelector("#diagram .diagram-scroll");
+  const card = document.querySelector("#diagram .diagram-card");
+  if (!scroller || !card?.classList.contains("scrolls") || !state.model?.coreSerial) return;
+  const g = scroller.querySelector(`g[data-serial="${CSS.escape(state.model.coreSerial)}"]`);
+  const rect = g?.querySelector("rect");
+  if (!rect) { scroller.scrollLeft = 0; scroller.scrollTop = 0; return; }
+  const nb = rect.getBoundingClientRect();
+  const sb = scroller.getBoundingClientRect();
+  scroller.scrollLeft += (nb.left + nb.width / 2) - (sb.left + sb.width / 2);
+  scroller.scrollTop += (nb.top + nb.height / 2) - (sb.top + sb.height / 2);
 }
 window.addEventListener("resize", () => fitDiagram());
 
