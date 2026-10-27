@@ -192,7 +192,7 @@ export async function exchangeToken(clientId: string, clientSecret: string): Pro
     body: new URLSearchParams({ grant_type: "client_credentials", client_id: clientId, client_secret: clientSecret }),
     cache: "no-store",
   });
-  if (!resp.ok) throw new CentralError(`GreenLake token request failed (HTTP ${resp.status}). Check the client ID and secret.`, resp.status === 400 || resp.status === 401 ? 401 : 502);
+  if (!resp.ok) throw new CentralError(`HPE token request failed (HTTP ${resp.status}). Check the client ID and secret, and that the client is a personal API client for your new Central instance.`, resp.status === 400 || resp.status === 401 ? 401 : 502);
   const body = (await resp.json()) as { access_token?: string; expires_in?: number };
   if (!body.access_token) throw new CentralError("GreenLake returned no access token.", 502);
   return { access_token: body.access_token, expires_in: typeof body.expires_in === "number" ? body.expires_in : null };

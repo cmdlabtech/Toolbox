@@ -7,7 +7,7 @@ The page (Cloudflare Pages) and the Worker can therefore be public without expos
 ## How credentials flow
 
 1. **Entry.** The Credentials panel takes a new Central cluster plus either:
-   - a GreenLake API client ID and secret (OAuth2 client credentials), or
+   - the client ID and secret of a new Central personal API client (OAuth2 client credentials), or
    - a bearer token.
 2. **Storage, browser only.**
    - `sessionStorage` (key `ct-auth`) by default. It clears when the tab closes.
@@ -52,9 +52,9 @@ The page (Cloudflare Pages) and the Worker can therefore be public without expos
 | **Credentials at rest in the browser** | A remembered client secret or token sits in `localStorage` on that device. Leave Remember unticked on shared machines. Forget clears it. Prefer a read-only API client so a leaked secret cannot change configuration |
 | **Cross-site scripting** | Script injected into the page could read the stored credentials. The page has no third-party scripts, and device data is escaped before display. A strict Content-Security-Policy on Pages (`script-src 'self'`) is recommended before going live |
 | **Credentials in transit through the Worker** | The token (and, in the fallback only, the client secret) passes through Cloudflare's edge for one request. It is not stored, logged or cached by this code. Cloudflare platform logs record URLs, not headers, and credentials are never placed in URLs |
-| **Token lifetime** | GreenLake tokens last 2 hours. Client-credential sign-in re-mints automatically. Bearer-token sign-in needs a new paste |
+| **Token lifetime** | Tokens from a new Central personal API client last about 2 hours (`expires_in` 7199). Tokens from a GreenLake platform (GLP) API client last 15 minutes. HPE issues no refresh token. Client-credential sign-in re-mints automatically. Bearer-token sign-in needs a new paste |
 | **Public Worker as a relay** | The Worker forwards only to new Central cluster hosts and only read-only GETs, so it cannot be used as a general proxy. Rate limiting (a Workers rate-limit binding or WAF rule on `/api/*`) is still advisable to protect the Central API quota |
-| **Over-privileged clients** | Users should create a GreenLake API client with the narrowest read-only role for Central monitoring |
+| **Over-privileged clients** | Users should create a new Central personal API client with the narrowest read-only role for Central monitoring |
 
 ## Still open
 

@@ -1,7 +1,7 @@
 // Browser-side credential handling (site/js/creds.js) with in-memory Web Storage.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { SSO_URL, STORE_KEY, apiRequest, createVault, mintToken, normalise, tokenValid } from "../site/js/creds.js";
+import { CLIENT_REJECTED, SSO_URL, STORE_KEY, apiRequest, createVault, mintToken, normalise, tokenValid } from "../site/js/creds.js";
 
 class Mem { constructor() { this.m = new Map(); } getItem(k) { return this.m.has(k) ? this.m.get(k) : null; } setItem(k, v) { this.m.set(k, String(v)); } removeItem(k) { this.m.delete(k); } }
 const BASE = "https://de1.api.central.arubanetworks.com";
@@ -72,4 +72,25 @@ test("token mint: direct to GreenLake first, Worker pass-through only on network
   assert.equal(fb.token, TOKEN);
 
   await assert.rejects(mintToken(creds, { fetchImpl: async () => Response.json({ error: "unauthorized_request" }, { status: 401 }) }), /unauthorized_request/);
+});
+
+test("token mint: documented request shape and clear credential-type errors", async () => {
+  const creds = normalise({ method: "client", baseUrl: BASE, clientId: "id-FAKE", clientSecret: "sec-FAKE" });
+  let seen;
+  await mintToken(creds, { fetchImpl: async (url, init) => { seen = { url, init }; return Response.json({ access_token: TOKEN, expires_in: 7199 }); } });
+  assert.equal(seen.url, "https://sso.common.cloud.hpe.com/as/token.oauth2");
+  assert.equal(seen.init.method, "POST");
+  assert.equal(seen.init.headers["Content-Type"], "application/x-www-form-urlencoded");
+  assert.equal(seen.init.headers.Authorization, undefined, "credentials go in the form body, not HTTP Basic");
+  const form = new URLSearchParams(seen.init.body);
+  assert.deepEqual([...form.keys()].sort(), ["client_id", "client_secret", "grant_type"]);
+  assert.equal(form.get("grant_type"), "client_credentials");
+
+  for (const status of [400, 401]) {
+    await assert.rejects(
+      mintToken(creds, { fetchImpl: async () => Response.json({ error: "unauthorized_request" }, { status }) }),
+      (e) => e.message.startsWith(CLIENT_REJECTED) && /personal API client/.test(e.message) && /Bearer token/.test(e.message));
+  }
+  await assert.rejects(mintToken(creds, { fetchImpl: async () => new Response("down", { status: 503 }) }), /Token request failed \(HTTP 503\)/);
+  assert.throws(() => normalise({ method: "client", baseUrl: BASE, clientId: "a" }), /personal API client/);
 });
