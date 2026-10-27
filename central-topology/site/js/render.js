@@ -1,7 +1,7 @@
 // SVG renderer. Produces one self-contained SVG string: every color is
 // resolved from theme tokens at render time, so a downloaded file looks the
 // same outside the page. Pure function except for tokens passed in.
-import { GEOM } from "./layout.js";
+import { GEOM, orthoBend } from "./layout.js";
 import { resolveMgmt } from "./model.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -14,7 +14,14 @@ export function readTokens(el = document.documentElement) {
   return Object.fromEntries(TOKEN_NAMES.map((t) => [t, cs.getPropertyValue(t).trim()]));
 }
 
+function orthoPath(a, b, lay) {
+  const pts = orthoBend(a, b, lay.axis);
+  if (pts.length < 3) return null;
+  return pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+}
+
 function routeEdge(a, b, from, to, lay) {
+  if (lay.route === "ortho") return orthoPath(a, b, lay);
   if (lay.route !== "gutter" || !lay.boxBySerial) return null;
   const ba = lay.boxBySerial.get(from);
   const bb = lay.boxBySerial.get(to);

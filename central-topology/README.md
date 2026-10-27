@@ -64,12 +64,14 @@ With no credentials entered and `MOCK=1` (the default in `wrangler.toml`), the W
 
 The toolbar Layout control redraws the current switches and links. Hub and spoke is the default. Drag a node to pin it; double-click it to let the layout place it again. Pinned positions are stored per layout in `localStorage` under `ct-positions`. Switching layouts leaves every other layout's pins in place. Export overrides writes the pins into the same JSON file; an older file with no pins leaves them as they are.
 
+A diagram is drawn at least as large as the left-to-right tree, so labels stay readable. When that is wider or taller than the pane, the canvas scrolls. SVG, PNG, and JSON downloads still contain the whole graph.
+
 - **Hub and spoke.** The district core is in the center. Each building occupies a sector: its building core on the inner ring, its access switches on the outer ring. Switches in the district core's own building sit on the inner ring.
-- **Tiered tree, top-down.** The district core is the root. The next tier is every switch one hop away (the building cores, plus any access switch linked directly to the district core). Access switches sit on the tiers below their parent, so a daisy-chained switch adds a tier.
+- **Tiered tree, top-down.** The district core is the root. The next tier is every switch one hop away (the building cores, plus any access switch linked directly to the district core). Access switches sit on the tiers below their parent, so a daisy-chained switch adds a tier. Switches on a tier stay grouped under their parent, with a link that leaves the site placed on the side facing that neighbor. Links run in the gap between tiers.
 - **Tiered tree, left to right.** The same tiers, with hops running left to right. It stays readable on a wide viewport, where the depth fits across the page.
 - **Radial rings.** Tiers are concentric rings: district core, then building cores, then access switches. Each building's switches share an arc.
 - **Grouped by site.** Each site is a labelled box with that site's switches stacked inside. Links that stay in the site run through the gutter beside the box. Links that leave the site run through the lane above the boxes.
-- **Force-directed.** Links act as springs and nodes repel. The simulation starts from a fixed seed and stops when it settles, so the same data always produces the same picture. It does not keep moving.
+- **Force-directed.** Links act as springs and nodes repel. The simulation starts from a fixed seed and stops when it settles, so the same data always produces the same picture. It does not keep moving. The settled graph is centered in the frame with padding around every node.
 
 ## Worker endpoints
 

@@ -27,6 +27,18 @@ export function layoutById(id, model) {
   return { ...LAYOUT_FNS[spec.id](model), id: spec.id };
 }
 
+// On-screen px per user unit. Never below the left-to-right tree fitted into
+// the same pane, so a wide layout scrolls instead of shrinking its labels.
+// `bounds` and `reference` are {w, h}. The SVG width/height attributes stay
+// in user units; only the display size uses this scale.
+export function displayScale(bounds, avail, reference) {
+  const fitOf = (b) => Math.min(avail.w / b.w, avail.h / b.h);
+  const fit = fitOf(bounds);
+  const floor = reference ? fitOf(reference) : fit;
+  if (!Number.isFinite(fit) || !Number.isFinite(floor)) return 1;
+  return Math.max(fit, floor);
+}
+
 // Radial hub-and-spoke: district core in the middle, one sector per building
 // with its building core on the inner ring and access switches on the outer ring.
 export function layout(model) {
@@ -61,8 +73,9 @@ export function layout(model) {
       pos.set(n.serial, polar(r + stagger, s.mid + t * spread));
     });
     const outer = Math.max(s.hub ? GEOM.r1 : 0, ...s.spokes.map((n) => Math.hypot(pos.get(n.serial).x, pos.get(n.serial).y)));
-    // Past the outer node, clear of a horizontal label as well as the node rect.
-    s.labelAt = polar(outer + 156, s.mid);
+    const label = sectorLabel(s.mid, outer);
+    s.labelAt = label.labelAt;
+    s.anchor = label.anchor;
     a0 += span;
   }
 
@@ -113,12 +126,33 @@ export function layoutTree(model, orientation) {
     const parent = n.parent && children.has(n.parent) ? n.parent : coreSerial;
     if (parent !== n.serial) children.get(parent).push(n.serial);
   }
+  // Each tier follows its parent. Siblings stay contiguous, and a switch with
+  // a link into another building sits on the side facing that building so the
+  // extra link does not cross its siblings.
+  const buildingIndex = new Map(model.buildings.map((b, i) => [b, i]));
+  const neighbors = new Map(nodes.map((n) => [n.serial, []]));
+  for (const e of model.edges) {
+    if (!neighbors.has(e.from) || !neighbors.has(e.to)) continue;
+    neighbors.get(e.from).push(e.to);
+    neighbors.get(e.to).push(e.from);
+  }
+  const siblingPull = (id) => {
+    const n = byId.get(id);
+    const home = buildingIndex.get(n.building) ?? 0;
+    let best = null;
+    for (const other of neighbors.get(id) ?? []) {
+      if (other === n.parent || !byId.has(other)) continue;
+      const o = byId.get(other);
+      if (!o || o.building === n.building) continue;
+      const idx = buildingIndex.get(o.building) ?? home;
+      const dist = Math.abs(idx - home);
+      if (!best || dist > best.dist) best = { idx, dist };
+    }
+    if (!best) return home * 2;
+    return best.idx < home ? home * 2 - 1 : home * 2 + 1;
+  };
   for (const kids of children.values()) {
-    kids.sort((a, b) => {
-      const na = byId.get(a), nb = byId.get(b);
-      const rank = (n) => (n.role === "building-core" ? 0 : 1);
-      return rank(na) - rank(nb) || na.building.localeCompare(nb.building) || na.name.localeCompare(nb.name);
-    });
+    kids.sort((a, b) => siblingPull(a) - siblingPull(b) || byId.get(a).name.localeCompare(byId.get(b).name));
   }
   // Siblings share a tier. The gap clears a node rect plus a fallback ring.
   const unit = tb ? GEOM.nodeW + 36 : GEOM.nodeH + 28;
@@ -157,8 +191,8 @@ export function layoutTree(model, orientation) {
       pos.set(n.serial, tb ? { x: Math.round(cross), y: 0 } : { x: 0, y: Math.round(cross) });
     });
   }
-  const extPos = placeExternals(model, pos, "beside");
-  return pack(pos, extPos, []);
+  const extPos = placeExternals(model, pos, tb ? "tb" : "lr");
+  return { ...pack(pos, extPos, []), route: "ortho", axis: tb ? "y" : "x" };
 }
 
 // Concentric rings by tier. Ring 0 is the district core, ring 1 the building
@@ -207,11 +241,13 @@ export function layoutRadial(model) {
         pos.set(n.serial, polar(r, mid + t * spread));
       });
     }
-    g.labelAt = polar(outer + 132, mid);
+    const label = sectorLabel(mid, outer);
+    g.labelAt = label.labelAt;
+    g.anchor = label.anchor;
     a0 += span;
   }
   const extPos = placeExternals(model, pos, "out");
-  const sectors = groups.map((g) => ({ building: g.building, labelAt: g.labelAt, anchor: "middle" }));
+  const sectors = groups.map((g) => ({ building: g.building, labelAt: g.labelAt, anchor: g.anchor }));
   return pack(pos, extPos, sectors);
 }
 
@@ -225,10 +261,13 @@ export function layoutSites(model) {
   const boxBySerial = new Map();
   const sectors = [];
   const gapX = 72;
-  const padX = 24;
+  const padX = 28;
   const padTop = 36;
-  const padBot = 18;
+  const padBot = 28;
   const rowGap = 18;
+  const extGap = 28;
+  const extInset = 40;
+  const pillW = 120;
   const laneY = 0;
   let x = 0;
   for (const b of model.buildings) {
@@ -238,7 +277,7 @@ export function layoutSites(model) {
     });
     if (!members.length) continue;
     const exts = externalsOf(model, members);
-    const boxW = padX * 2 + GEOM.nodeW + (exts.length ? 16 + 120 : 0);
+    const boxW = exts.length ? padX + GEOM.nodeW + extGap + pillW + extInset : padX * 2 + GEOM.nodeW;
     const box = { x, y: 40, w: boxW, h: 0 };
     const cx = box.x + padX + GEOM.nodeW / 2;
     members.forEach((n, i) => {
@@ -250,7 +289,7 @@ export function layoutSites(model) {
     exts.forEach((ext, i) => {
       const anchor = pos.get(ext.local);
       const y = anchor.y + i * (GEOM.nodeH + rowGap);
-      const px = Math.round(cx + GEOM.nodeW / 2 + 16 + 60);
+      const px = Math.round(box.x + padX + GEOM.nodeW + extGap + pillW / 2);
       extPos.set(ext.id, { x: px, y });
       bottom = Math.max(bottom, y + 15 + padBot);
     });
@@ -356,9 +395,14 @@ export function layoutForce(model) {
   // Rounding can close a 1px gap. Push apart on the integer grid.
   separate(pos, [...pos.keys()], () => ({ w: 168, h: 58 }));
   const both = new Map([...pos, ...extPos]);
-  separate(both, [...both.keys()], (id) => (extPos.has(id) && !pos.has(id) ? { w: 136, h: 46 } : { w: 168, h: 58 }));
+  const gapOf = (id) => (extPos.has(id) && !pos.has(id) ? { w: 136, h: 46 } : { w: 168, h: 58 });
+  separate(both, [...both.keys()], gapOf);
+  // The repulsion pass leaves large gaps. Pull inward and separate again so
+  // the settled graph fills its frame instead of sitting in a sparse box.
+  compact(both, [...both.keys()], gapOf);
   for (const id of ids) pos.set(id, { x: Math.round(both.get(id).x), y: Math.round(both.get(id).y) });
   for (const e of exts) extPos.set(e.id, { x: Math.round(both.get(e.id).x), y: Math.round(both.get(e.id).y) });
+  frameSettled(pos, extPos);
   return pack(pos, extPos, []);
 }
 
@@ -466,6 +510,7 @@ function externalsOf(model, members) {
 function placeExternals(model, pos, mode) {
   const extPos = new Map();
   const obstacles = [...pos.values()].map((p) => ({ p, w: GEOM.nodeW, h: GEOM.nodeH }));
+  const segments = switchSegments(model, pos, mode === "out" ? null : mode === "lr" ? "x" : "y");
   for (const e of model.edges) {
     if (!e.external) continue;
     const local = model.byId.has(e.from) ? e.from : model.byId.has(e.to) ? e.to : null;
@@ -476,13 +521,13 @@ function placeExternals(model, pos, mode) {
     if (!p) continue;
     let ang = Math.atan2(p.y, p.x);
     if (!Number.isFinite(ang) || (p.x === 0 && p.y === 0)) ang = 0.7;
-    let placed = mode === "out"
-      ? { x: Math.round((Math.hypot(p.x, p.y) + 180) * Math.cos(ang)), y: Math.round((Math.hypot(p.x, p.y) + 180) * Math.sin(ang)) }
-      : { x: p.x + Math.round(GEOM.nodeW / 2 + 80), y: p.y };
-    for (let k = 0; k < 24 && hits(placed, 120, 30, obstacles); k++) {
-      placed = mode === "out"
-        ? { x: placed.x + Math.round(48 * Math.cos(ang)), y: placed.y + Math.round(48 * Math.sin(ang)) }
-        : { x: placed.x, y: placed.y + 72 };
+    const candidates = externalCandidates(p, mode, ang);
+    let placed = candidates[candidates.length - 1];
+    for (const c of candidates) {
+      if (hits(c, 120, 30, obstacles)) continue;
+      if (rectHitsAnySegment(pillRect(c, 8), segments)) continue;
+      placed = c;
+      break;
     }
     extPos.set(other, placed);
     obstacles.push({ p: placed, w: 120, h: 30 });
@@ -490,11 +535,174 @@ function placeExternals(model, pos, mode) {
   return extPos;
 }
 
+// Point the label out from the rim of its own sector. Text grows away from
+// the ring so a long name stays next to that arc instead of the canvas corner.
+function sectorLabel(mid, outer) {
+  const c = Math.cos(mid);
+  const s = Math.sin(mid);
+  const rim = polar(outer, mid);
+  const gap = 16;
+  if (Math.abs(c) >= Math.abs(s)) {
+    const dir = c >= 0 ? 1 : -1;
+    return {
+      anchor: dir > 0 ? "start" : "end",
+      labelAt: { x: rim.x + dir * (GEOM.nodeW / 2 + gap), y: rim.y + 4 },
+    };
+  }
+  const dir = s >= 0 ? 1 : -1;
+  return {
+    anchor: "middle",
+    labelAt: { x: rim.x, y: rim.y + dir * (GEOM.nodeH / 2 + gap + 11) },
+  };
+}
+
+// Translate the settled force graph so node centers sit in the middle of the
+// frame. boundsFor pads every center the same way, so the padding stays even.
+function frameSettled(pos, extPos) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of [...pos.values(), ...extPos.values()]) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  if (!Number.isFinite(minX)) return;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  for (const p of pos.values()) {
+    p.x = Math.round(p.x - cx);
+    p.y = Math.round(p.y - cy);
+  }
+  for (const p of extPos.values()) {
+    p.x = Math.round(p.x - cx);
+    p.y = Math.round(p.y - cy);
+  }
+}
+
+/** Bend points for a tree edge that runs in the gap between two tiers.
+ * `axis` is the depth direction: "y" top-down, "x" left-to-right.
+ */
+export function orthoBend(a, b, axis) {
+  if (a.x === b.x || a.y === b.y) return [a, b];
+  const alongX = axis === "x" || (axis !== "y" && Math.abs(b.x - a.x) >= Math.abs(b.y - a.y));
+  if (alongX) {
+    const mx = Math.round((a.x + b.x) / 2);
+    return [a, { x: mx, y: a.y }, { x: mx, y: b.y }, b];
+  }
+  const my = Math.round((a.y + b.y) / 2);
+  return [a, { x: a.x, y: my }, { x: b.x, y: my }, b];
+}
+
+function externalCandidates(p, mode, ang) {
+  if (mode === "out") {
+    const dist0 = Math.hypot(p.x, p.y) + 180;
+    const out = [];
+    for (let k = 0; k < 8; k++) {
+      const dist = dist0 + k * 48;
+      out.push({ x: Math.round(dist * Math.cos(ang)), y: Math.round(dist * Math.sin(ang)) });
+    }
+    return out;
+  }
+  // Tree links leave along the depth axis. Sit on the opposite side, then
+  // fall back to the cross axis, and only then along the links.
+  const dirs = mode === "lr" ? [[-1, 0], [0, -1], [0, 1], [1, 0]] : [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const gapX = Math.round(GEOM.nodeW / 2 + 76);
+  const gapY = Math.round(GEOM.nodeH / 2 + 36);
+  const out = [];
+  for (let step = 0; step < 6; step++) {
+    for (const [dx, dy] of dirs) {
+      out.push({
+        x: Math.round(p.x + dx * (gapX + step * 40)),
+        y: Math.round(p.y + dy * (gapY + step * 32)),
+      });
+    }
+  }
+  return out;
+}
+
+function switchSegments(model, pos, axis) {
+  const segs = [];
+  const add = (u, v) => {
+    const a = pos.get(u);
+    const b = pos.get(v);
+    if (!a || !b) return;
+    const pts = axis ? orthoBend(a, b, axis) : [a, b];
+    for (let i = 0; i < pts.length - 1; i++) segs.push([pts[i], pts[i + 1]]);
+  };
+  for (const e of model.edges) {
+    if (e.external) continue;
+    add(e.from, e.to);
+  }
+  for (const n of model.nodes) if (n.parent) add(n.serial, n.parent);
+  return segs;
+}
+
+function pillRect(p, margin) {
+  return { x: p.x - 60 - margin, y: p.y - 15 - margin, w: 120 + margin * 2, h: 30 + margin * 2 };
+}
+
+function rectHitsAnySegment(rect, segments) {
+  for (const [a, b] of segments) if (rectHitsSegment(rect, a, b)) return true;
+  return false;
+}
+
+function rectHitsSegment(rect, a, b) {
+  if (pointInRect(a, rect) || pointInRect(b, rect)) return true;
+  const corners = [
+    { x: rect.x, y: rect.y },
+    { x: rect.x + rect.w, y: rect.y },
+    { x: rect.x + rect.w, y: rect.y + rect.h },
+    { x: rect.x, y: rect.y + rect.h },
+  ];
+  for (let i = 0; i < 4; i++) if (segmentsTouch(a, b, corners[i], corners[(i + 1) % 4])) return true;
+  return false;
+}
+
+function pointInRect(p, rect) {
+  return p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h;
+}
+
+function segmentsTouch(a, b, c, d) {
+  const o = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const o1 = o(a, b, c);
+  const o2 = o(a, b, d);
+  const o3 = o(c, d, a);
+  const o4 = o(c, d, b);
+  if (o1 === 0 && onSeg(c, a, b)) return true;
+  if (o2 === 0 && onSeg(d, a, b)) return true;
+  if (o3 === 0 && onSeg(a, c, d)) return true;
+  if (o4 === 0 && onSeg(b, c, d)) return true;
+  return o1 * o2 < 0 && o3 * o4 < 0;
+}
+
+function onSeg(p, a, b) {
+  return p.x >= Math.min(a.x, b.x) - 0.5 && p.x <= Math.max(a.x, b.x) + 0.5
+    && p.y >= Math.min(a.y, b.y) - 0.5 && p.y <= Math.max(a.y, b.y) + 0.5;
+}
+
 function hits(p, w, h, obstacles) {
   for (const o of obstacles) {
     if (Math.abs(p.x - o.p.x) < (w + o.w) / 2 && Math.abs(p.y - o.p.y) < (h + o.h) / 2) return true;
   }
   return false;
+}
+
+function compact(points, ids, sizeOf) {
+  for (let pass = 0; pass < 48; pass++) {
+    let cx = 0, cy = 0;
+    for (const id of ids) {
+      cx += points.get(id).x;
+      cy += points.get(id).y;
+    }
+    cx /= ids.length;
+    cy /= ids.length;
+    for (const id of ids) {
+      const p = points.get(id);
+      p.x = cx + (p.x - cx) * 0.9;
+      p.y = cy + (p.y - cy) * 0.9;
+    }
+    separate(points, ids, sizeOf);
+  }
 }
 
 function separate(points, ids, sizeOf) {

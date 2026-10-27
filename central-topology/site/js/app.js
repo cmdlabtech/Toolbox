@@ -1,5 +1,5 @@
 import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED } from "./model.js";
-import { LAYOUTS, applyPositionOverrides, clearPosition, layoutById, writePosition } from "./layout.js";
+import { LAYOUTS, applyPositionOverrides, clearPosition, displayScale, layoutById, orthoBend, writePosition } from "./layout.js";
 import { renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, apiRequest, createVault, mintToken, normalise, tokenValid } from "./creds.js";
@@ -124,7 +124,27 @@ function paint() {
     subtitle: `${model.nodes.length} switches · ${model.buildings.length} buildings · ${layoutLabel} · Mgmt: ${mgmtLabel} · ${state.data.mock ? "MOCK DATA · " : ""}${new Date(state.data.generatedAt).toLocaleString()}`,
   });
   $("diagram").innerHTML = state.svg;
+  fitDiagram();
 }
+
+// Size the SVG in px. The width and height attributes stay in user units so
+// SVG, PNG, and JSON exports still hold the whole graph.
+function fitDiagram() {
+  const svg = $("diagram")?.querySelector("svg");
+  const lay = state.lay;
+  const model = state.model;
+  if (!svg || !lay?.bounds || !model) return;
+  const host = $("diagram");
+  const availW = Math.max(280, host.clientWidth - 32);
+  const availH = Math.max(280, window.innerHeight - host.getBoundingClientRect().top - 12);
+  const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
+  const scale = displayScale(lay.bounds, { w: availW, h: availH }, reference);
+  svg.style.width = `${Math.max(1, Math.round(lay.bounds.w * scale))}px`;
+  svg.style.height = `${Math.max(1, Math.round(lay.bounds.h * scale))}px`;
+  svg.style.maxWidth = "none";
+  svg.style.maxHeight = "none";
+}
+window.addEventListener("resize", () => fitDiagram());
 
 function draw() {
   if (!state.data) return;
@@ -226,6 +246,23 @@ function svgPoint(svg, ev) {
   return { x: p.x, y: p.y };
 }
 const near = (x, y, p) => Math.hypot(x - p.x, y - p.y) < 0.5;
+function edgeEnds(el) {
+  if (el.tagName === "line") {
+    return {
+      a: { x: +el.getAttribute("x1"), y: +el.getAttribute("y1") },
+      b: { x: +el.getAttribute("x2"), y: +el.getAttribute("y2") },
+      ortho: false,
+    };
+  }
+  if (el.tagName !== "path" || state.lay?.route !== "ortho") return null;
+  const nums = [...(el.getAttribute("d") ?? "").matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => +m[0]);
+  if (nums.length < 4) return null;
+  return {
+    a: { x: nums[0], y: nums[1] },
+    b: { x: nums[nums.length - 2], y: nums[nums.length - 1] },
+    ortho: true,
+  };
+}
 {
   let drag = null;
   const host = $("diagram");
@@ -237,11 +274,12 @@ const near = (x, y, p) => Math.hypot(x - p.x, y - p.y) < 0.5;
     const serial = g.dataset.serial;
     const origin = state.lay?.pos.get(serial);
     if (!svg || !origin) return;
-    const lines = [...svg.querySelectorAll("line")].flatMap((el) => {
-      const x1 = +el.getAttribute("x1"), y1 = +el.getAttribute("y1");
-      const x2 = +el.getAttribute("x2"), y2 = +el.getAttribute("y2");
-      const end = near(x1, y1, origin) ? "1" : near(x2, y2, origin) ? "2" : "";
-      return end ? [{ el, end }] : [];
+    const lines = [...svg.querySelectorAll("line, path")].flatMap((el) => {
+      const ends = edgeEnds(el);
+      if (!ends) return [];
+      const end = near(ends.a.x, ends.a.y, origin) ? "1" : near(ends.b.x, ends.b.y, origin) ? "2" : "";
+      if (!end) return [];
+      return [{ el, end, ortho: ends.ortho, other: end === "1" ? ends.b : ends.a }];
     });
     drag = { serial, origin, start: svgPoint(svg, ev), g, lines, moved: false, pointer: ev.pointerId };
     host.classList.add("dragging");
@@ -258,7 +296,12 @@ const near = (x, y, p) => Math.hypot(x - p.x, y - p.y) < 0.5;
     if (x !== drag.origin.x || y !== drag.origin.y) drag.moved = true;
     drag.g.setAttribute("transform", `translate(${x - drag.origin.x} ${y - drag.origin.y})`);
     for (const ln of drag.lines) {
-      if (ln.end === "1") { ln.el.setAttribute("x1", x); ln.el.setAttribute("y1", y); }
+      if (ln.ortho) {
+        const a = ln.end === "1" ? { x, y } : ln.other;
+        const b = ln.end === "1" ? ln.other : { x, y };
+        const pts = orthoBend(a, b, state.lay?.axis);
+        ln.el.setAttribute("d", pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" "));
+      } else if (ln.end === "1") { ln.el.setAttribute("x1", x); ln.el.setAttribute("y1", y); }
       else { ln.el.setAttribute("x2", x); ln.el.setAttribute("y2", y); }
     }
     drag.x = x;

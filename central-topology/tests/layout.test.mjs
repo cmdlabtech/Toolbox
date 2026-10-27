@@ -5,7 +5,7 @@ import { buildModel, parseOverrides } from "../site/js/model.js";
 import { jsonExport } from "../site/js/export.js";
 import { renderSvg } from "../site/js/render.js";
 import {
-  GEOM, LAYOUTS, applyPositionOverrides, clearPosition, labelBox, layout, layoutById, writePosition,
+  GEOM, LAYOUTS, applyPositionOverrides, clearPosition, displayScale, labelBox, layout, layoutById, orthoBend, writePosition,
 } from "../site/js/layout.js";
 
 const data = await topologyFromFixtures();
@@ -136,4 +136,158 @@ test("override import keeps a per-layout position map and still rejects a bad fi
   assert.deepEqual(body.positions.sites.A, { x: 1, y: 2 });
   assert.equal(body.switches.length, 19);
   assert.equal(body.links.length, model.edges.length);
+});
+
+function samePoint(a, b) {
+  return Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5;
+}
+
+function orient(a, b, c) {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+function properCross(a, b, c, d) {
+  if (samePoint(a, c) || samePoint(a, d) || samePoint(b, c) || samePoint(b, d)) return false;
+  const o1 = orient(a, b, c);
+  const o2 = orient(a, b, d);
+  const o3 = orient(c, d, a);
+  const o4 = orient(c, d, b);
+  return o1 * o2 < 0 && o3 * o4 < 0;
+}
+
+function drawnSegments(lay) {
+  const at = (id) => lay.pos.get(id) ?? lay.extPos?.get(id);
+  const segs = [];
+  const add = (u, v) => {
+    const a = at(u);
+    const b = at(v);
+    if (!a || !b) return;
+    const pts = lay.route === "ortho" ? orthoBend(a, b, lay.axis) : [a, b];
+    for (let i = 0; i < pts.length - 1; i++) segs.push({ a: pts[i], b: pts[i + 1], u, v });
+  };
+  const seen = new Set();
+  for (const e of model.edges) {
+    seen.add([e.from, e.to].sort().join("|"));
+    add(e.from, e.to);
+  }
+  for (const n of model.nodes) {
+    if (!n.parent || seen.has([n.serial, n.parent].sort().join("|"))) continue;
+    add(n.serial, n.parent);
+  }
+  return segs;
+}
+
+function pointInRect(p, r) {
+  return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+}
+
+function segmentHitsRect(a, b, r) {
+  if (pointInRect(a, r) || pointInRect(b, r)) return true;
+  const corners = [
+    { x: r.x, y: r.y }, { x: r.x + r.w, y: r.y },
+    { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h },
+  ];
+  for (let i = 0; i < 4; i++) if (properCross(a, b, corners[i], corners[(i + 1) % 4])) return true;
+  return false;
+}
+
+test("mock trees have no crossing links and no link through another node", () => {
+  for (const id of ["tree-tb", "tree-lr"]) {
+    const lay = layoutById(id, model);
+    const segs = drawnSegments(lay);
+    for (let i = 0; i < segs.length; i++) {
+      for (let j = i + 1; j < segs.length; j++) {
+        assert.equal(properCross(segs[i].a, segs[i].b, segs[j].a, segs[j].b), false, `${id} segments cross`);
+      }
+    }
+    const boxes = boxesOf(lay);
+    for (const seg of segs) {
+      for (const box of boxes) {
+        if (box.id.startsWith("label:")) continue;
+        const aName = model.nodes.find((n) => n.serial === seg.u)?.name ?? model.externals.find((e) => e.serial === seg.u)?.name ?? seg.u;
+        const bName = model.nodes.find((n) => n.serial === seg.v)?.name ?? model.externals.find((e) => e.serial === seg.v)?.name ?? seg.v;
+        if (box.id === aName || box.id === bName) continue;
+        assert.equal(segmentHitsRect(seg.a, seg.b, box), false, `${id}: ${aName}–${bName} runs through ${box.id}`);
+      }
+    }
+  }
+});
+
+test("display scale stays finite and does not shrink below the left-to-right tree", () => {
+  const avail = { w: 1055, h: 740 };
+  const lr = layoutById("tree-lr", model).bounds;
+  const floor = Math.min(avail.w / lr.w, avail.h / lr.h);
+  assert.equal(Number.isFinite(floor) && floor > 0, true);
+  for (const spec of LAYOUTS) {
+    const lay = layoutById(spec.id, model);
+    const scale = displayScale(lay.bounds, avail, lr);
+    const fit = Math.min(avail.w / lay.bounds.w, avail.h / lay.bounds.h);
+    assert.equal(Number.isFinite(scale) && scale > 0, true, spec.id);
+    assert.ok(scale + 1e-9 >= floor, `${spec.id} scale ${scale} below ${floor}`);
+    assert.ok(scale + 1e-9 >= fit, spec.id);
+    for (const n of model.nodes) {
+      const p = lay.pos.get(n.serial);
+      assert.equal(Number.isFinite(p.x) && Number.isFinite(p.y), true, spec.id);
+    }
+    const svg = renderSvg(model, lay, { tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: spec.label });
+    assert.match(svg, new RegExp(`width="${Math.round(lay.bounds.w)}"`), `${spec.id} export width`);
+    assert.match(svg, new RegExp(`height="${Math.round(lay.bounds.h)}"`), `${spec.id} export height`);
+    for (const n of model.nodes) assert.ok(svg.includes(n.name), `${spec.id} export ${n.name}`);
+  }
+  const wide = displayScale({ w: 4000, h: 400 }, avail, lr);
+  assert.ok(wide > Math.min(avail.w / 4000, avail.h / 400));
+});
+
+test("force-directed graph is centered, with every node inside the frame", () => {
+  const lay = layoutById("force", model);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, bottom = -Infinity;
+  for (const p of [...lay.pos.values(), ...lay.extPos.values()]) {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+  const mid = (minX + maxX) / 2;
+  const frameMid = lay.bounds.x + lay.bounds.w / 2;
+  assert.ok(Math.abs(mid - frameMid) <= 1, `center ${mid} vs frame ${frameMid}`);
+  for (const n of model.nodes) {
+    const p = lay.pos.get(n.serial);
+    const top = p.y - GEOM.nodeH / 2;
+    const foot = p.y + GEOM.nodeH / 2;
+    bottom = Math.max(bottom, foot);
+    assert.ok(p.x - GEOM.nodeW / 2 >= lay.bounds.x + 20, n.name);
+    assert.ok(p.x + GEOM.nodeW / 2 <= lay.bounds.x + lay.bounds.w - 20, n.name);
+    assert.ok(top >= lay.bounds.y + 72, n.name);
+    assert.ok(foot <= lay.bounds.y + lay.bounds.h - 20, n.name);
+  }
+  assert.ok(bottom <= lay.bounds.y + lay.bounds.h - 20);
+  assert.equal(Number.isFinite(lay.bounds.w + lay.bounds.h), true);
+});
+
+test("site ghosts sit fully inside their box with a gap, and tree ghosts sit off other links", () => {
+  const sites = layoutById("sites", model);
+  const boxes = (sites.sectors ?? []).filter((s) => s.box).map((s) => s.box);
+  const inside = (pill, box, gap) => pill.x >= box.x + gap && pill.y >= box.y + gap
+    && pill.x + pill.w <= box.x + box.w - gap && pill.y + pill.h <= box.y + box.h - gap;
+  const separated = (pill, box, gap) => pill.x + pill.w + gap <= box.x || box.x + box.w + gap <= pill.x
+    || pill.y + pill.h + gap <= box.y || box.y + box.h + gap <= pill.y;
+  for (const [id, p] of sites.extPos) {
+    const pill = { x: p.x - 60, y: p.y - 15, w: 120, h: 30 };
+    const name = model.externals.find((e) => e.serial === id)?.name ?? id;
+    for (const box of boxes) {
+      assert.ok(inside(pill, box, 12) || separated(pill, box, 12), `${name} meets a site border`);
+    }
+  }
+  for (const id of ["tree-lr", "tree-tb"]) {
+    const lay = layoutById(id, model);
+    const segs = drawnSegments(lay);
+    for (const [extId, p] of lay.extPos) {
+      const pill = { x: p.x - 60, y: p.y - 15, w: 120, h: 30 };
+      const name = model.externals.find((e) => e.serial === extId)?.name ?? extId;
+      for (const seg of segs) {
+        if (seg.u === extId || seg.v === extId) continue;
+        assert.equal(segmentHitsRect(seg.a, seg.b, pill), false, `${id}: ${name} sits on a link`);
+      }
+    }
+  }
 });
