@@ -1,10 +1,10 @@
 # Central Topology
 
-A switch topology diagram for a new Central (HPE GreenLake) tenant. It draws a hub-and-spoke layout: the district core sits in the middle, each building core is a hub, and access switches are spokes. Each node is labeled with its name and a management IP you choose. You can download the diagram as SVG, PNG or JSON.
+A switch topology diagram for a new Central (HPE GreenLake) tenant. A layout picker draws the same switches six ways. Hub and spoke is the default: the district core sits in the middle, each building core is a hub, and access switches are spokes. Each node is labeled with its name and a management IP you choose. You can download the diagram as SVG, PNG or JSON.
 
 - `site/`: a static page with no build step, hosted on Cloudflare Pages.
 - `worker/`: a stateless, read-only pass-through on Cloudflare Workers. It holds no credentials. It is new Central only, and the topology API is the inventory source.
-- `tests/`: `node --test`. Covers the Worker merge against the fixtures, role inference, management-IP choice, override parsing, and the credential model: nothing persisted or logged server-side, and requests without credentials get mock data or a 401.
+- `tests/`: `node --test`. Covers the Worker merge against the fixtures, role inference, management-IP choice, override parsing, layout placement, and the credential model: nothing persisted or logged server-side, and requests without credentials get mock data or a 401.
 - `docs/API-NOTES.md`: every Central call with its doc link, which items are unverified, the auth flow, the CORS check, and the management-IP path end to end.
 - `TOKEN-RISK.md`: the credential model (bring your own, held in the browser) and its residual risks.
 
@@ -53,12 +53,25 @@ With no credentials entered and `MOCK=1` (the default in `wrangler.toml`), the W
    - Each building's core is its switch closest to the district core, measured by BFS hops.
    - Everything else is access.
    - Ambiguous switches are flagged: no site, linked into another building, multi-homed, or no path to the core.
-3. Overrides are stored in `localStorage` under `ct-overrides`. You can set the district core, or a switch's building or role, then export or import them as JSON.
-4. `layout.js` places nodes radially. `render.js` produces one self-contained SVG with colors taken from the `theme.css` tokens.
-5. Downloads:
+3. Overrides are stored in `localStorage` under `ct-overrides`. You can set the district core, or a switch's building or role, then export or import them as JSON. Those apply in every layout.
+4. `layout.js` places nodes. The Layout picker selects one of the six layouts below; the choice is kept in `localStorage` under `ct-layout`. `render.js` produces one self-contained SVG with colors taken from the `theme.css` tokens.
+5. Downloads follow the layout on screen:
    - SVG is that string.
    - PNG is the SVG drawn onto a 2× canvas.
-   - JSON has the model, the selected management IP for each switch, and your overrides.
+   - JSON has the model, the selected management IP for each switch, the layout id, position overrides, and your other overrides.
+
+## Layouts
+
+The toolbar Layout control redraws the current switches and links. Hub and spoke is the default. Drag a node to pin it; double-click it to let the layout place it again. Pinned positions are stored per layout in `localStorage` under `ct-positions`. Switching layouts leaves every other layout's pins in place. Export overrides writes the pins into the same JSON file; an older file with no pins leaves them as they are.
+
+A wide diagram keeps the left-to-right label size and scrolls sideways inside the card. A diagram that already fits, including radial rings, is drawn fitted inside the frame. The title, the detail line, and the legend stay above a scrolling graph. SVG, PNG, and JSON downloads still contain the whole graph.
+
+- **Hub and spoke.** The district core is in the center. Each building occupies a sector: its building core on the inner ring, its access switches on the outer ring. Switches in the district core's own building sit on the inner ring.
+- **Tiered tree, top-down.** The district core is the root. The next tier is every switch one hop away (the building cores, plus any access switch linked directly to the district core). Access switches sit on the tiers below their parent, so a daisy-chained switch adds a tier. Switches on a tier stay grouped under their parent, with a link that leaves the site placed on the side facing that neighbor. Links run in the gap between tiers.
+- **Tiered tree, left to right.** The same tiers, with hops running left to right. It stays readable on a wide viewport, where the depth fits across the page.
+- **Radial rings.** Tiers are concentric rings: district core, then building cores, then access switches. Each building's switches share an arc.
+- **Grouped by site.** Each site is a labelled box with that site's switches stacked inside. Links that stay in the site run through the gutter beside the box. Links that leave the site run through the lane above the boxes.
+- **Force-directed.** Links act as springs and nodes repel. The simulation starts from a fixed seed and stops when it settles, so the same data always produces the same picture. It does not keep moving. The settled graph is centered in the frame, with at least a 16px gap between node boxes.
 
 ## Worker endpoints
 
