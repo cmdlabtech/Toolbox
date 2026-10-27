@@ -1,0 +1,648 @@
+{
+ "SG188EFC07": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": "10.20.0.1",
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.0.1",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG28851A9C": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.0.11",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG2EFE1AD2": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.0.12",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG6EBB7402": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": "10.20.1.1",
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.1.1",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG4D0640FC": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.1.11",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG5D186396": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.1.12",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SGB0423702": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.1.13",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG1682C978": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.1.14",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG36670055": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": "10.20.2.1",
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.2.1",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SGC40767FF": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.2.11",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SGAE5515DB": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.2.12",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG29060159": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.2.13",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG63D57F1D": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": "10.20.3.1",
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.3.1",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG0975B360": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.3.11",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG74C757A1": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SGC5489CBB": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": "10.20.4.1",
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.4.1",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG7F217032": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.4.11",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG4DC4F1DA": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": "10.99.4.12",
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SG83363C34": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ }
+}

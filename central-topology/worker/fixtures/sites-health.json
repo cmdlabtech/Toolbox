@@ -1,0 +1,82 @@
+{
+ "items": [
+  {
+   "id": "2107231",
+   "type": "network-monitoring/site-health",
+   "siteName": "District Office",
+   "address": {
+    "country": "US",
+    "address": "",
+    "city": "Westfield",
+    "zipCode": "46074",
+    "state": "IN"
+   },
+   "devices": {
+    "count": 3
+   }
+  },
+  {
+   "id": "2651049",
+   "type": "network-monitoring/site-health",
+   "siteName": "Maple ES",
+   "address": {
+    "country": "US",
+    "address": "",
+    "city": "Westfield",
+    "zipCode": "46074",
+    "state": "IN"
+   },
+   "devices": {
+    "count": 3
+   }
+  },
+  {
+   "id": "2910578",
+   "type": "network-monitoring/site-health",
+   "siteName": "Oak MS",
+   "address": {
+    "country": "US",
+    "address": "",
+    "city": "Westfield",
+    "zipCode": "46074",
+    "state": "IN"
+   },
+   "devices": {
+    "count": 5
+   }
+  },
+  {
+   "id": "2437665",
+   "type": "network-monitoring/site-health",
+   "siteName": "Pine ES",
+   "address": {
+    "country": "US",
+    "address": "",
+    "city": "Westfield",
+    "zipCode": "46074",
+    "state": "IN"
+   },
+   "devices": {
+    "count": 3
+   }
+  },
+  {
+   "id": "2864147",
+   "type": "network-monitoring/site-health",
+   "siteName": "Westfield HS",
+   "address": {
+    "country": "US",
+    "address": "",
+    "city": "Westfield",
+    "zipCode": "46074",
+    "state": "IN"
+   },
+   "devices": {
+    "count": 5
+   }
+  }
+ ],
+ "count": 5,
+ "total": 5,
+ "offset": 0
+}

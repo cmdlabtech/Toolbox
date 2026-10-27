@@ -1,0 +1,47 @@
+/* Design tokens. Everything visual reads from here, including the exported
+   SVG/PNG (render.js resolves these at render time), so a future PDF can
+   reuse the same palette by copying this file. */
+:root {
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #16181d;
+  --muted: #5d6573;
+  --border: #dfe3ea;
+  --accent: #1f6feb;
+  --radius: 10px;
+
+  --diagram-bg: #ffffff;
+  --diagram-fg: #16181d;
+  --diagram-muted: #5d6573;
+  --node-fill: #ffffff;
+  --node-core: #b42318;
+  --node-bcore: #1f6feb;
+  --node-access: #2f9e6e;
+  --node-ext: #98a2b3;
+  --edge: #8b95a7;
+  --edge-inferred: #c0c6d2;
+  --warn: #c77700;
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115;
+  --surface: #171a21;
+  --fg: #e7eaf0;
+  --muted: #9aa3b2;
+  --border: #2a2f3a;
+  --accent: #4c8dff;
+
+  --diagram-bg: #12151b;
+  --diagram-fg: #e7eaf0;
+  --diagram-muted: #9aa3b2;
+  --node-fill: #1a1e26;
+  --node-core: #f97066;
+  --node-bcore: #6aa2ff;
+  --node-access: #4fc28f;
+  --node-ext: #667085;
+  --edge: #5b6577;
+  --edge-inferred: #3b4250;
+  --warn: #f5a524;
+}

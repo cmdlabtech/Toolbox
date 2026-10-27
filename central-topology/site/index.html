@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Central Topology</title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="app.css">
+  <script src="config.js"></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header>
+    <span class="brand">CMDLAB</span>
+    <h1>Central Topology</h1>
+    <span id="mockBadge" class="badge" hidden>Mock data</span>
+    <span class="spacer"></span>
+    <span id="connState" class="conn" aria-live="polite">Not connected</span>
+    <button id="credsBtn" type="button" aria-expanded="false" aria-controls="credsPanel">Credentials</button>
+    <button id="themeBtn" type="button">Theme</button>
+  </header>
+  <div class="toolbar">
+    <button id="refreshBtn" class="primary" type="button">Refresh</button>
+    <label>Mgmt IP <select id="mgmtSel"></select></label>
+    <label>District core <select id="coreSel"></select></label>
+    <div class="group">
+      <button id="dlSvg" type="button">Download SVG</button>
+      <button id="dlPng" type="button">Download PNG</button>
+      <button id="dlJson" type="button">Download JSON</button>
+    </div>
+    <div class="group">
+      <button id="ovExport" type="button">Export overrides</button>
+      <button id="ovImport" type="button">Import overrides</button>
+      <button id="ovReset" type="button">Reset overrides</button>
+      <input id="ovFile" type="file" accept="application/json,.json" hidden>
+    </div>
+  </div>
+  <section id="credsPanel" class="creds" hidden aria-labelledby="credsTitle">
+    <h2 id="credsTitle">Central credentials</h2>
+    <p class="note">Credentials stay in this browser. They are sent only in request headers to HPE GreenLake and new Central (through a stateless pass-through that stores and logs nothing). Without credentials the page shows mock data.</p>
+    <div class="fields">
+      <label>Cluster <select id="cBase"></select></label>
+      <fieldset class="method">
+        <legend>Sign-in method</legend>
+        <label><input type="radio" name="cMethod" value="client" checked> Client ID + secret</label>
+        <label><input type="radio" name="cMethod" value="token"> Bearer token</label>
+      </fieldset>
+      <label data-for="client">Client ID <input id="cId" type="text" autocomplete="off" spellcheck="false"></label>
+      <label data-for="client">Client secret <input id="cSecret" type="password" autocomplete="off"></label>
+      <label data-for="token" hidden>Bearer token <input id="cToken" type="password" autocomplete="off"></label>
+      <label class="check"><input id="cRemember" type="checkbox"> Remember on this device (localStorage; otherwise cleared when the tab closes)</label>
+    </div>
+    <div class="actions">
+      <button id="cConnect" class="primary" type="button">Connect</button>
+      <button id="cForget" type="button">Forget</button>
+      <button id="cClose" type="button">Close</button>
+      <span id="cMsg" role="status"></span>
+    </div>
+  </section>
+  <div id="status" role="status">Loading…</div>
+  <main>
+    <div id="diagram"></div>
+    <aside id="side"></aside>
+  </main>
+</body>
+</html>

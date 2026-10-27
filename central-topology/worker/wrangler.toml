@@ -1,0 +1,29 @@
+# central-topology-api: stateless, read-only pass-through to the new Central (MRT) API.
+# Local dev: `npm run dev` (wrangler dev --assets ../site) serves the page and /api/*
+# on one origin. Hosted, the page is a separate Cloudflare Pages project.
+#
+# This Worker holds NO credentials: no secrets, no KV, no Durable Objects, no
+# cache. Each request carries the caller's own access token and cluster URL in
+# headers (Authorization, X-Central-Base); see ../TOKEN-RISK.md.
+name = "central-topology-api"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# "1" = requests without credentials get synthetic fixtures (./fixtures).
+# "0" = requests without credentials get 401.
+MOCK = "1"
+# Comma-separated origins allowed to call /api/* cross-origin (the Pages site).
+ALLOWED_ORIGINS = "https://central-topology.pages.dev"
+
+# Public preview (mock data by default). Deploy: npx wrangler deploy --env preview
+# Pairs with the Pages project central-topology-preview (see ../site/config.js).
+# No secrets and no storage bindings; MOCK stays "1".
+[env.preview]
+name = "central-topology-preview"
+workers_dev = true
+preview_urls = false
+
+[env.preview.vars]
+MOCK = "1"
+ALLOWED_ORIGINS = "https://central-topology-preview.pages.dev"
