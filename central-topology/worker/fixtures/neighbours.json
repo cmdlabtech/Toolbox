@@ -1,0 +1,496 @@
+{
+ "SG188EFC07": {
+  "id": "SG188EFC07",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG6EBB7402",
+    "name": "WHS-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/1",
+    "toPort": "1/1/49",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
+   },
+   {
+    "serial": "SG36670055",
+    "name": "OMS-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/2",
+    "toPort": "1/1/49",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   },
+   {
+    "serial": "SG63D57F1D",
+    "name": "MES-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/3",
+    "toPort": "1/1/49",
+    "siteId": "2651049",
+    "siteName": "Maple ES"
+   },
+   {
+    "serial": "SGC5489CBB",
+    "name": "PES-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/4",
+    "toPort": "1/1/49",
+    "siteId": "2437665",
+    "siteName": "Pine ES"
+   },
+   {
+    "serial": "SG28851A9C",
+    "name": "DO-ACC-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/10",
+    "toPort": "1/1/49",
+    "siteId": "2107231",
+    "siteName": "District Office"
+   },
+   {
+    "serial": "SG2EFE1AD2",
+    "name": "DO-ACC-02",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/11",
+    "toPort": "1/1/49",
+    "siteId": "2107231",
+    "siteName": "District Office"
+   }
+  ]
+ },
+ "SG28851A9C": {
+  "id": "SG28851A9C",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG188EFC07",
+    "name": "DO-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/10",
+    "siteId": "2107231",
+    "siteName": "District Office"
+   }
+  ]
+ },
+ "SG2EFE1AD2": {
+  "id": "SG2EFE1AD2",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG188EFC07",
+    "name": "DO-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/11",
+    "siteId": "2107231",
+    "siteName": "District Office"
+   }
+  ]
+ },
+ "SG6EBB7402": {
+  "id": "SG6EBB7402",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG188EFC07",
+    "name": "DO-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/1",
+    "siteId": "2107231",
+    "siteName": "District Office"
+   },
+   {
+    "serial": "SG4D0640FC",
+    "name": "WHS-ACC-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/1",
+    "toPort": "1/1/49",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
+   },
+   {
+    "serial": "SG5D186396",
+    "name": "WHS-ACC-02",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/2",
+    "toPort": "1/1/49",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
+   },
+   {
+    "serial": "SGB0423702",
+    "name": "WHS-ACC-03",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/3",
+    "toPort": "1/1/49",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
+   },
+   {
+    "serial": "SG1682C978",
+    "name": "WHS-ACC-04",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/4",
+    "toPort": "1/1/49",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
+   }
+  ]
+ },
+ "SG4D0640FC": {
+  "id": "SG4D0640FC",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG6EBB7402",
+    "name": "WHS-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/1",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
+   }
+  ]
+ },
+ "SG5D186396": {
+  "id": "SG5D186396",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG6EBB7402",
+    "name": "WHS-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/2",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
+   }
+  ]
+ },
+ "SGB0423702": {
+  "id": "SGB0423702",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG6EBB7402",
+    "name": "WHS-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/3",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
+   }
+  ]
+ },
+ "SG1682C978": {
+  "id": "SG1682C978",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG6EBB7402",
+    "name": "WHS-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/4",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
+   }
+  ]
+ },
+ "SG36670055": {
+  "id": "SG36670055",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG188EFC07",
+    "name": "DO-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/2",
+    "siteId": "2107231",
+    "siteName": "District Office"
+   },
+   {
+    "serial": "SGC40767FF",
+    "name": "OMS-ACC-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/1",
+    "toPort": "1/1/49",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   },
+   {
+    "serial": "SGAE5515DB",
+    "name": "OMS-ACC-02",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/2",
+    "toPort": "1/1/49",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   },
+   {
+    "serial": "SG29060159",
+    "name": "OMS-ACC-03",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/3",
+    "toPort": "1/1/49",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   },
+   {
+    "serial": "SG83363C34",
+    "name": "SPARE-SW-07",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/20",
+    "toPort": "1/1/25",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   }
+  ]
+ },
+ "SGC40767FF": {
+  "id": "SGC40767FF",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG36670055",
+    "name": "OMS-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/1",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   }
+  ]
+ },
+ "SGAE5515DB": {
+  "id": "SGAE5515DB",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG36670055",
+    "name": "OMS-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/2",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   }
+  ]
+ },
+ "SG29060159": {
+  "id": "SG29060159",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG36670055",
+    "name": "OMS-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/3",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   }
+  ]
+ },
+ "SG63D57F1D": {
+  "id": "SG63D57F1D",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG188EFC07",
+    "name": "DO-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/3",
+    "siteId": "2107231",
+    "siteName": "District Office"
+   },
+   {
+    "serial": "SG0975B360",
+    "name": "MES-ACC-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/1",
+    "toPort": "1/1/49",
+    "siteId": "2651049",
+    "siteName": "Maple ES"
+   },
+   {
+    "serial": "SG74C757A1",
+    "name": "MES-ACC-02",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/2",
+    "toPort": "1/1/49",
+    "siteId": "2651049",
+    "siteName": "Maple ES"
+   },
+   {
+    "serial": "SG83363C34",
+    "name": "SPARE-SW-07",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/20",
+    "toPort": "1/1/26",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   }
+  ]
+ },
+ "SG0975B360": {
+  "id": "SG0975B360",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG63D57F1D",
+    "name": "MES-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/1",
+    "siteId": "2651049",
+    "siteName": "Maple ES"
+   }
+  ]
+ },
+ "SG74C757A1": {
+  "id": "SG74C757A1",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG63D57F1D",
+    "name": "MES-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/2",
+    "siteId": "2651049",
+    "siteName": "Maple ES"
+   }
+  ]
+ },
+ "SGC5489CBB": {
+  "id": "SGC5489CBB",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG188EFC07",
+    "name": "DO-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/4",
+    "siteId": "2107231",
+    "siteName": "District Office"
+   },
+   {
+    "serial": "SG7F217032",
+    "name": "PES-ACC-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/1",
+    "toPort": "1/1/49",
+    "siteId": "2437665",
+    "siteName": "Pine ES"
+   }
+  ]
+ },
+ "SG7F217032": {
+  "id": "SG7F217032",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SGC5489CBB",
+    "name": "PES-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/1",
+    "siteId": "2437665",
+    "siteName": "Pine ES"
+   },
+   {
+    "serial": "SG4DC4F1DA",
+    "name": "PES-ACC-02",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/50",
+    "toPort": "1/1/49",
+    "siteId": "2437665",
+    "siteName": "Pine ES"
+   }
+  ]
+ },
+ "SG4DC4F1DA": {
+  "id": "SG4DC4F1DA",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG7F217032",
+    "name": "PES-ACC-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/49",
+    "toPort": "1/1/50",
+    "siteId": "2437665",
+    "siteName": "Pine ES"
+   }
+  ]
+ },
+ "SG83363C34": {
+  "id": "SG83363C34",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG36670055",
+    "name": "OMS-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/25",
+    "toPort": "1/1/20",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   },
+   {
+    "serial": "SG63D57F1D",
+    "name": "MES-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/26",
+    "toPort": "1/1/20",
+    "siteId": "2651049",
+    "siteName": "Maple ES"
+   }
+  ]
+ }
+}

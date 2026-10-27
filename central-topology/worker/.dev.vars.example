@@ -1,0 +1,4 @@
+# Local overrides for `wrangler dev` (copy to .dev.vars, which is gitignored).
+# There are no credential settings: credentials are entered in the browser
+# and sent per request. Nothing secret belongs in this file.
+MOCK=1

@@ -1,0 +1,50 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { topologyFromFixtures } from "./helpers.mjs";
+import { asList, interfaceKind, scrub } from "../worker/src/central.ts";
+
+test("inventory comes only from sites-health + per-site topology (no device inventory call)", async () => {
+  const calls = [];
+  const data = await topologyFromFixtures(calls);
+  assert.equal(data.switches.length, 19);
+  assert.ok(calls.includes("/network-monitoring/v1/sites-health"));
+  assert.equal(calls.filter((c) => c.startsWith("/network-monitoring/v1/topology/")).length, 5);
+  for (const c of calls) {
+    assert.doesNotMatch(c, /\/network-monitoring\/v1\/(devices|switches)$/, `inventory call made: ${c}`);
+    assert.doesNotMatch(c, /device-inventory|\/monitoring\/v1\//);
+  }
+});
+
+test("switches seen in several site topologies get their home site from switch detail", async () => {
+  const data = await topologyFromFixtures();
+  const core = data.switches.find((s) => s.name === "DO-CORE-01");
+  assert.equal(core.site, "District Office");
+  assert.equal(core.siteSource, "switch-detail");
+  const mes = data.switches.find((s) => s.name === "MES-CORE-01");
+  assert.equal(mes.site, "Maple ES");
+  assert.equal(data.switches.find((s) => s.name === "WHS-ACC-01").siteSource, "topology");
+});
+
+test("LLDP fill-in reconnects a site whose topology omits the cross-site uplink", async () => {
+  const data = await topologyFromFixtures();
+  const pes = data.switches.find((s) => s.name === "PES-CORE-01").serial;
+  const core = data.switches.find((s) => s.name === "DO-CORE-01").serial;
+  const l = data.links.find((x) => [x.from, x.to].includes(pes) && [x.from, x.to].includes(core));
+  assert.ok(l, "PES uplink present");
+  assert.equal(l.source, "neighbours");
+});
+
+test("non-switch topology devices are kept as externals", async () => {
+  const data = await topologyFromFixtures();
+  assert.deepEqual(data.externals.map((e) => e.name).sort(), ["DO-FW-01", "WHS-AP-114"]);
+});
+
+test("helpers", () => {
+  assert.deepEqual(asList({ serial: "A" }), [{ serial: "A" }]);
+  assert.equal(asList(null).length, 0);
+  assert.equal(interfaceKind("mgmt", null), "oobm");
+  assert.equal(interfaceKind("loopback0", null), "loopback");
+  assert.equal(interfaceKind("1/1/1", "ETHERNET"), "other");
+  const s = scrub('Bearer abc.def {"access_token":"xyz"}');
+  assert.doesNotMatch(s, /abc\.def|xyz/);
+});

@@ -38,6 +38,7 @@
 | **[NetWatch](netwatch/)** | Continuous ICMP loss monitoring, automatic packet capture, Claude / Grok root-cause analysis | [Docs](netwatch/) · [Releases](https://github.com/cmdlabtech/Netwatch/releases) |
 | **[AOS-CX Config Backup](aos-cx-config-backup/)** | Scheduled AOS-CX config backups from a Windows tray app (local, GitHub, or Wasabi S3) | [Docs](aos-cx-config-backup/) · [EXE V3.7](https://github.com/cmdlabtech/AOS-CX-Config-Backup-Tool/releases/download/V3.7/AOS-CX.Config.Backup.Tool.exe) |
 | **[GreenLake AP Licensing](greenlake-ap-licensing/)** | Join GreenLake subscriptions with Central AP status into one searchable HTML report | **[Launch hosted app](https://ap-license-report.admin2655.workers.dev/)** · [Docs](greenlake-ap-licensing/) |
+| **[Central Topology](central-topology/)** | Hub-and-spoke switch topology for new Central, with SVG, PNG, and JSON export; credentials stay in the browser | **[Launch preview (mock data)](https://central-topology-preview.pages.dev/)** · [Docs](central-topology/) |
 | **[ClearPass Endpoint Console](clearpass-endpoint-console/)** | Bulk / manual MAC import into Policy Manager endpoints and Guest devices | [Open console](clearpass-endpoint-console/) · [Docs](clearpass-endpoint-console/) |
 | **[ClearPass CertKit notes](clearpass-certkit/)** | Ops checklist for CertKit → ClearPass certificate deploy + ISRG Root X1 PEM | [Docs](clearpass-certkit/) |
 
