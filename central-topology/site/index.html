@@ -42,9 +42,10 @@
       <label>Cluster <select id="cBase"></select></label>
       <fieldset class="method">
         <legend>Sign-in method</legend>
-        <label><input type="radio" name="cMethod" value="client" checked> Client ID + secret</label>
+        <label><input type="radio" name="cMethod" value="client" checked> Client ID + secret (new Central personal API client)</label>
         <label><input type="radio" name="cMethod" value="token"> Bearer token</label>
       </fieldset>
+      <p class="note" data-for="client">Create the client in HPE GreenLake under Manage Workspace &gt; Personal API clients and choose your new Central instance as the service. API clients scoped to the GreenLake platform (GLP) use a different token endpoint; for those, request a token yourself and use Bearer token sign-in.</p>
       <label data-for="client">Client ID <input id="cId" type="text" autocomplete="off" spellcheck="false"></label>
       <label data-for="client">Client secret <input id="cSecret" type="password" autocomplete="off"></label>
       <label data-for="token" hidden>Bearer token <input id="cToken" type="password" autocomplete="off"></label>

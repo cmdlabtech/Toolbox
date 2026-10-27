@@ -32,7 +32,7 @@ export function normalise(input) {
   }
   const clientId = String(input.clientId ?? "").trim();
   const clientSecret = String(input.clientSecret ?? "");
-  if (!clientId || !clientSecret) throw new Error("Enter the GreenLake client ID and secret.");
+  if (!clientId || !clientSecret) throw new Error("Enter the client ID and secret of a new Central personal API client.");
   return { method: "client", baseUrl, clientId, clientSecret, token: null, expiresAt: null };
 }
 
@@ -62,6 +62,14 @@ export function createVault(stores) {
   return vault;
 }
 
+/**
+ * The client-credential sign-in uses the new Central token endpoint, which
+ * accepts only personal API clients scoped to a Central instance. Clients
+ * scoped to the HPE GreenLake platform (GLP) use a separate, workspace-specific
+ * token endpoint; their tokens work here through Bearer token sign-in.
+ */
+export const CLIENT_REJECTED = "HPE rejected the client ID or secret. Use a personal API client created for your new Central instance (HPE GreenLake: Manage Workspace > Personal API clients). For a GreenLake platform (GLP) API client, request a token yourself and use Bearer token sign-in";
+
 export const tokenValid = (c, now = Date.now()) => !!c?.token && (c.expiresAt == null || c.expiresAt - EXPIRY_SKEW_MS > now);
 
 /**
@@ -86,7 +94,11 @@ export async function mintToken(creds, { fetchImpl = fetch, apiBase = "", now = 
     });
   }
   const body = await resp.json().catch(() => ({}));
-  if (!resp.ok || !body.access_token) throw new Error(body.error_description || body.error || `Token request failed (HTTP ${resp.status}).`);
+  if (!resp.ok || !body.access_token) {
+    const reason = body.error_description || body.error || `HTTP ${resp.status}`;
+    if (resp.status === 400 || resp.status === 401) throw new Error(`${CLIENT_REJECTED} (${reason})`);
+    throw new Error(`Token request failed (${reason}).`);
+  }
   const ttl = Number(body.expires_in) || 7200;
   return { ...creds, token: body.access_token, expiresAt: now + ttl * 1000 };
 }

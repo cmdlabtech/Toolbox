@@ -4,12 +4,15 @@ This app uses the **new Central (HPE GreenLake) MRT API only**. Every call is a 
 
 ## Auth
 
-- **Flow:** OAuth2 client credentials on HPE GreenLake.
-- **Request:** `POST https://sso.common.cloud.hpe.com/as/token.oauth2` with form body `grant_type=client_credentials`, `client_id` and `client_secret`.
-- **Credentials:** these must be API client credentials for the Central application on HPE GreenLake.
-- **Token lifetime:** two hours.
+- **Flow:** OAuth2 client credentials (`grant_type=client_credentials`). No `scope` or `audience` parameter is documented or sent.
+- **Request:** `POST https://sso.common.cloud.hpe.com/as/token.oauth2` with `Content-Type: application/x-www-form-urlencoded` and form fields `grant_type=client_credentials`, `client_id` and `client_secret` (all required). This is the documented form; the issuer's discovery document also lists HTTP Basic (`client_secret_basic`), which this project does not use.
+- **Credentials:** a **personal API client for the new Central instance** (HPE GreenLake: Manage Workspace > Personal API clients, service = your Central instance).
+- **GreenLake platform (GLP) API clients** can also call new Central, but they use a different, workspace-specific token endpoint: `POST https://global.api.greenlake.hpe.com/authorization/v2/oauth2/<workspace-id>/token` with the same form body. That endpoint rejects browser preflights (no CORS), so this project does not exchange GLP credentials; a token from it can be used with Bearer token sign-in.
+- **Response:** `{access_token, token_type: "Bearer", expires_in}`. `expires_in` is 7199 seconds for Central personal API clients and 899 seconds for GLP clients. There is no refresh token; request a new token when it expires (the browser does this automatically for client-credential sign-in).
+- **Tokens do not work with Classic Central.**
   - Reference: https://developer.arubanetworks.com/new-central/reference/generate-access-token
   - Guide: https://developer.arubanetworks.com/new-central/docs/generating-and-managing-access-tokens
+  - GreenLake authentication: https://developer.greenlake.hpe.com/docs/greenlake/guides/public/authentication/authentication
 - **Using the token:** send it as `Authorization: Bearer <token>` to the cluster base URL.
   - Base URLs come from the spec `servers` list, for example `https://us1.api.central.arubanetworks.com`, `us2`, `us4`, `us5`, `us6`, `de1`–`de3`, `gb1`, `ca1`, `in1`, `jp1`, `au1` and `ae1`.
   - The user picks the cluster in the browser's credentials panel. It reaches the Worker in the `X-Central-Base` header, and the Worker accepts only `https://<cluster>.api.central.arubanetworks.com` (or `.com.cn`).
@@ -28,6 +31,21 @@ Resulting design:
 1. **Token:** the browser POSTs to the GreenLake token endpoint directly. Only if that request fails at the network or CORS level (for example, if HPE changes its CORS policy) does the browser fall back to `POST /api/token` on the Worker. That route takes a JSON body, never a query string, forwards it to the same endpoint, and returns `{access_token, expires_in}` with `Cache-Control: no-store`. The browser holds the token.
 2. **Data:** the browser calls the Worker with `Authorization: Bearer <token>` and `X-Central-Base: <cluster URL>`. The Worker uses them for that one request and returns `Cache-Control: no-store`.
 3. If HPE ever adds CORS to the cluster API hosts, `site/js/creds.js` and `app.js` could call Central directly and the Worker could be retired. Re-run the probe above before relying on that.
+
+## Request-method check (token and data calls)
+
+Checked on 2026-10-27 at about 18:15 EDT with curl and obviously fake values only (no real client, secret or token). The OpenAPI specs behind the reference pages were also compared with the code: every data call is `GET` under `/network-monitoring/v1` with `Authorization: Bearer`, and list calls page with `limit` (max 1000; this project uses 100) and `offset`.
+
+| Request | Result | Meaning |
+|---|---|---|
+| `POST /as/token.oauth2`, form body (`grant_type`, `client_id`, `client_secret`) | `401 {"error":"unauthorized_request"}` | Format accepted; the fake client is rejected. This is the method the project uses |
+| `POST /as/token.oauth2`, JSON body with the same fields | `400 {"error":"invalid_request"}` | JSON is not accepted. The Worker fallback therefore converts the browser's JSON to a form body before calling HPE |
+| `POST /as/token.oauth2`, HTTP Basic plus form `grant_type` | `401 {"error":"unauthorized_request"}` | Also accepted (discovery lists `client_secret_basic`), but not the documented form |
+| `POST /as/token.oauth2`, form body without `grant_type` | `400 {"error":"invalid_request"}` | `grant_type` is required |
+| `GET /as/token.oauth2` | `404` | Token requests must be `POST` |
+| `POST https://global.api.greenlake.hpe.com/authorization/v2/oauth2/<fake-workspace-id>/token`, form body | `404 {"error":"invalid_request"}` | GLP workspace issuer; needs a real workspace ID |
+| `OPTIONS` on the GLP workspace issuer with `Origin` | `401`, no `Access-Control-Allow-*` | No CORS; a browser cannot call it directly |
+| `HEAD`, `GET` (fake bearer) and `OPTIONS` on `us1`, `de1` and `cn1` `/network-monitoring/v1/sites-health` | `401`, `WWW-Authenticate: Bearer realm=api, error=invalid_token`; body `HPE_GL_NETWORKING_ERROR_UNAUTHORIZED` | Bearer auth confirmed; no CORS. The gateway authenticates before routing, so unauthenticated probes cannot confirm individual paths; the paths come from the specs |
 
 ## Source of truth: topology
 

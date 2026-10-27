@@ -16,7 +16,10 @@ Status: preview. The hosted preview shows a synthetic district by default. Live 
 
 ## Credentials: bring your own, held in the browser
 
-Users sign in from the **Credentials** panel. They choose a new Central cluster and enter either a GreenLake API client ID and secret, or a bearer token.
+Users sign in from the **Credentials** panel. They choose a new Central cluster and enter either the client ID and secret of a new Central personal API client, or a bearer token.
+
+- **Which API client:** in HPE GreenLake, open Manage Workspace > Personal API clients and create a client whose service is your new Central instance. Its credentials work with the new Central token endpoint that this page uses.
+- **GreenLake platform (GLP) API clients** are scoped to the workspace rather than to Central. They use a different token endpoint, `https://global.api.greenlake.hpe.com/authorization/v2/oauth2/<workspace-id>/token`, which does not allow browser (CORS) requests. This page does not exchange GLP credentials. A token obtained from that endpoint can be used with Bearer token sign-in; it lasts 15 minutes.
 
 - **Storage:** credentials stay in that browser. They are kept in `sessionStorage` by default, which clears when the tab closes. Ticking **Remember on this device** keeps them in `localStorage` instead. **Forget** clears both.
 - **Token:** the browser exchanges the client ID and secret for a token directly with HPE GreenLake. The token endpoint allows CORS; see `docs/API-NOTES.md`.
