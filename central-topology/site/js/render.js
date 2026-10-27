@@ -14,6 +14,18 @@ export function readTokens(el = document.documentElement) {
   return Object.fromEntries(TOKEN_NAMES.map((t) => [t, cs.getPropertyValue(t).trim()]));
 }
 
+function routeEdge(a, b, from, to, lay) {
+  if (lay.route !== "gutter" || !lay.boxBySerial) return null;
+  const ba = lay.boxBySerial.get(from);
+  const bb = lay.boxBySerial.get(to);
+  if (!ba || !bb) return null;
+  const ga = ba.x - 22;
+  const gb = bb.x - 22;
+  if (ba === bb) return `M ${a.x} ${a.y} L ${ga} ${a.y} L ${ga} ${b.y} L ${b.x} ${b.y}`;
+  const lane = lay.laneY ?? Math.min(ba.y, bb.y) - 28;
+  return `M ${a.x} ${a.y} L ${ga} ${a.y} L ${ga} ${lane} L ${gb} ${lane} L ${gb} ${b.y} L ${b.x} ${b.y}`;
+}
+
 export function renderSvg(model, lay, opts) {
   const T = opts.tokens;
   const { x, y, w, h } = lay.bounds;
@@ -25,32 +37,45 @@ export function renderSvg(model, lay, opts) {
   out.push(`<text x="${x + 24}" y="${y + 56}" font-size="12" fill="${T["--diagram-muted"]}">${esc(opts.subtitle)}</text>`);
 
   const color = { "district-core": T["--node-core"], "building-core": T["--node-bcore"], access: T["--node-access"] };
-  const at = (id) => lay.pos.get(id) ?? lay.extPos.get(id);
+  const extPos = lay.extPos ?? new Map();
+  const at = (id) => lay.pos.get(id) ?? extPos.get(id);
 
-  // Edges first so nodes sit on top.
-  out.push(`<g stroke-linecap="round">`);
+  for (const s of lay.sectors ?? []) {
+    if (!s.box) continue;
+    out.push(`<rect x="${s.box.x}" y="${s.box.y}" width="${s.box.w}" height="${s.box.h}" rx="10" fill="none" stroke="${T["--diagram-muted"]}" stroke-width="1"/>`);
+  }
+
+  // Edges first so nodes sit on top. Site layout routes links through the
+  // gutter so a straight segment does not cut across a column of switches.
+  out.push(`<g stroke-linecap="round" fill="none">`);
   const drawn = new Set();
+  const drawEdge = (x1, y1, x2, y2, from, to, attrs, title) => {
+    const d = routeEdge({ x: x1, y: y1 }, { x: x2, y: y2 }, from, to, lay);
+    if (d) out.push(`<path d="${d}" ${attrs}><title>${title}</title></path>`);
+    else out.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${attrs}><title>${title}</title></line>`);
+  };
   for (const e of model.edges) {
     const a = at(e.from), b = at(e.to);
     if (!a || !b) continue;
     drawn.add([e.from, e.to].sort().join("|"));
     const lldp = e.source === "neighbours";
-    out.push(`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${e.external ? T["--node-ext"] : T["--edge"]}" stroke-width="${e.external ? 1.2 : 2}"${lldp ? ` stroke-dasharray="7 5"` : ""}><title>${esc(`${e.fromPort ?? "?"} ↔ ${e.toPort ?? "?"}${lldp ? " (LLDP fill-in)" : ""}`)}</title></line>`);
+    drawEdge(a.x, a.y, b.x, b.y, e.from, e.to, `stroke="${e.external ? T["--node-ext"] : T["--edge"]}" stroke-width="${e.external ? 1.2 : 2}"${lldp ? ` stroke-dasharray="7 5"` : ""}`, esc(`${e.fromPort ?? "?"} ↔ ${e.toPort ?? "?"}${lldp ? " (LLDP fill-in)" : ""}`));
   }
-  // Inferred tree edges (no link in the data): dotted, so a hub-and-spoke path
-  // is always visible back to the district core.
+  // Inferred tree edges (no link in the data): dotted, so a path is always
+  // visible back to the district core.
   for (const n of model.nodes) {
     if (!n.parent || !n.parentInferred || drawn.has([n.serial, n.parent].sort().join("|"))) continue;
     const a = at(n.serial), b = at(n.parent);
-    if (a && b) out.push(`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${T["--edge-inferred"]}" stroke-width="1.5" stroke-dasharray="2 5"><title>Inferred: no link in topology data</title></line>`);
+    if (a && b) drawEdge(a.x, a.y, b.x, b.y, n.serial, n.parent, `stroke="${T["--edge-inferred"]}" stroke-width="1.5" stroke-dasharray="2 5"`, "Inferred: no link in topology data");
   }
   out.push(`</g>`);
 
-  for (const s of lay.sectors) {
-    out.push(`<text x="${s.labelAt.x}" y="${s.labelAt.y}" text-anchor="middle" font-size="12" font-weight="700" letter-spacing="0.06em" fill="${T["--diagram-muted"]}">${esc(s.building.toUpperCase())}</text>`);
+  for (const s of lay.sectors ?? []) {
+    if (!s.labelAt) continue;
+    out.push(`<text x="${s.labelAt.x}" y="${s.labelAt.y}" text-anchor="${s.anchor ?? "middle"}" font-size="12" font-weight="700" letter-spacing="0.06em" fill="${T["--diagram-muted"]}">${esc(s.building.toUpperCase())}</text>`);
   }
 
-  for (const [id, p] of lay.extPos) {
+  for (const [id, p] of extPos) {
     const ext = model.externals.find((d) => d.serial === id);
     out.push(`<g><rect x="${p.x - 60}" y="${p.y - 15}" width="120" height="30" rx="15" fill="${T["--diagram-bg"]}" stroke="${T["--node-ext"]}" stroke-dasharray="4 3"/>`);
     out.push(`<text x="${p.x}" y="${p.y + 4}" text-anchor="middle" font-size="11" fill="${T["--diagram-muted"]}">${esc(ext?.name ?? id)}</text></g>`);

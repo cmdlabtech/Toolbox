@@ -169,5 +169,24 @@ export function parseOverrides(text) {
     if (ROLES.includes(v.role)) e.role = v.role;
     if (Object.keys(e).length) out.switches[serial] = e;
   }
+  const positions = parsePositionStore(o.positions);
+  if (positions) out.positions = positions;
   return out;
+}
+
+/** Per-layout {x,y} maps. Unknown layout ids are kept. Invalid points are dropped. */
+function parsePositionStore(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const out = {};
+  for (const [layoutId, map] of Object.entries(raw)) {
+    if (!/^[a-z0-9-]{1,40}$/.test(layoutId) || !map || typeof map !== "object" || Array.isArray(map)) continue;
+    const m = {};
+    for (const [serial, p] of Object.entries(map)) {
+      if (!p || typeof p !== "object") continue;
+      const x = Number(p.x), y = Number(p.y);
+      if (Number.isFinite(x) && Number.isFinite(y)) m[serial] = { x: Math.round(x), y: Math.round(y) };
+    }
+    if (Object.keys(m).length) out[layoutId] = m;
+  }
+  return Object.keys(out).length ? out : null;
 }

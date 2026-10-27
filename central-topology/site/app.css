@@ -15,6 +15,9 @@ button:disabled { opacity: .5; cursor: default; }
 main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: calc(100vh - 120px); }
 #diagram { overflow: auto; padding: 16px; }
 #diagram svg { width: 100%; height: auto; max-height: calc(100vh - 160px); border: 1px solid var(--border); border-radius: var(--radius); }
+#diagram svg g[data-serial] { cursor: grab; }
+#diagram.dragging { user-select: none; }
+#diagram.dragging svg g[data-serial] { cursor: grabbing; }
 aside { border-left: 1px solid var(--border); background: var(--surface); overflow: auto; padding: 12px 14px; }
 aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 0 6px; }
 .sw { border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-bottom: 6px; }

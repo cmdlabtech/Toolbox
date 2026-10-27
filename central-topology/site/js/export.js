@@ -51,6 +51,8 @@ export function jsonExport(model, mgmt, overrides, meta) {
         mgmtFallback: m.fallback, flags: n.flags };
     }),
     links: model.edges.map((e) => ({ from: e.from, to: e.to, fromPort: e.fromPort, toPort: e.toPort, source: e.source })),
+    layout: meta.layout ?? "hub",
+    positions: meta.positions ?? {},
     overrides,
   };
 }
