@@ -4,8 +4,9 @@ import { topologyFromFixtures } from "./helpers.mjs";
 import { buildModel, parseOverrides } from "../site/js/model.js";
 import { jsonExport } from "../site/js/export.js";
 import { renderSvg } from "../site/js/render.js";
+import { largeSample } from "../site/js/large-sample.js";
 import {
-  CANVAS_PAD, CARD_NAME_FONT, CARD_NAME_MIN_PX, GEOM, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, clearPosition, coreScroll, displayScale, fitScale, hubOpeningScale, labelBox, layout, layoutById, layoutSites, nameFloorScale, openingScale, orthoBend, readableScale, replaceMeasure, shownBounds, siteColumnCount, writePosition,
+  CANVAS_PAD, CARD_NAME_FONT, CARD_NAME_MIN_PX, GEOM, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, clearPosition, coreScroll, deviceGroup, displayScale, fitScale, hubOpeningScale, labelBox, layout, layoutById, layoutSites, nameFloorScale, openingScale, opensAtNameFloor, orthoBend, readableScale, replaceMeasure, shownBounds, siteColumnCount, writePosition,
 } from "../site/js/layout.js";
 
 const data = await topologyFromFixtures();
@@ -41,7 +42,8 @@ function boxesOf(lay) {
 }
 
 test("layout catalogue keeps hub and spoke first", () => {
-  assert.deepEqual(LAYOUTS.map((l) => l.id), ["hub", "tree-tb", "tree-lr", "radial", "sites", "force"]);
+  assert.deepEqual(LAYOUTS.map((l) => l.id), ["hub", "tree-tb", "tree-lr", "radial", "sites", "groups", "force"]);
+  assert.equal(LAYOUTS.find((l) => l.id === "groups").label, "Grouped by group");
   assert.equal(LAYOUTS[0].label, "Hub and spoke");
 });
 
@@ -399,6 +401,97 @@ test("grouped by site lays groups across the available width", () => {
   const count = siteColumnCount(boxes.length, availW, one);
   assert.equal(lay.columns, count);
   assert.ok(span * nameFloorScale() <= availW + one, "columns stay within the pane at the 11px floor");
+});
+
+test("grouped by group uses the device-group field and an Ungrouped bucket", () => {
+  const m = buildModel(data);
+  assert.equal(m.nodes.find((n) => n.name === "DO-CORE-01").group, "Group 1");
+  assert.equal(m.nodes.find((n) => n.name === "DO-ACC-02").group, null);
+  assert.equal(m.nodes.find((n) => n.name === "SPARE-SW-07").group, null);
+  for (const n of m.nodes) if (n.group) assert.match(n.group, /^Group \d+$/);
+  const lay = layoutById("groups", m);
+  const labels = (lay.sectors ?? []).map((s) => s.building);
+  assert.deepEqual(labels, ["Group 1", "Group 2", "Group 3", "Ungrouped"]);
+  const ungrouped = m.nodes.filter((n) => deviceGroup(n) === "Ungrouped");
+  assert.ok(ungrouped.length >= 2);
+  for (const n of ungrouped) {
+    const box = lay.boxBySerial.get(n.serial);
+    assert.equal(lay.sectors.find((s) => s.box === box).building, "Ungrouped");
+  }
+  const g1 = m.nodes.filter((n) => n.group === "Group 1");
+  const box = lay.boxBySerial.get(g1[0].serial);
+  for (const n of g1) assert.equal(lay.boxBySerial.get(n.serial), box);
+  const g2 = m.nodes.find((n) => n.group === "Group 2");
+  assert.notEqual(lay.boxBySerial.get(g2.serial), box);
+  const sample = largeSample();
+  for (const s of sample.switches) if (s.group) assert.match(s.group, /^Group \d+$/);
+  assert.ok(sample.switches.some((s) => !s.group));
+});
+
+test("links between groups are drawn lighter, like links between buildings", () => {
+  const m = buildModel(data);
+  const opts = { tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "Grouped by group" };
+  const countLight = (svg) => (svg.match(/stroke-opacity="0\.28"/g) ?? []).length;
+  const pairs = (same) => m.edges.filter((e) => {
+    if (e.external) return false;
+    const a = m.byId.get(e.from);
+    const b = m.byId.get(e.to);
+    if (!a || !b) return false;
+    const leaves = same(a, b);
+    return leaves;
+  }).length;
+  const groupLay = layoutById("groups", m);
+  const groupSvg = renderSvg(m, groupLay, opts);
+  const crossGroup = pairs((a, b) => deviceGroup(a) !== deviceGroup(b));
+  assert.ok(crossGroup > 0);
+  assert.ok(pairs((a, b) => deviceGroup(a) === deviceGroup(b)) > 0);
+  assert.equal(countLight(groupSvg), crossGroup);
+  const siteSvg = renderSvg(m, layoutById("sites", m), opts);
+  const crossSite = pairs((a, b) => a.building !== b.building);
+  assert.equal(countLight(siteSvg), crossSite);
+  const core = m.nodes.find((n) => n.name === "DO-CORE-01");
+  const acc = m.nodes.find((n) => n.name === "DO-ACC-02");
+  assert.equal(core.building, acc.building);
+  assert.notEqual(deviceGroup(core), deviceGroup(acc));
+  assert.ok(crossGroup > crossSite);
+});
+
+test("group cards open at the 11px name floor and use the full width", () => {
+  const availW = 1000;
+  const lay = layoutById("groups", model, { width: availW });
+  const boxes = (lay.sectors ?? []).filter((s) => s.box).map((s) => s.box);
+  assert.ok(boxes.length >= 2);
+  const cols = new Set(boxes.map((b) => b.x)).size;
+  assert.ok(cols >= 2, "groups share the width instead of one narrow column");
+  const span = Math.max(...boxes.map((b) => b.x + b.w)) - Math.min(...boxes.map((b) => b.x));
+  const one = Math.max(...boxes.map((b) => b.w));
+  assert.ok(span > one * 1.5);
+  assert.equal(lay.columns, siteColumnCount(boxes.length, availW, one));
+  assert.ok(span * nameFloorScale() <= availW + one);
+  assert.equal(opensAtNameFloor("groups"), true);
+  const avail = { w: 900, h: 420 };
+  const wide = layoutById("groups", buildModel(largeSample(), { coreSerial: largeSample().coreSerial }), { width: avail.w });
+  const frame = { ...wide.bounds, h: Math.max(1, wide.bounds.h - 72) };
+  const fit = fitScale(frame, avail);
+  const floor = nameFloorScale();
+  assert.ok(fit < floor);
+  const scale = hubOpeningScale(frame, avail);
+  assert.ok(Math.abs(scale - floor) < 1e-9);
+  assert.ok(CARD_NAME_FONT * scale + 1e-9 >= 11);
+});
+
+test("the district core stays marked inside its group", () => {
+  const m = buildModel(data);
+  const lay = layoutById("groups", m);
+  const svg = renderSvg(m, lay, { tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "Grouped by group" });
+  const at = svg.indexOf(`data-serial="${m.coreSerial}"`);
+  const chunk = svg.slice(at, at + 600);
+  assert.match(chunk, /stroke="#b42318"/);
+  assert.match(chunk, /stroke-width="2\.5"/);
+  const core = m.byId.get(m.coreSerial);
+  for (const n of m.nodes.filter((x) => deviceGroup(x) === deviceGroup(core))) {
+    assert.ok(lay.pos.get(n.serial).y >= lay.pos.get(core.serial).y);
+  }
 });
 
 test("site ghosts sit fully inside their box with a gap, and tree ghosts sit off other links", () => {

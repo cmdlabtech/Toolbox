@@ -276,10 +276,43 @@ test("campus hub fits eight buildings at the 11px floor, and access chips are no
   const svg = renderSvg(model, lay, {
     tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "Hub and spoke", collapseAps: true,
   });
+  const zoomed = renderSvg(model, { ...lay, bounds: opened }, {
+    tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "Hub and spoke",
+    collapseAps: true, showPorts: true, portScale: 1,
+  });
+  const ports = [];
+  const portRe = /<g data-port-end="([^"]+)"[^>]*>([\s\S]*?)<\/g>/g;
+  let portMatch;
+  while ((portMatch = portRe.exec(zoomed))) {
+    const rect = portMatch[2].match(/<rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)"/);
+    assert.ok(rect, "port label has a background");
+    assert.match(portMatch[2], /font-size="10"/);
+    ports.push({
+      end: portMatch[1],
+      x: Number(rect[1]), y: Number(rect[2]), w: Number(rect[3]), h: Number(rect[4]),
+    });
+  }
+  assert.ok(ports.length >= 20, "zoomed hub still draws switch port labels");
+  const hiddenPorts = renderSvg(model, lay, {
+    tokens: TOKENS, mgmt: "monitor", title: "t", subtitle: "s", showPorts: false, portScale: 1,
+  });
+  assert.equal(hiddenPorts.includes("data-port-end"), false);
+  for (const lab of ports) {
+    assert.ok(lab.x >= opened.x - 0.5 && lab.y >= opened.y - 0.5, "port label clipped");
+    assert.ok(lab.x + lab.w <= opened.x + opened.w + 0.5 && lab.y + lab.h <= opened.y + opened.h + 0.5, "port label clipped");
+    for (const card of cards) {
+      assert.equal(intersects(lab, card), false, `port label covers ${card.id}`);
+    }
+  }
+  const hidSvg = renderSvg(hidden, hid, {
+    tokens: TOKENS, mgmt: "monitor", title: "t", subtitle: "s", collapseAps: true, showPorts: true, portScale: 1,
+  });
+  assert.match(hidSvg, /data-port-end=/);
+  assert.equal(hidSvg.includes("data-chip"), false);
   assert.ok(svg.includes("BUILDING A"));
   assert.ok(svg.includes("BUILDING H"));
   assert.ok(svg.includes("BLDG-A-SW-01"));
-  assert.match(svg, /stroke-opacity="0\.18"/);
+  assert.match(svg, /stroke-opacity="0\.28"/);
   assert.ok(svg.includes("CORE-FW-01"));
   const accessName = model.externals.find((d) => d.name.startsWith("AP-BLDG-A-")).name;
   assert.equal(svg.includes(accessName), false);

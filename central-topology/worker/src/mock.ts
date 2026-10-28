@@ -6,6 +6,7 @@ import switchDetail from "../fixtures/switch-detail.json" with { type: "json" };
 import neighbours from "../fixtures/neighbours.json" with { type: "json" };
 import vlans from "../fixtures/vlans.json" with { type: "json" };
 import interfaces from "../fixtures/interfaces.json" with { type: "json" };
+import deviceInventory from "../fixtures/device-inventory.json" with { type: "json" };
 import { CentralError, type GetJson } from "./central.ts";
 
 const routes: [RegExp, Record<string, unknown>][] = [
@@ -18,6 +19,7 @@ const routes: [RegExp, Record<string, unknown>][] = [
 
 export const mockGetter: GetJson = async (path) => {
   if (path === "/network-monitoring/v1/sites-health") return sitesHealth;
+  if (path === "/network-monitoring/v1/device-inventory") return deviceInventory;
   for (const [re, table] of routes) {
     const m = path.match(re);
     if (m) {

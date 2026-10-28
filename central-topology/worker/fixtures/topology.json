@@ -92,8 +92,19 @@
     "fromPortList": [
      {
       "index": 1,
-      "name": "1/1/10",
-      "lag": null,
+      "name": "1/1/15",
+      "lag": "lag1",
+      "health": "Good",
+      "healthReason": null,
+      "vlanId": 99,
+      "vlanMode": "trunk",
+      "allowedVlans": "1,10,99",
+      "nativeVlan": "1"
+     },
+     {
+      "index": 2,
+      "name": "1/1/16",
+      "lag": "lag1",
       "health": "Good",
       "healthReason": null,
       "vlanId": 99,
@@ -106,7 +117,18 @@
      {
       "index": 1,
       "name": "1/1/49",
-      "lag": null,
+      "lag": "lag1",
+      "health": "Good",
+      "healthReason": null,
+      "vlanId": 99,
+      "vlanMode": "trunk",
+      "allowedVlans": "1,10,99",
+      "nativeVlan": "1"
+     },
+     {
+      "index": 2,
+      "name": "1/1/50",
+      "lag": "lag1",
       "health": "Good",
       "healthReason": null,
       "vlanId": 99,

@@ -24,7 +24,8 @@ function mac(name) {
   return `38:21:c7:${hex.slice(0, 2)}:${hex.slice(2, 4)}:${hex.slice(4, 6)}`;
 }
 
-function sw(name, site, model, ip, status = "ONLINE") {
+function sw(name, site, model, ip, status = "ONLINE", group = null) {
+  const trimmed = typeof group === "string" ? group.trim() : "";
   return {
     serial: serial(name),
     mac: mac(name),
@@ -33,10 +34,16 @@ function sw(name, site, model, ip, status = "ONLINE") {
     status,
     site,
     siteId: site,
+    group: trimmed || null,
     ipv4: ip,
     vlans: [{ id: "99", name: "Management", ipv4: ip }],
     interfaces: [],
   };
+}
+
+function groupName(bi, role, accessIndex, accessCount) {
+  if (role === "access" && bi === BUILDINGS.length - 1 && accessIndex === accessCount) return "";
+  return `Group ${(bi % 3) + 1}`;
 }
 
 /** API-shaped topology, plus coreSerial for the district-core override. */
@@ -50,7 +57,7 @@ export function largeSample() {
   BUILDINGS.forEach((b, bi) => {
     const core = b.core ?? `${b.code}-CORE-01`;
     names.push({ name: core, site: b.site, role: "core" });
-    switches.push(sw(core, b.site, bi === 0 ? "Aruba 8360-32Y4C" : "Aruba 6300M 48G", `10.10.${bi}.1`));
+    switches.push(sw(core, b.site, bi === 0 ? "Aruba 8360-32Y4C" : "Aruba 6300M 48G", `10.10.${bi}.1`, "ONLINE", groupName(bi, "core", 0, b.access)));
     for (let a = 1; a <= b.access; a++) {
       const name = `${b.code}-SW-${String(a).padStart(2, "0")}`;
       names.push({ name, site: b.site, role: "access", bi, a });
@@ -60,6 +67,7 @@ export function largeSample() {
         a % 2 ? "Aruba 6100 48G 4SFP+" : "Aruba 6200F 48G",
         `10.10.${bi}.${10 + a}`,
         a === b.access && bi === 2 ? "OFFLINE" : "ONLINE",
+        groupName(bi, "access", a, b.access),
       ));
     }
   });

@@ -23,9 +23,12 @@ export interface TopoDevice {
   ipv4: string | null;         // topology devices[].ipv4
   vlanIds: number[];           // topology devices[].vlans (IDs only, no addresses)
 }
+export interface LinkPort { name: string; lag: string | null }
 export interface TopoLink {
   from: string; to: string;
   fromPort: string | null; toPort: string | null;
+  fromPorts: LinkPort[];
+  toPorts: LinkPort[];
   speedGbps: number | null;
   source: "topology" | "neighbours";
 }
@@ -62,6 +65,39 @@ export function interfaceKind(name: string, type: string | null): NormInterface[
 
 export const isSwitch = (d: TopoDevice) => (d.type ?? "").toLowerCase().includes("switch");
 
+// `lag` is a name string in the topology spec. A nested {name} or {id} is
+// accepted so a LAG still labels if the payload wraps it.
+function lagName(v: unknown): string | null {
+  if (typeof v === "string") return str(v);
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    return str(o.name) ?? str(o.id);
+  }
+  return null;
+}
+
+/** Every interface on one end of a topology link (`fromPortList` / `toPortList`). */
+export function portList(v: unknown): LinkPort[] {
+  const out: LinkPort[] = [];
+  for (const p of asList(v)) {
+    const name = str(p?.name);
+    if (!name) continue;
+    const lag = lagName(p?.lag);
+    if (out.some((q) => q.name === name && q.lag === lag)) continue;
+    out.push({ name, lag });
+  }
+  return out;
+}
+
+function linkEnds(from: string, to: string, fromPorts: LinkPort[], toPorts: LinkPort[], speedGbps: number | null, source: TopoLink["source"]): TopoLink {
+  return {
+    from, to, fromPorts, toPorts,
+    fromPort: fromPorts[0]?.name ?? null,
+    toPort: toPorts[0]?.name ?? null,
+    speedGbps, source,
+  };
+}
+
 // limit/offset pagination used by sites-health, vlans and interfaces.
 async function paged(get: GetJson, path: string, limit = 100): Promise<any[]> {
   const out: any[] = [];
@@ -75,12 +111,50 @@ async function paged(get: GetJson, path: string, limit = 100): Promise<any[]> {
   return out;
 }
 
+// Device inventory pages with `limit` and a `next` cursor, not offset.
+async function pagedCursor(get: GetJson, path: string, extra?: Record<string, string>, limit = 100): Promise<any[]> {
+  const out: any[] = [];
+  const seen = new Set<string>();
+  let cursor: string | null = null;
+  for (let guard = 0; guard < 100; guard++) {
+    const params: Record<string, string> = { limit: String(limit), ...(extra ?? {}) };
+    if (cursor) params.next = cursor;
+    const body = await get(path, params);
+    const page = asList(body?.items);
+    out.push(...page);
+    const next = body?.next;
+    if (next === undefined || next === null || String(next).trim() === "") break;
+    const token = String(next).trim();
+    if (seen.has(token) || page.length === 0) break;
+    seen.add(token);
+    if (typeof body?.total === "number" && out.length >= body.total) break;
+    cursor = token;
+  }
+  return out;
+}
+
 export function central(get: GetJson) {
   return {
     async sites(): Promise<Site[]> {
       return (await paged(get, "/network-monitoring/v1/sites-health"))
         .filter((s) => str(s.id))
         .map((s) => ({ id: String(s.id), name: str(s.siteName) ?? String(s.id) }));
+    },
+
+    // Central device group name. Not used as the switch inventory.
+    // GET /network-monitoring/v1/device-inventory → items[].deviceGroupName,
+    // matched on items[].serialNumber (else items[].id).
+    async deviceGroups(): Promise<{ serial: string; group: string | null }[]> {
+      const items = await pagedCursor(get, "/network-monitoring/v1/device-inventory", {
+        filter: "deviceType eq 'SWITCH'",
+      });
+      const out: { serial: string; group: string | null }[] = [];
+      for (const d of items) {
+        const serial = str(d?.serialNumber) ?? str(d?.id);
+        if (!serial) continue;
+        out.push({ serial, group: str(d?.deviceGroupName) });
+      }
+      return out;
     },
 
     async topology(siteId: string): Promise<{ devices: TopoDevice[]; links: TopoLink[] }> {
@@ -97,12 +171,12 @@ export function central(get: GetJson) {
       }));
       const links = asList(body?.links)
         .filter((l: any) => str(l.from) && str(l.to))
-        .map((l: any): TopoLink => ({
-          from: String(l.from), to: String(l.to),
-          fromPort: str(asList(l.fromPortList)[0]?.name), toPort: str(asList(l.toPortList)[0]?.name),
-          speedGbps: typeof l.speed === "number" ? l.speed : null,
-          source: "topology",
-        }));
+        .map((l: any): TopoLink => linkEnds(
+          String(l.from), String(l.to),
+          portList(l.fromPortList), portList(l.toPortList),
+          typeof l.speed === "number" ? l.speed : null,
+          "topology",
+        ));
       return { devices, links };
     },
 
@@ -114,14 +188,32 @@ export function central(get: GetJson) {
     },
 
     // LLDP fill-in when topology leaves a switch cut off from the rest.
+    // LLDP fill-in. Several rows for one neighbor (LAG members) become one link.
+    // localPort is this switch; toPort is the remote interface.
     async neighbours(serial: string): Promise<TopoLink[]> {
       const body = await get(`/network-monitoring/v1/neighbours/${encodeURIComponent(serial)}`);
-      return asList(body?.neighbours)
-        .filter((n: any) => str(n.serial))
-        .map((n: any): TopoLink => ({
-          from: serial, to: String(n.serial),
-          fromPort: str(n.localPort), toPort: str(n.toPort), speedGbps: null, source: "neighbours",
-        }));
+      const grouped = new Map<string, TopoLink>();
+      for (const n of asList(body?.neighbours)) {
+        const to = str(n.serial);
+        if (!to || to === serial) continue;
+        const local = str(n.localPort);
+        const remote = str(n.toPort);
+        const hit = grouped.get(to);
+        if (!hit) {
+          grouped.set(to, linkEnds(
+            serial, to,
+            local ? [{ name: local, lag: null }] : [],
+            remote ? [{ name: remote, lag: null }] : [],
+            null, "neighbours",
+          ));
+          continue;
+        }
+        if (local && !hit.fromPorts.some((p) => p.name === local)) hit.fromPorts.push({ name: local, lag: null });
+        if (remote && !hit.toPorts.some((p) => p.name === remote)) hit.toPorts.push({ name: remote, lag: null });
+        hit.fromPort = hit.fromPorts[0]?.name ?? null;
+        hit.toPort = hit.toPorts[0]?.name ?? null;
+      }
+      return [...grouped.values()];
     },
 
     async vlans(serial: string): Promise<NormVlan[]> {

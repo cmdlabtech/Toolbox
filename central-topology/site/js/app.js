@@ -1,23 +1,26 @@
-import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED } from "./model.js";
+import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED, switchLinks } from "./model.js";
 import { largeSample } from "./large-sample.js";
-import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, fitScale, hubOpeningScale, layoutById, openingScale, orthoBend, replaceMeasure, shownBounds, writePosition } from "./layout.js";
+import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, shownBounds, writePosition } from "./layout.js";
 import { renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
-import { CLUSTERS, apiRequest, createVault, mintToken, normalise, tokenValid } from "./creds.js";
+import { CLUSTERS, connectionState, createVault, fetchWithAuth, mintToken, normalise, reuseSavedToken, tokenPlaceholder } from "./creds.js";
+import { UI_KEYS as KEYS, loadPref, readUiPrefs, savePref, writeUiPref } from "./prefs.js";
 
 const $ = (id) => document.getElementById(id);
 // Device data comes from the tenant; escape it before it touches innerHTML.
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const KEYS = { overrides: "ct-overrides", mgmt: "ct-mgmt", theme: "ct-theme", layout: "ct-layout", positions: "ct-positions" };
-const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
-const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+const load = (k, d) => loadPref(localStorage, k, d);
+const save = (k, v) => savePref(localStorage, k, v);
+const prefs = readUiPrefs(localStorage);
 
 const state = {
   data: null,
   overrides: load(KEYS.overrides, { coreSerial: null, switches: {} }),
   positions: load(KEYS.positions, {}),
-  layout: load(KEYS.layout, "hub"),
-  mgmt: load(KEYS.mgmt, "monitor"),
+  layout: prefs.layout,
+  mgmt: prefs.mgmt,
+  showAccessNeighbors: prefs.showAccessNeighbors,
+  showPorts: prefs.showPorts,
   model: null, lay: null, svg: "",
   view: null,
   openChips: new Set(),
@@ -25,7 +28,7 @@ const state = {
 };
 if (!LAYOUTS.some((l) => l.id === state.layout)) state.layout = "hub";
 if (!state.positions || typeof state.positions !== "object" || Array.isArray(state.positions)) state.positions = {};
-document.documentElement.dataset.theme = load(KEYS.theme, "light");
+document.documentElement.dataset.theme = prefs.theme;
 
 function status(msg, err = false) { const s = $("status"); s.textContent = msg; s.className = err ? "err" : ""; }
 
@@ -33,21 +36,11 @@ const apiBase = (window.CT_CONFIG?.apiBase ?? "").replace(/\/+$/, "");
 const vault = createVault({ session: sessionStorage, local: localStorage });
 vault.load();
 
-/** Current credentials with a usable token, minting one if needed. Null = mock. */
-async function activeCreds() {
-  const c = vault.get();
-  if (!c) return null;
-  if (tokenValid(c)) return c;
-  if (c.method !== "client") throw new Error("The bearer token has expired. Paste a new one in Credentials.");
-  const fresh = await mintToken(c, { apiBase });
-  vault.save(fresh);
-  return fresh;
-}
-
 function connState() {
-  const c = vault.get(); const el = $("connState");
-  el.textContent = c ? `Live: ${new URL(c.baseUrl).hostname.split(".")[0]}${vault.remembered() ? " (remembered)" : ""}` : "Not connected (mock)";
-  el.className = c ? "conn live" : "conn";
+  const view = connectionState(vault.get(), vault.remembered());
+  const el = $("connState");
+  el.textContent = view.text;
+  el.className = view.live ? "conn live" : "conn";
 }
 
 async function refresh() {
@@ -63,16 +56,19 @@ async function refresh() {
       draw();
       return;
     }
-    const creds = await activeCreds();
-    const { url, init } = apiRequest(apiBase, "/api/topology?include=vlans,interfaces", creds);
-    const resp = await fetch(url, init);
-    const body = await resp.json();
-    if (resp.status === 401 && creds) vault.save({ ...creds, token: null, expiresAt: null });
-    if (!resp.ok) throw new Error(body.error ?? `HTTP ${resp.status}`);
-    state.data = body;
-    $("mockBadge").hidden = !body.mock;
+    const result = await fetchWithAuth(vault.get(), { apiBase });
+    if (result.creds) vault.save(result.creds);
+    state.data = result.body;
+    $("mockBadge").hidden = !result.body.mock;
     draw();
+    connState();
   } catch (e) {
+    if (e?.creds) vault.save(e.creds);
+    connState();
+    const panelOpen = !$("credsPanel").hidden;
+    const typing = panelOpen && [$("cToken"), $("cSecret"), $("cId")].some((el) => el.value.trim());
+    if (e?.reopen && !(panelOpen && typing)) togglePanel(true, e.message);
+    else if (panelOpen) cMsg(e.message, true);
     status(`Could not load topology: ${e.message}`, true);
   }
 }
@@ -90,13 +86,13 @@ function fillPanel() {
   $("cId").value = c?.clientId ?? "";
   $("cSecret").value = ""; $("cToken").value = "";
   $("cSecret").placeholder = c?.clientSecret ? "(saved in this browser)" : "";
-  $("cToken").placeholder = c?.method === "token" ? "(saved in this browser)" : "";
+  $("cToken").placeholder = tokenPlaceholder(c);
   $("cRemember").checked = vault.remembered();
   showMethod();
 }
-function togglePanel(open = $("credsPanel").hidden) {
+function togglePanel(open = $("credsPanel").hidden, message = "") {
   $("credsPanel").hidden = !open; $("credsBtn").setAttribute("aria-expanded", String(open));
-  if (open) { fillPanel(); cMsg(""); }
+  if (open) { fillPanel(); cMsg(message, Boolean(message)); }
 }
 $("credsBtn").addEventListener("click", () => togglePanel());
 $("cClose").addEventListener("click", () => togglePanel(false));
@@ -108,7 +104,7 @@ $("cConnect").addEventListener("click", async () => {
     const creds = normalise({
       method: method(), baseUrl: $("cBase").value, clientId: $("cId").value,
       clientSecret: $("cSecret").value || (prev?.clientId === $("cId").value.trim() ? prev?.clientSecret : ""),
-      token: $("cToken").value || (prev?.method === "token" ? prev.token : ""),
+      token: method() === "token" ? reuseSavedToken($("cToken").value, prev) : "",
     });
     cMsg(creds.method === "client" ? "Requesting a token from HPE GreenLake…" : "Saved.");
     const ready = creds.method === "client" ? await mintToken(creds, { apiBase }) : creds;
@@ -126,9 +122,13 @@ connState();
 
 function persist() { save(KEYS.overrides, state.overrides); draw(); }
 
+function diagramModel() {
+  return modelForNeighborToggle(state.model, state.showAccessNeighbors);
+}
+
 function paint() {
   if (!state.model) return;
-  const model = state.model;
+  const model = diagramModel();
   const opts = mgmtOptions(state.data.switches);
   const mgmtLabel = opts.find((o) => o.id === state.mgmt)?.label ?? state.mgmt;
   const layoutLabel = LAYOUTS.find((l) => l.id === state.layout)?.label ?? "Hub and spoke";
@@ -137,6 +137,7 @@ function paint() {
   const subtitle = `${model.nodes.length} switches · ${model.buildings.length} buildings · ${layoutLabel} · Mgmt: ${mgmtLabel} · ${state.data.mock ? "MOCK DATA · " : ""}${new Date(state.data.generatedAt).toLocaleString()}`;
   state.svg = renderSvg(model, lay, {
     tokens: readTokens(), mgmt: state.mgmt, title: "Switch topology", subtitle,
+    showPorts: state.showPorts !== false,
   });
   state.subtitle = subtitle;
   mountDiagram();
@@ -194,7 +195,7 @@ function graphAvail(scroller, host) {
 function mountDiagram(scrollAfter) {
   const host = $("diagram");
   const lay = state.lay;
-  const model = state.model;
+  const model = diagramModel();
   if (!host || !lay?.bounds || !model) return;
   const tokens = readTokens();
   host.innerHTML = `<div class="diagram-card scrolls">${diagramHead(tokens)}<div class="diagram-scroll"></div></div>`;
@@ -205,7 +206,7 @@ function mountDiagram(scrollAfter) {
     const opened = shownBounds(lay, model, { collapseAps: true, openChips: state.openChips, ...frameOpts });
     const frame = cropped(opened);
     let scale;
-    if (lay.id === "hub" || lay.id === "sites") scale = hubOpeningScale(frame, avail);
+    if (opensAtNameFloor(lay.id)) scale = hubOpeningScale(frame, avail);
     else {
       const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
       scale = openingScale(frame, avail, cropped(reference));
@@ -223,6 +224,7 @@ function mountDiagram(scrollAfter) {
   scroller.innerHTML = renderSvg(model, { ...lay, bounds }, {
     tokens, mgmt: state.mgmt, title: "Switch topology", subtitle: state.subtitle,
     collapseAps: !expanded, openChips: state.openChips,
+    showPorts: state.showPorts !== false, portScale: state.view.scale,
   });
   const svg = scroller.querySelector("svg");
   if (!svg) return;
@@ -258,7 +260,7 @@ function stepZoom(factor) {
   const old = state.view.scale;
   const expanded = chipsExpanded(old, state.view.openedAt);
   const frameOpts = state.lay.id === "hub" ? HUB_FRAME : {};
-  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
+  const bounds = shownBounds(state.lay, diagramModel(), { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
   const fit = fitScale(cropped(bounds), avail);
   const next = Math.min(Math.max(old * factor, Math.min(fit, state.view.openedAt) * 0.5), Math.max(state.view.openedAt * 8, fit));
   state.view.scale = next;
@@ -273,7 +275,7 @@ function fitView() {
   const avail = graphAvail(scroller, $("diagram"));
   const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
   const frameOpts = state.lay.id === "hub" ? HUB_FRAME : {};
-  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
+  const bounds = shownBounds(state.lay, diagramModel(), { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
   state.view.scale = fitScale(cropped(bounds), avail);
   state.view.user = true;
   mountDiagram({ left: 0, top: 0 });
@@ -306,7 +308,7 @@ function noteContainer() {
   const widthChanged = !state.container || state.container.w !== next.w;
   state.container = next;
   if (state.view && !state.view.user) state.view = null;
-  if (state.layout === "sites" && widthChanged && state.model) paint();
+  if (refillsOnWidth(state.layout) && widthChanged && state.model) paint();
   else fitDiagram();
   return true;
 }
@@ -349,6 +351,16 @@ function draw() {
   status(`${model.nodes.length} switches, ${model.edges.length} links. Core: ${model.byId.get(model.coreSerial)?.name ?? "none"} (${model.coreSource}).${w.length ? ` ${w.length} warning(s).` : ""}`);
 }
 
+function linkListHtml(model, serial) {
+  const items = switchLinks(model, serial).map((l) => {
+    const ports = state.showPorts !== false && (l.local || l.remote)
+      ? ` · ${esc(l.local ?? "—")} ↔ ${esc(l.remote ?? "—")}`
+      : "";
+    return `<li>${esc(l.peerName)}${ports}</li>`;
+  }).join("");
+  return items ? `<ul class="linklist">${items}</ul>` : "";
+}
+
 function side(model) {
   const buildings = [...new Set([...model.buildings, ...(state.data.sites ?? []).map((s) => s.name)])].sort();
   const html = [];
@@ -358,9 +370,10 @@ function side(model) {
       const o = state.overrides.switches[n.serial] ?? {};
       const placed = state.positions[state.layout]?.[n.serial];
       html.push(`<div class="sw" data-serial="${esc(n.serial)}"><div class="name">${esc(n.name)} ${o.role || o.building || placed ? '<span class="ovr">override</span>' : ""}</div>
-        <div class="meta">${esc(n.serial)} · ${esc(n.model)} · hop ${n.hop ?? "–"} · site ${esc(n.site ?? "none")}</div>
+        <div class="meta">${esc(n.serial)} · ${esc(n.model)} · hop ${n.hop ?? "–"} · site ${esc(n.site ?? "none")} · ${esc(deviceGroup(n))}</div>
         <div class="row"><select data-k="role">${["", ...ROLES].map((r) => `<option value="${r}"${(o.role ?? "") === r ? " selected" : ""}>${r ? r : `role: ${n.role} (auto)`}</option>`).join("")}</select>
         <select data-k="building">${["", ...buildings, UNASSIGNED].map((x) => `<option value="${esc(x)}"${(o.building ?? "") === x ? " selected" : ""}>${esc(x ? x : `building: ${n.site ?? UNASSIGNED} (site)`)}</option>`).join("")}</select></div>
+        ${linkListHtml(model, n.serial)}
         ${n.flags.map((f) => `<div class="flag">⚠ ${esc(f)}</div>`).join("")}</div>`);
     }
   }
@@ -389,6 +402,18 @@ $("layoutSel").addEventListener("change", (e) => {
 });
 $("mgmtSel").addEventListener("change", (e) => { state.mgmt = e.target.value; save(KEYS.mgmt, state.mgmt); draw(); });
 $("refreshBtn").addEventListener("click", refresh);
+$("portsToggle").checked = state.showPorts !== false;
+$("portsToggle").addEventListener("change", (e) => {
+  state.showPorts = e.target.checked;
+  writeUiPref(localStorage, "showPorts", state.showPorts);
+  if (state.model) { paint(); side(state.model); }
+});
+$("showAccessNeighbors").checked = state.showAccessNeighbors;
+$("showAccessNeighbors").addEventListener("change", (e) => {
+  state.showAccessNeighbors = e.target.checked;
+  writeUiPref(localStorage, "showAccessNeighbors", state.showAccessNeighbors);
+  draw();
+});
 $("themeBtn").addEventListener("click", () => {
   const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = t; save(KEYS.theme, t); draw();
