@@ -1,6 +1,6 @@
 import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED } from "./model.js";
 import { largeSample } from "./large-sample.js";
-import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, orthoBend, replaceMeasure, shownBounds, writePosition } from "./layout.js";
+import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, shownBounds, writePosition } from "./layout.js";
 import { renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, connectionState, createVault, fetchWithAuth, mintToken, normalise, reuseSavedToken, tokenPlaceholder } from "./creds.js";
@@ -204,7 +204,7 @@ function mountDiagram(scrollAfter) {
     const opened = shownBounds(lay, model, { collapseAps: true, openChips: state.openChips, ...frameOpts });
     const frame = cropped(opened);
     let scale;
-    if (lay.id === "hub" || lay.id === "sites") scale = hubOpeningScale(frame, avail);
+    if (opensAtNameFloor(lay.id)) scale = hubOpeningScale(frame, avail);
     else {
       const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
       scale = openingScale(frame, avail, cropped(reference));
@@ -305,7 +305,7 @@ function noteContainer() {
   const widthChanged = !state.container || state.container.w !== next.w;
   state.container = next;
   if (state.view && !state.view.user) state.view = null;
-  if (state.layout === "sites" && widthChanged && state.model) paint();
+  if (refillsOnWidth(state.layout) && widthChanged && state.model) paint();
   else fitDiagram();
   return true;
 }
@@ -357,7 +357,7 @@ function side(model) {
       const o = state.overrides.switches[n.serial] ?? {};
       const placed = state.positions[state.layout]?.[n.serial];
       html.push(`<div class="sw" data-serial="${esc(n.serial)}"><div class="name">${esc(n.name)} ${o.role || o.building || placed ? '<span class="ovr">override</span>' : ""}</div>
-        <div class="meta">${esc(n.serial)} · ${esc(n.model)} · hop ${n.hop ?? "–"} · site ${esc(n.site ?? "none")}</div>
+        <div class="meta">${esc(n.serial)} · ${esc(n.model)} · hop ${n.hop ?? "–"} · site ${esc(n.site ?? "none")} · ${esc(deviceGroup(n))}</div>
         <div class="row"><select data-k="role">${["", ...ROLES].map((r) => `<option value="${r}"${(o.role ?? "") === r ? " selected" : ""}>${r ? r : `role: ${n.role} (auto)`}</option>`).join("")}</select>
         <select data-k="building">${["", ...buildings, UNASSIGNED].map((x) => `<option value="${esc(x)}"${(o.building ?? "") === x ? " selected" : ""}>${esc(x ? x : `building: ${n.site ?? UNASSIGNED} (site)`)}</option>`).join("")}</select></div>
         ${n.flags.map((f) => `<div class="flag">⚠ ${esc(f)}</div>`).join("")}</div>`);

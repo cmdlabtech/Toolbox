@@ -127,7 +127,7 @@ test("hiding access neighbors keeps core, building-core, and switch links", () =
   assert.deepEqual([...accessOnlyNeighborIds(view)], []);
 });
 
-test("hub and grouped-by-site layouts are placed again without access neighbors", () => {
+test("hub, grouped-by-site, and grouped-by-group layouts are placed again without access neighbors", () => {
   const sample = largeSample();
   const model = buildModel(sample, { coreSerial: sample.coreSerial });
   const hiddenIds = [...accessOnlyNeighborIds(model)];
@@ -158,7 +158,7 @@ test("hub and grouped-by-site layouts are placed again without access neighbors"
   const bcoreName = nameOf(model, bcoreId);
 
   const opts = { tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "neighbors" };
-  for (const id of ["hub", "sites"]) {
+  for (const id of ["hub", "sites", "groups"]) {
     const full = layoutById(id, model);
     const hid = layoutById(id, view);
     assert.equal(hid.pos.size, model.nodes.length, id);

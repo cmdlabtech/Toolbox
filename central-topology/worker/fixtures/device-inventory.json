@@ -1,0 +1,133 @@
+{
+ "items": [
+  {
+   "serialNumber": "SG188EFC07",
+   "id": "SG188EFC07",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 1",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG28851A9C",
+   "id": "SG28851A9C",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 1",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG2EFE1AD2",
+   "id": "SG2EFE1AD2",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG6EBB7402",
+   "id": "SG6EBB7402",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG4D0640FC",
+   "id": "SG4D0640FC",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG5D186396",
+   "id": "SG5D186396",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SGB0423702",
+   "id": "SGB0423702",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG1682C978",
+   "id": "SG1682C978",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG36670055",
+   "id": "SG36670055",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SGC40767FF",
+   "id": "SGC40767FF",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SGAE5515DB",
+   "id": "SGAE5515DB",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG29060159",
+   "id": "SG29060159",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG63D57F1D",
+   "id": "SG63D57F1D",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 3",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG0975B360",
+   "id": "SG0975B360",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 3",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG74C757A1",
+   "id": "SG74C757A1",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 3",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SGC5489CBB",
+   "id": "SGC5489CBB",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 3",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG7F217032",
+   "id": "SG7F217032",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 3",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SG4DC4F1DA",
+   "id": "SG4DC4F1DA",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 3",
+   "type": "network-monitoring/device-monitoring"
+  }
+ ],
+ "count": 18,
+ "total": 18,
+ "next": null
+}
