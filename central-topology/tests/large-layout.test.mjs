@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildModel } from "../site/js/model.js";
 import { largeSample } from "../site/js/large-sample.js";
-import { GEOM, displayScale, labelBox, layoutById } from "../site/js/layout.js";
+import {
+  GEOM, accessChipBoxes, accessNeighborGroups, apChipLabel, chipsExpanded, fitScale, labelBox, layoutById, openingScale, readableScale, shownBounds,
+} from "../site/js/layout.js";
 import { renderSvg } from "../site/js/render.js";
 
 const sample = largeSample();
@@ -111,13 +113,31 @@ test("large hub-and-spoke places every node, keeps cards and labels apart, and f
     assert.ok(b.y + b.h <= lay.bounds.y + lay.bounds.h + 0.5, `${b.id} clipped on the bottom`);
   }
 
+  const chips = accessChipBoxes(model, lay);
+  for (const chip of chips) {
+    for (const card of cards) assert.equal(intersects(chip.box, card), false, `${chip.text} overlaps ${card.id}`);
+    for (const label of labels) assert.equal(intersects(chip.box, label), false, `${chip.text} overlaps ${label.id}`);
+  }
+  for (const s of lay.sectors) {
+    const hub = model.nodes.find((n) => n.building === s.building && n.role === "building-core");
+    if (!hub) continue;
+    const p = lay.pos.get(hub.serial);
+    const lb = labelBox(s);
+    const card = { x: p.x - GEOM.nodeW / 2, y: p.y - GEOM.nodeH / 2, w: GEOM.nodeW, h: GEOM.nodeH };
+    const gap = Math.max(card.x - (lb.x + lb.w), lb.x - (card.x + card.w), card.y - (lb.y + lb.h), lb.y - (card.y + card.h), 0);
+    assert.ok(gap < 48, `${s.building} label is ${gap}px from its core`);
+  }
+
   // 1440px window: diagram column beside the 340px switch list, minus the card padding.
   const avail = { w: 1440 - 340 - 32, h: 900 - 160 - 32 };
   const reference = layoutById("tree-lr", model).bounds;
-  const scale = displayScale(lay.bounds, avail, reference);
-  assert.equal(Number.isFinite(scale) && scale > 0, true);
-  assert.ok(lay.bounds.w * scale <= avail.w + 0.5, `width ${lay.bounds.w * scale} exceeds ${avail.w}`);
-  assert.ok(lay.bounds.h * scale <= avail.h + 0.5, `height ${lay.bounds.h * scale} exceeds ${avail.h}`);
+  const visible = shownBounds(lay, model, { collapseAps: true });
+  const scale = openingScale(visible, avail, reference);
+  const floor = readableScale(avail, reference);
+  const fit = fitScale(visible, avail);
+  assert.ok(scale + 1e-9 >= floor, "opening scale drops below the readable floor");
+  if (fit + 1e-9 >= floor) assert.ok(Math.abs(scale - fit) < 1e-9);
+  else assert.ok(Math.abs(scale - floor) < 1e-9);
 
   const svg = renderSvg(model, lay, { tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "Hub and spoke" });
   assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
@@ -125,4 +145,27 @@ test("large hub-and-spoke places every node, keeps cards and labels apart, and f
   assert.ok(svg.includes("BUILDING A"));
   assert.ok(svg.includes("BUILDING F"));
   assert.ok(svg.includes("BLDG-A-SW-01"));
+});
+
+test("access neighbors collapse to one chip and expand on zoom or click", () => {
+  const lay = layoutById("hub", model);
+  const groups = accessNeighborGroups(model);
+  assert.ok(groups.size >= 10);
+  for (const [serial, ids] of groups) {
+    assert.equal(model.byId.get(serial).role, "access");
+    assert.ok(ids.length >= 1);
+    assert.equal(apChipLabel(ids.length), `+${ids.length} APs`);
+  }
+  const [serial, ids] = groups.entries().next().value;
+  const ghostName = model.externals.find((e) => e.serial === ids[0]).name;
+  const opts = { tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "Hub and spoke" };
+  const collapsed = renderSvg(model, lay, { ...opts, collapseAps: true });
+  assert.match(collapsed, /\+\d+ APs/);
+  assert.equal(collapsed.includes(ghostName), false);
+  const clicked = renderSvg(model, lay, { ...opts, collapseAps: true, openChips: new Set([serial]) });
+  assert.ok(clicked.includes(ghostName), "click expands that switch's neighbors");
+  assert.equal(chipsExpanded(1, 1), false);
+  assert.equal(chipsExpanded(1.25, 1), true);
+  const zoomed = renderSvg(model, lay, { ...opts, collapseAps: !chipsExpanded(1.25, 1) });
+  assert.ok(zoomed.includes(ghostName), "zooming in past the opening scale expands neighbors");
 });

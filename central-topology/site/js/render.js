@@ -1,7 +1,7 @@
 // SVG renderer. Produces one self-contained SVG string: every color is
 // resolved from theme tokens at render time, so a downloaded file looks the
 // same outside the page. Pure function except for tokens passed in.
-import { GEOM, orthoBend } from "./layout.js";
+import { GEOM, accessChipBoxes, orthoBend } from "./layout.js";
 import { resolveMgmt } from "./model.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -46,6 +46,9 @@ export function renderSvg(model, lay, opts) {
   const color = { "district-core": T["--node-core"], "building-core": T["--node-bcore"], access: T["--node-access"] };
   const extPos = lay.extPos ?? new Map();
   const at = (id) => lay.pos.get(id) ?? extPos.get(id);
+  const openChips = opts.openChips instanceof Set ? opts.openChips : new Set(opts.openChips ?? []);
+  const chips = opts.collapseAps ? accessChipBoxes(model, lay).filter((c) => !openChips.has(c.serial)) : [];
+  const hidden = new Set(chips.flatMap((c) => c.ids));
 
   for (const s of lay.sectors ?? []) {
     if (!s.box) continue;
@@ -62,11 +65,22 @@ export function renderSvg(model, lay, opts) {
     else out.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${attrs}><title>${title}</title></line>`);
   };
   for (const e of model.edges) {
+    if (hidden.has(e.from) || hidden.has(e.to)) continue;
     const a = at(e.from), b = at(e.to);
     if (!a || !b) continue;
     drawn.add([e.from, e.to].sort().join("|"));
     const lldp = e.source === "neighbours";
-    drawEdge(a.x, a.y, b.x, b.y, e.from, e.to, `stroke="${e.external ? T["--node-ext"] : T["--edge"]}" stroke-width="${e.external ? 1.2 : 2}"${lldp ? ` stroke-dasharray="7 5"` : ""}`, esc(`${e.fromPort ?? "?"} ↔ ${e.toPort ?? "?"}${lldp ? " (LLDP fill-in)" : ""}`));
+    const fromN = model.byId.get(e.from);
+    const toN = model.byId.get(e.to);
+    const cross = !e.external && fromN && toN && fromN.building !== toN.building;
+    const stroke = e.external ? T["--node-ext"] : T["--edge"];
+    const width = e.external ? 1.2 : 2;
+    drawEdge(a.x, a.y, b.x, b.y, e.from, e.to, `stroke="${stroke}" stroke-width="${width}"${cross ? ` stroke-opacity="0.45"` : ""}${lldp ? ` stroke-dasharray="7 5"` : ""}`, esc(`${e.fromPort ?? "?"} ↔ ${e.toPort ?? "?"}${lldp ? " (LLDP fill-in)" : ""}`));
+  }
+  for (const chip of chips) {
+    const parent = lay.pos.get(chip.serial);
+    if (!parent) continue;
+    drawEdge(parent.x, parent.y, chip.x, chip.y, chip.serial, chip.ids[0], `stroke="${T["--node-ext"]}" stroke-width="1.2" stroke-dasharray="7 5"`, esc(chip.text));
   }
   // Inferred tree edges (no link in the data): dotted, so a path is always
   // visible back to the district core.
@@ -83,9 +97,16 @@ export function renderSvg(model, lay, opts) {
   }
 
   for (const [id, p] of extPos) {
+    if (hidden.has(id)) continue;
     const ext = model.externals.find((d) => d.serial === id);
     out.push(`<g><rect x="${p.x - 60}" y="${p.y - 15}" width="120" height="30" rx="15" fill="${T["--diagram-bg"]}" stroke="${T["--node-ext"]}" stroke-dasharray="4 3"/>`);
     out.push(`<text x="${p.x}" y="${p.y + 4}" text-anchor="middle" font-size="11" fill="${T["--diagram-muted"]}">${esc(ext?.name ?? id)}</text></g>`);
+  }
+  for (const chip of chips) {
+    const { x, y, w, h } = chip.box;
+    out.push(`<g data-chip="${esc(chip.serial)}" style="cursor:pointer"><title>${esc(chip.text)}</title>`);
+    out.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="${T["--diagram-bg"]}" stroke="${T["--node-ext"]}" stroke-dasharray="4 3"/>`);
+    out.push(`<text x="${chip.x}" y="${chip.y + 4}" text-anchor="middle" font-size="11" font-weight="700" fill="${T["--diagram-fg"]}">${esc(chip.text)}</text></g>`);
   }
 
   for (const n of model.nodes) {

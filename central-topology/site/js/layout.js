@@ -43,6 +43,144 @@ export function displayScale(bounds, avail, reference) {
   return fit;
 }
 
+/** Scale that fits `bounds` inside `avail`. */
+export function fitScale(bounds, avail) {
+  const s = Math.min(avail.w / bounds.w, avail.h / bounds.h);
+  return Number.isFinite(s) && s > 0 ? s : 1;
+}
+
+/** PR #6 readable floor: how the left-to-right tree fits this pane. */
+export function readableScale(avail, reference) {
+  if (!reference || !(reference.w > 0) || !(reference.h > 0)) return 0;
+  return fitScale(reference, avail);
+}
+
+/**
+ * Open fitted when that still keeps labels at or above the readable floor.
+ * Otherwise open at the floor and let the user pan.
+ */
+export function openingScale(bounds, avail, reference) {
+  const fit = fitScale(bounds, avail);
+  const floor = readableScale(avail, reference);
+  if (!Number.isFinite(floor) || floor <= 0 || fit >= floor) return fit;
+  return floor;
+}
+
+/** Scroll offsets that put the district core in the middle of the pane. */
+export function coreScroll(core, bounds, scale, avail) {
+  return {
+    left: (core.x - bounds.x) * scale - avail.w / 2,
+    top: (core.y - bounds.y) * scale - avail.h / 2,
+  };
+}
+
+export function apChipLabel(count) {
+  return `+${count} APs`;
+}
+
+/** True once the user has zoomed in past the scale the view opened at. */
+export function chipsExpanded(scale, openedAt) {
+  return Number.isFinite(scale) && Number.isFinite(openedAt) && scale > openedAt + 1e-6;
+}
+
+/** External neighbors of access switches, one list per switch. */
+export function accessNeighborGroups(model) {
+  const groups = new Map();
+  for (const e of model.edges) {
+    if (!e.external) continue;
+    const local = model.byId.has(e.from) ? e.from : model.byId.has(e.to) ? e.to : null;
+    if (!local) continue;
+    const node = model.byId.get(local);
+    if (!node || node.role !== "access") continue;
+    const other = local === e.from ? e.to : e.from;
+    const list = groups.get(local) ?? [];
+    if (!list.includes(other)) list.push(other);
+    groups.set(local, list);
+  }
+  for (const list of groups.values()) list.sort();
+  return groups;
+}
+
+export function chipMetrics(count) {
+  const text = apChipLabel(count);
+  const w = Math.max(72, Math.ceil(text.length * 7.4) + 18);
+  const h = 24;
+  return { text, w, h };
+}
+
+function boxesMiss(a, b, gap) {
+  return a.x + a.w + gap <= b.x || b.x + b.w + gap <= a.x || a.y + a.h + gap <= b.y || b.y + b.h + gap <= a.y;
+}
+
+/** One chip per access switch, placed just outside that card. */
+export function accessChipBoxes(model, lay) {
+  const core = lay.pos.get(model.coreSerial) ?? { x: 0, y: 0 };
+  const obstacles = [];
+  for (const n of model.nodes) {
+    const p = lay.pos.get(n.serial);
+    if (!p) continue;
+    obstacles.push({ x: p.x - GEOM.nodeW / 2, y: p.y - GEOM.nodeH / 2, w: GEOM.nodeW, h: GEOM.nodeH });
+  }
+  for (const s of lay.sectors ?? []) {
+    const b = labelBox(s);
+    if (b) obstacles.push(b);
+  }
+  const chips = [];
+  for (const [serial, ids] of accessNeighborGroups(model)) {
+    const parent = lay.pos.get(serial);
+    if (!parent || !ids.length) continue;
+    const { text, w, h } = chipMetrics(ids.length);
+    let dx = parent.x - core.x;
+    let dy = parent.y - core.y;
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len;
+    dy /= len;
+    const tx = -dy;
+    const ty = dx;
+    const dist = GEOM.nodeW / 2 + w / 2 + 14;
+    let placed = null;
+    for (const mul of [1, 1.4, 1.8, 2.3]) {
+      for (const side of [0, 1, -1, 2, -2]) {
+        const x = parent.x + dx * dist * mul + tx * side * (w + 10);
+        const y = parent.y + dy * dist * mul + ty * side * (h + 10);
+        const box = { x: x - w / 2, y: y - h / 2, w, h };
+        if (obstacles.some((o) => !boxesMiss(box, o, 6))) continue;
+        placed = { x, y, box };
+        break;
+      }
+      if (placed) break;
+    }
+    if (!placed) {
+      const x = parent.x + dx * dist;
+      const y = parent.y + dy * dist;
+      placed = { x, y, box: { x: x - w / 2, y: y - h / 2, w, h } };
+    }
+    obstacles.push(placed.box);
+    chips.push({ serial, ids, count: ids.length, text, x: placed.x, y: placed.y, box: placed.box });
+  }
+  return chips;
+}
+
+/** Bounds of what the opening view draws: hidden access neighbors drop out, chips stay. */
+export function shownBounds(lay, model, opts = {}) {
+  const ext = new Map(lay.extPos ?? []);
+  const open = opts.openChips instanceof Set ? opts.openChips : new Set(opts.openChips ?? []);
+  if (opts.collapseAps) {
+    for (const [serial, ids] of accessNeighborGroups(model)) {
+      if (open.has(serial)) continue;
+      for (const id of ids) ext.delete(id);
+    }
+  }
+  const extra = [...(lay.extra ?? [])];
+  if (opts.collapseAps) {
+    for (const chip of accessChipBoxes(model, lay)) {
+      if (open.has(chip.serial)) continue;
+      extra.push({ x: chip.box.x, y: chip.box.y }, { x: chip.box.x + chip.box.w, y: chip.box.y + chip.box.h });
+    }
+  }
+  return boundsFor(lay.pos, ext, lay.sectors ?? [], extra);
+}
+
 // Hub and spoke. The district core stays at the origin. Each building is one
 // cluster on a ring sized to that cluster: switches sit on a grid pitched to
 // the card, and LLDP neighbors sit in a band further out. The ring grows
@@ -198,39 +336,19 @@ function buildLocal(sector, theta, ghosts) {
   const u0 = -((tCount - 1) / 2) * pitchT;
   for (let col = 0; col < tCount; col++) columns.push(u0 + col * pitchT);
 
+  // Access switches sit toward the district core. The building core is the
+  // outer card of the sector, and the label sits on that outer edge.
   const items = [];
-  if (sector.hub) items.push({ id: sector.hub.serial, u: 0, v: 0, kind: "card" });
-  const spokeOrigin = sector.hub ? pitchR : 0;
   sector.spokes.forEach((sw, i) => {
     const col = i % tCount;
     const row = Math.floor(i / tCount);
-    items.push({ id: sw.serial, u: columns[col], v: spokeOrigin + row * pitchR, kind: "card" });
+    items.push({ id: sw.serial, u: columns[col], v: row * pitchR, kind: "card" });
   });
-
-  let maxCardV = -Infinity;
-  for (const item of items) maxCardV = Math.max(maxCardV, item.v + cardHalf.halfV);
-  if (!Number.isFinite(maxCardV)) maxCardV = 0;
-
-  // Neighbors sit in a band beyond the switches, ordered by the parent's
-  // place along the arc so a ghost stays outward of its own switch.
-  const parents = [...items].sort((a, b) => a.u - b.u || a.v - b.v || String(a.id).localeCompare(String(b.id)));
-  const orderedGhosts = [];
-  for (const parent of parents) {
-    for (const id of ghosts.get(parent.id) ?? []) orderedGhosts.push(id);
-  }
-  if (orderedGhosts.length) {
-    const gPitchT = ghostHalf.halfU * 2 + HUB_GAP;
-    const cols = Math.max(1, Math.ceil(orderedGhosts.length / 3));
-    const u0g = -((cols - 1) / 2) * gPitchT;
-    const base = maxCardV + HUB_GAP + ghostHalf.halfV;
-    orderedGhosts.forEach((id, i) => {
-      items.push({
-        id,
-        u: u0g + (i % cols) * gPitchT,
-        v: base + Math.floor(i / cols) * ghostPitch,
-        kind: "ghost",
-      });
-    });
+  let spokeOuter = -Infinity;
+  for (const item of items) spokeOuter = Math.max(spokeOuter, item.v + cardHalf.halfV);
+  if (sector.hub) {
+    const inner = Number.isFinite(spokeOuter) ? spokeOuter : -cardHalf.halfV;
+    items.push({ id: sector.hub.serial, u: 0, v: inner + HUB_GAP + cardHalf.halfV, kind: "card" });
   }
 
   let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
@@ -240,24 +358,46 @@ function buildLocal(sector, theta, ghosts) {
     minV = Math.min(minV, v - halfV);
     maxV = Math.max(maxV, v + halfV);
   };
-  for (const item of items) {
-    const h = item.kind === "ghost" ? ghostHalf : cardHalf;
-    grow(item.u, item.v, h.halfU, h.halfV);
-  }
+  for (const item of items) grow(item.u, item.v, cardHalf.halfU, cardHalf.halfV);
   if (!Number.isFinite(minU)) { minU = 0; maxU = 0; minV = 0; maxV = 0; }
 
   const text = String(sector.building).toUpperCase();
   const lw = Math.ceil(text.length * 8.4) + 8;
   const lh = 14;
-  const uMid = (minU + maxU) / 2;
+  const uMid = sector.hub ? 0 : (minU + maxU) / 2;
   const v0 = maxV + HUB_GAP;
   let label;
+  let labelOuter;
   if (radialIsX) {
     grow(uMid, v0 + lw / 2, lh / 2, lw / 2);
     label = { u: uMid + 4, v: v0, anchor: o.sign > 0 ? "start" : "end" };
+    labelOuter = v0 + lw;
   } else {
     grow(uMid, v0 + lh / 2, lw / 2, lh / 2);
     label = { u: uMid, v: o.sign > 0 ? v0 + 11 : v0 + 3, anchor: "middle" };
+    labelOuter = v0 + lh;
+  }
+
+  const parents = [...items].sort((a, b) => a.u - b.u || a.v - b.v || String(a.id).localeCompare(String(b.id)));
+  const orderedGhosts = [];
+  for (const parent of parents) {
+    for (const id of ghosts.get(parent.id) ?? []) orderedGhosts.push(id);
+  }
+  if (orderedGhosts.length) {
+    const gPitchT = ghostHalf.halfU * 2 + HUB_GAP;
+    const cols = Math.max(1, Math.ceil(orderedGhosts.length / 3));
+    const u0g = -((cols - 1) / 2) * gPitchT;
+    const base = labelOuter + HUB_GAP + ghostHalf.halfV;
+    orderedGhosts.forEach((id, i) => {
+      const ghost = {
+        id,
+        u: u0g + (i % cols) * gPitchT,
+        v: base + Math.floor(i / cols) * ghostPitch,
+        kind: "ghost",
+      };
+      items.push(ghost);
+      grow(ghost.u, ghost.v, ghostHalf.halfU, ghostHalf.halfV);
+    });
   }
 
   const cU = (minU + maxU) / 2;
