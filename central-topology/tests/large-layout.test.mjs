@@ -25,12 +25,12 @@ test("large sample is a second campus, not a replacement for the small mock", ()
   assert.equal(new Set(sample.switches.map((s) => s.site)).size, 6);
   assert.ok(sample.externals.length >= 40);
   assert.ok(sample.links.length >= 200);
-  assert.equal(model.byId.get(model.coreSerial).name, "LCSC-DC-Stack1");
+  assert.equal(model.byId.get(model.coreSerial).name, "CORE-01");
   assert.equal(model.coreSource, "override");
   assert.equal(model.nodes.length, sample.switches.length);
-  assert.ok(model.buildings.includes("TRANSPORTATION"));
-  assert.ok(model.buildings.includes("PERRY WORTH ELEMENTARY"));
-  assert.ok(model.buildings.includes("STOKES ELEMENTARY"));
+  assert.ok(model.buildings.includes("Building A"));
+  assert.ok(model.buildings.includes("Building F"));
+  assert.ok(model.nodes.some((n) => n.name === "BLDG-A-SW-01"));
 });
 
 test("large hub-and-spoke places every node, keeps cards and labels apart, and fits the open view", () => {
@@ -122,6 +122,7 @@ test("large hub-and-spoke places every node, keeps cards and labels apart, and f
   const svg = renderSvg(model, lay, { tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "Hub and spoke" });
   assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
   for (const n of model.nodes) assert.ok(svg.includes(n.name), n.name);
-  assert.ok(svg.includes("TRANSPORTATION"));
-  assert.ok(svg.includes("PERRY WORTH ELEMENTARY"));
+  assert.ok(svg.includes("BUILDING A"));
+  assert.ok(svg.includes("BUILDING F"));
+  assert.ok(svg.includes("BLDG-A-SW-01"));
 });

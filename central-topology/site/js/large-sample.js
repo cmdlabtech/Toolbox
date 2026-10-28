@@ -3,12 +3,12 @@
 // Names, serials, and addresses are synthetic. 44 switches, 6 buildings.
 
 const BUILDINGS = [
-  { site: "LCSC", code: "LCSC", access: 6, core: "LCSC-DC-Stack1" },
-  { site: "TRANSPORTATION", code: "TRAN", access: 9 },
-  { site: "STOKES ELEMENTARY", code: "STOKES", access: 7 },
-  { site: "PERRY WORTH ELEMENTARY", code: "PERRY", access: 6 },
-  { site: "MIDDLE SCHOOL", code: "MS", access: 5 },
-  { site: "HIGH SCHOOL", code: "HS", access: 5 },
+  { site: "Building A", code: "BLDG-A", access: 6, core: "CORE-01" },
+  { site: "Building B", code: "BLDG-B", access: 9 },
+  { site: "Building C", code: "BLDG-C", access: 7 },
+  { site: "Building D", code: "BLDG-D", access: 6 },
+  { site: "Building E", code: "BLDG-E", access: 5 },
+  { site: "Building F", code: "BLDG-F", access: 5 },
 ];
 
 function serial(name) {
@@ -90,14 +90,14 @@ export function largeSample() {
     link(coreName, `1/1/${b.code.length}`, `${b.code}-CORE-01`, "1/1/49");
   }
   const crosses = [
-    ["TRAN-SW-01", "STOKES-CORE-01"],
-    ["TRAN-SW-04", "PERRY-CORE-01"],
-    ["STOKES-SW-02", "MS-CORE-01"],
-    ["PERRY-SW-03", "HS-CORE-01"],
-    ["MS-SW-01", "TRAN-CORE-01"],
-    ["HS-SW-02", "LCSC-DC-Stack1"],
-    ["STOKES-SW-05", "TRAN-CORE-01"],
-    ["PERRY-SW-01", "MS-CORE-01"],
+    ["BLDG-B-SW-01", "BLDG-C-CORE-01"],
+    ["BLDG-B-SW-04", "BLDG-D-CORE-01"],
+    ["BLDG-C-SW-02", "BLDG-E-CORE-01"],
+    ["BLDG-D-SW-03", "BLDG-F-CORE-01"],
+    ["BLDG-E-SW-01", "BLDG-B-CORE-01"],
+    ["BLDG-F-SW-02", "CORE-01"],
+    ["BLDG-C-SW-05", "BLDG-B-CORE-01"],
+    ["BLDG-D-SW-01", "BLDG-E-CORE-01"],
   ];
   for (const [a, b] of crosses) link(a, "1/1/48", b, "1/1/47");
 
@@ -115,9 +115,9 @@ export function largeSample() {
     });
   };
 
-  ghost("LCSC-FW-01", "Firewall", coreName, "1/1/40");
-  ghost("LCSC-RTR-01", "Router", coreName, "1/1/41");
-  ghost("LCSC-WAN-01", "Router", coreName, "1/1/42");
+  ghost("CORE-FW-01", "Firewall", coreName, "1/1/40");
+  ghost("CORE-RTR-01", "Router", coreName, "1/1/41");
+  ghost("CORE-WAN-01", "Router", coreName, "1/1/42");
 
   for (const n of names) {
     const code = BUILDINGS.find((b) => b.site === n.site).code;
