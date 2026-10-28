@@ -3,14 +3,19 @@
    reuse the same palette by copying this file. */
 :root {
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-heading: "Unbounded", "Inter", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
-  --bg: #f6f7f9;
+  --bg: #eef0f4;      /* brand Mist */
   --surface: #ffffff;
-  --fg: #16181d;
-  --muted: #5d6573;
+  --fg: #2a2f3a;      /* brand Ink */
+  --muted: #5b606b;   /* brand Slate Gray */
   --border: #dfe3ea;
-  --accent: #1f6feb;
+  /* Accent text stays on white; do not place it on Mist below 18px regular / 14px bold (Cobalt on Mist is 4.47:1). */
+  --accent: #2e62f0;  /* brand Cobalt: text, links, focus */
+  --accent-fill: #2e62f0;  /* brand Cobalt: filled controls (white text on it) */
+  --header-bg: var(--surface);
+  --header-border: var(--border);
   --radius: 10px;
 
   --diagram-bg: #ffffff;
@@ -26,12 +31,18 @@
   --warn: #c77700;
 }
 :root[data-theme="dark"] {
-  --bg: #0f1115;
+  --bg: #161a22;      /* brand Night */
   --surface: #171a21;
   --fg: #e7eaf0;
   --muted: #9aa3b2;
   --border: #2a2f3a;
+  /* Dark-mode accessibility tint of Cobalt, NOT a new brand color. Used only for
+     dark-mode text, links and focus rings on Night, where brand Cobalt #2E62F0
+     is 3.4:1 (below 4.5:1 for small text). Filled controls stay Cobalt. */
   --accent: #4c8dff;
+  --accent-fill: #2e62f0;  /* brand Cobalt */
+  --header-bg: #161a22;    /* brand Night */
+  --header-border: #343b48; /* header divider on Night, ~1.55:1 */
 
   --diagram-bg: #12151b;
   --diagram-fg: #e7eaf0;

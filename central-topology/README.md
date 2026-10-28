@@ -129,3 +129,26 @@ npx wrangler pages deploy ../site --project-name <pages-project> --branch main
 ```
 
 No secrets are required. Set `MOCK = "0"` if requests without credentials should receive 401 instead of mock data.
+
+---
+
+## Support
+
+If Central Topology saves you a whiteboard session, consider supporting continued development:
+
+[![Donate with PayPal](https://img.shields.io/badge/Donate_with-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://cmdlab.tech/donate)
+
+## License
+
+MIT — see the [Toolbox LICENSE](../LICENSE).
+
+---
+
+<p align="center">
+  <sub>
+    <a href="../README.md">Toolbox</a>
+    · <a href="../SECURITY.md">Security</a>
+    · <a href="https://cmdlab.tech/donate">Donate</a>
+    · <a href="https://github.com/cmdlabtech">CMDLAB</a>
+  </sub>
+</p>
