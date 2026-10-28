@@ -11,9 +11,11 @@
   --fg: #2a2f3a;      /* brand Ink */
   --muted: #5b606b;   /* brand Slate Gray */
   --border: #dfe3ea;
+  /* Accent text stays on white; do not place it on Mist below 18px regular / 14px bold (Cobalt on Mist is 4.47:1). */
   --accent: #2e62f0;  /* brand Cobalt: text, links, focus */
   --accent-fill: #2e62f0;  /* brand Cobalt: filled controls (white text on it) */
   --header-bg: var(--surface);
+  --header-border: var(--border);
   --radius: 10px;
 
   --diagram-bg: #ffffff;
@@ -40,6 +42,7 @@
   --accent: #4c8dff;
   --accent-fill: #2e62f0;  /* brand Cobalt */
   --header-bg: #161a22;    /* brand Night */
+  --header-border: #343b48; /* header divider on Night, ~1.55:1 */
 
   --diagram-bg: #12151b;
   --diagram-fg: #e7eaf0;

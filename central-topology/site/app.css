@@ -1,7 +1,7 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body { margin: 0; font-family: var(--font-sans); background: var(--bg); color: var(--fg); font-size: 14px; display: flex; flex-direction: column; }
-header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--header-bg); }
+header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--header-border); background: var(--header-bg); }
 header .brand { font-weight: 800; letter-spacing: .08em; font-size: 13px; color: var(--muted); }
 header h1 { font-family: var(--font-heading); font-weight: 500; font-size: 17px; margin: 0; }
 header label.check {
