@@ -4,6 +4,9 @@ body { margin: 0; font-family: var(--font-sans); background: var(--bg); color: v
 header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
 header .brand { font-weight: 800; letter-spacing: .08em; font-size: 13px; color: var(--muted); }
 header h1 { font-size: 17px; margin: 0; }
+header label.check { display: inline-flex; align-items: center; gap: 8px; min-block-size: 44px; font-size: 13px; color: var(--fg); cursor: pointer; }
+header label.check input { accent-color: var(--accent); inline-size: 1.15em; aspect-ratio: 1; margin: 0; cursor: pointer; }
+header label.check input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--warn); color: var(--warn); }
 .spacer { flex: 1; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
@@ -37,6 +40,8 @@ aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; co
 .sw .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .sw .row select { font-size: 12px; padding: 3px 6px; flex: 1 1 140px; min-width: 0; max-width: 100%; }
 .flag { color: var(--warn); font-size: 11px; margin-top: 4px; }
+.linklist { list-style: none; margin: 6px 0 0; padding: 0; }
+.linklist li { font-family: var(--font-mono); font-size: 11px; color: var(--muted); line-height: 1.35; }
 .ovr { font-size: 10px; color: var(--accent); }
 #status { padding: 6px 20px; font-size: 12px; color: var(--muted); }
 #status.err { color: var(--node-core); }

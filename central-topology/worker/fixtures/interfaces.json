@@ -50,8 +50,20 @@
     "ipv4": null
    },
    {
-    "id": "1/1/10",
-    "name": "1/1/10",
+    "id": "1/1/15",
+    "name": "1/1/15",
+    "type": "ETHERNET",
+    "status": "Up",
+    "operStatus": "Up",
+    "adminStatus": "Up",
+    "uplink": false,
+    "neighbour": "DO-ACC-01",
+    "neighbourSerial": "SG28851A9C",
+    "ipv4": null
+   },
+   {
+    "id": "1/1/16",
+    "name": "1/1/16",
     "type": "ETHERNET",
     "status": "Up",
     "operStatus": "Up",
@@ -94,8 +106,8 @@
     "ipv4": "10.255.0.1"
    }
   ],
-  "count": 8,
-  "total": 8,
+  "count": 9,
+  "total": 9,
   "offset": null
  },
  "SG28851A9C": {
@@ -111,10 +123,22 @@
     "neighbour": "DO-CORE-01",
     "neighbourSerial": "SG188EFC07",
     "ipv4": null
+   },
+   {
+    "id": "1/1/50",
+    "name": "1/1/50",
+    "type": "ETHERNET",
+    "status": "Up",
+    "operStatus": "Up",
+    "adminStatus": "Up",
+    "uplink": true,
+    "neighbour": "DO-CORE-01",
+    "neighbourSerial": "SG188EFC07",
+    "ipv4": null
    }
   ],
-  "count": 1,
-  "total": 1,
+  "count": 2,
+  "total": 2,
   "offset": null
  },
  "SG2EFE1AD2": {
@@ -618,7 +642,7 @@
     "status": "Up",
     "operStatus": "Up",
     "adminStatus": "Up",
-    "uplink": false,
+    "uplink": true,
     "neighbour": "PES-ACC-02",
     "neighbourSerial": "SG4DC4F1DA",
     "ipv4": null

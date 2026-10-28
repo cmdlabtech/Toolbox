@@ -64,6 +64,7 @@ The app makes **no** device-inventory call. It never calls `GET /network-monitor
 
 - `devices[]`: `serial` (unmanaged devices are `tpd_<mac>`), `mac`, `name`, `health`, `model`, `deviceFunction` (example "Access Switch"), `deployment`, `status`, `type` (example "Switch"), **`ipv4`**, `healthReason`, `conductorSerial`, `internet`, `lastSeen`, `vlans` (VLAN IDs only, no addresses).
 - `links[]`: `from`, `to` (serials), `edgeType` (example "ETHERNET"), `health`, `healthReason`, `speed` (Gbps), `stpState`, `fromPortList[]`/`toPortList[]` (`index`, `name`, `lag`, `health`, `vlanId`, `vlanMode`, `allowedVlans`, `nativeVlan`), `isSibling`.
+- Merged link ports: `fromPorts[]` and `toPorts[]` are `{name, lag}` from every `fromPortList` / `toPortList` entry (`name` and `lag`). `fromPort` and `toPort` stay the first port name. An LLDP fill-in uses `neighbours[].localPort` on the queried switch and `neighbours[].toPort` on the neighbor; several rows for one neighbor are one link. `include=interfaces` is still only the management-IP fetch (OOBM and loopback). Link interfaces come from the topology port lists and the LLDP port fields above.
 - Top level: `id`, `type`, `isolatedDevicesCount`, `isolatedHealth`.
 
 ### Unverified or ambiguous (needs a live tenant)

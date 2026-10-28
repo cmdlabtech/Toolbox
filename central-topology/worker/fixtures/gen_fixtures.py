@@ -53,16 +53,19 @@ by = {s["name"]: s for s in SW}
 for s in SW:
     s["serial"] = serial(s["name"])
 
-LINKS = []  # (a, aport, b, bport)
-def link(a, ap, b, bp): LINKS.append((a, ap, b, bp))
+LINKS = []  # (a, a_ports, b, b_ports, lag or None)
+def link(a, ap, b, bp, lag=None):
+    names = lambda p: [p] if isinstance(p, str) else list(p)
+    LINKS.append((a, names(ap), b, names(bp), lag))
 for i, (code, site, n) in enumerate(buildings, start=1):
     link("DO-CORE-01", f"1/1/{i}", f"{code}-CORE-01", "1/1/49")
     for a in range(1, n + 1):
         if (code, a) == ("PES", 2):
             continue
         link(f"{code}-CORE-01", f"1/1/{a}", f"{code}-ACC-0{a}", "1/1/49")
-for a in (1, 2):
-    link("DO-CORE-01", f"1/1/{9+a}", f"DO-ACC-0{a}", "1/1/49")
+# DO-ACC-01 is a two-member LAG so the diagram can show "lag1 (1/1/49-50)".
+link("DO-CORE-01", ["1/1/15", "1/1/16"], "DO-ACC-01", ["1/1/49", "1/1/50"], "lag1")
+link("DO-CORE-01", "1/1/11", "DO-ACC-02", "1/1/49")
 # Pine ES access 02 is daisy-chained off access 01 (hop 3 from the district core)
 link("PES-ACC-01", "1/1/50", "PES-ACC-02", "1/1/49")
 # Ambiguous spare: LLDP to Oak MS core and Maple ES core
@@ -90,14 +93,19 @@ def function_of(s):
     if s["name"].endswith("-CORE-01"): return "Aggregation Switch"
     return "Access Switch"
 
-def port(name, vlan_mode="trunk"):
-    return [{"index": 1, "name": name, "lag": None, "health": "Good", "healthReason": None,
-             "vlanId": 99, "vlanMode": vlan_mode, "allowedVlans": "1,10,99", "nativeVlan": "1"}]
+def as_ports(p):
+    return [p] if isinstance(p, str) else list(p)
 
-def edge(a, ap, b, bp):
+def port_entries(names, lag=None):
+    return [{"index": i, "name": name, "lag": lag, "health": "Good", "healthReason": None,
+             "vlanId": 99, "vlanMode": "trunk", "allowedVlans": "1,10,99", "nativeVlan": "1"}
+            for i, name in enumerate(as_ports(names), start=1)]
+
+def edge(a, ap, b, bp, lag=None):
     return {"from": by[a]["serial"] if a in by else a, "to": by[b]["serial"] if b in by else b,
             "edgeType": "ETHERNET", "health": "Good", "healthReason": None, "speed": 10,
-            "stpState": "Forwarding", "fromPortList": port(ap), "toPortList": port(bp), "isSibling": False}
+            "stpState": "Forwarding", "fromPortList": port_entries(ap, lag), "toPortList": port_entries(bp, lag),
+            "isSibling": False}
 
 sites = sorted({s["site"] for s in SW})
 sites_health = {"items": [{"id": site_id(n), "type": "network-monitoring/site-health", "siteName": n,
@@ -116,18 +124,18 @@ for n in sites:
     members = [s for s in SW if s["site"] == n]
     devs = {s["name"]: switch_device(s, function_of(s)) for s in members}
     links = []
-    for a, ap, b, bp in LINKS:
+    for a, ap, b, bp, lag in LINKS:
         sa, sb = by[a]["site"], by[b]["site"]
         if sa == n and sb == n:
-            links.append(edge(a, ap, b, bp))
+            links.append(edge(a, ap, b, bp, lag))
         elif n in (sa, sb) and n != "District Office" and n != "Pine ES" and "DO-CORE-01" in (a, b):
             other = a if sb == n else b
             devs[other] = switch_device(by[other], function_of(by[other]))
-            links.append(edge(a, ap, b, bp))
+            links.append(edge(a, ap, b, bp, lag))
         elif n in (sa, sb) and "SPARE-SW-07" in (a, b) and n == "Oak MS":
             other = a if sb == n else b
             devs[other] = switch_device(by[other], function_of(by[other]))
-            links.append(edge(a, ap, b, bp))
+            links.append(edge(a, ap, b, bp, lag))
     for local, lport, e in EXTERNAL:
         if by[local]["site"] == n:
             tpd = "tpd_" + e["mac"].replace(":", "")
@@ -148,11 +156,15 @@ for s in SW:
 neighbours = {}
 for s in SW:
     neighbours[s["serial"]] = {"id": s["serial"], "type": "Neighbours", "neighbours": []}
-for a, ap, b, bp in LINKS:
-    for x, xp, y, yp in ((a, ap, b, bp), (b, bp, a, ap)):
-        neighbours[by[x]["serial"]]["neighbours"].append({
-            "serial": by[y]["serial"], "name": y, "type": "Switch", "health": "Good",
-            "localPort": xp, "toPort": yp, "siteId": site_id(by[y]["site"]), "siteName": by[y]["site"]})
+for a, ap, b, bp, _lag in LINKS:
+    for x, xports, y, yports in ((a, ap, b, bp), (b, bp, a, ap)):
+        n = max(len(xports), len(yports))
+        for i in range(n):
+            xp = xports[min(i, len(xports) - 1)]
+            yp = yports[min(i, len(yports) - 1)]
+            neighbours[by[x]["serial"]]["neighbours"].append({
+                "serial": by[y]["serial"], "name": y, "type": "Switch", "health": "Good",
+                "localPort": xp, "toPort": yp, "siteId": site_id(by[y]["site"]), "siteName": by[y]["site"]})
 
 vlans = {}
 for s in SW:
@@ -169,11 +181,13 @@ for s in SW:
 interfaces = {}
 for s in SW:
     items = []
-    for a, ap, b, bp in LINKS:
-        if s["name"] in (a, b):
-            port, other = (ap, b) if s["name"] == a else (bp, a)
+    for a, ap, b, bp, _lag in LINKS:
+        if s["name"] not in (a, b):
+            continue
+        ports, other = (ap, b) if s["name"] == a else (bp, a)
+        for port in ports:
             items.append({"id": port, "name": port, "type": "ETHERNET", "status": "Up",
-                          "operStatus": "Up", "adminStatus": "Up", "uplink": port.endswith(("/49", "/25", "/26")),
+                          "operStatus": "Up", "adminStatus": "Up", "uplink": port.endswith(("/49", "/50", "/25", "/26")),
                           "neighbour": other, "neighbourSerial": by[other]["serial"], "ipv4": None})
     if s["oobm"]:
         items.append({"id": "mgmt", "name": "mgmt", "type": "MANAGEMENT", "status": "Up",

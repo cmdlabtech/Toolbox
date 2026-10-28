@@ -50,7 +50,10 @@ export function jsonExport(model, mgmt, overrides, meta) {
         role: n.role, roleSource: n.roleSource, hop: n.hop, parent: n.parent, mgmtIp: m.ip, mgmtIpSource: m.source,
         mgmtFallback: m.fallback, flags: n.flags };
     }),
-    links: model.edges.map((e) => ({ from: e.from, to: e.to, fromPort: e.fromPort, toPort: e.toPort, source: e.source })),
+    links: model.edges.map((e) => ({
+      from: e.from, to: e.to, fromPort: e.fromPort, toPort: e.toPort,
+      fromLabel: e.fromLabel ?? null, toLabel: e.toLabel ?? null, source: e.source,
+    })),
     layout: meta.layout ?? "hub",
     positions: meta.positions ?? {},
     overrides,
