@@ -5,7 +5,7 @@ import { buildModel, parseOverrides } from "../site/js/model.js";
 import { jsonExport } from "../site/js/export.js";
 import { renderSvg } from "../site/js/render.js";
 import {
-  GEOM, LAYOUTS, applyPositionOverrides, clearPosition, coreScroll, displayScale, fitScale, labelBox, layout, layoutById, openingScale, orthoBend, readableScale, writePosition,
+  CARD_NAME_FONT, CARD_NAME_MIN_PX, GEOM, LAYOUTS, applyPositionOverrides, clearPosition, coreScroll, displayScale, fitScale, hubOpeningScale, labelBox, layout, layoutById, nameFloorScale, openingScale, orthoBend, readableScale, shownBounds, writePosition,
 } from "../site/js/layout.js";
 
 const data = await topologyFromFixtures();
@@ -211,6 +211,48 @@ test("mock trees have no crossing links and no link through another node", () =>
       }
     }
   }
+});
+
+test("hub opening scale is an absolute 11px name floor", () => {
+  const avail = { w: 1068, h: 708 };
+  const floor = nameFloorScale();
+  assert.equal(CARD_NAME_MIN_PX, 11);
+  assert.equal(CARD_NAME_FONT, 12.5);
+  assert.ok(Math.abs(floor - 11 / 12.5) < 1e-12);
+  assert.equal(nameFloorScale(), floor);
+  const reference = layoutById("tree-lr", model).bounds;
+  const relative = readableScale(avail, reference);
+  assert.ok(Math.abs(floor - relative) > 1e-3, "floor must not be the left-to-right fit");
+
+  const roomy = { w: 400, h: 280 };
+  const roomyFit = fitScale(roomy, avail);
+  assert.ok(roomyFit > floor);
+  assert.ok(Math.abs(hubOpeningScale(roomy, avail) - roomyFit) < 1e-9);
+  assert.ok(hubOpeningScale(roomy, avail) <= roomyFit + 1e-9);
+
+  const huge = { w: 9000, h: 7000 };
+  const hugeFit = fitScale(huge, avail);
+  assert.ok(hugeFit < floor);
+  const opened = hubOpeningScale(huge, avail);
+  assert.ok(Math.abs(opened - floor) < 1e-9, "fit below the floor opens at the floor");
+  assert.ok(opened <= floor + 1e-9, "never open above the floor");
+  const core = { x: 40, y: -20 };
+  const frame = { x: -2000, y: -1500, w: 9000, h: 7000 };
+  const scroll = coreScroll(core, frame, opened, avail);
+  const midX = (core.x - frame.x) * opened - scroll.left;
+  const midY = (core.y - frame.y) * opened - scroll.top;
+  assert.ok(Math.abs(midX - avail.w / 2) < 1e-6);
+  assert.ok(Math.abs(midY - avail.h / 2) < 1e-6);
+
+  assert.equal(model.nodes.length, 19);
+  const smallLay = layoutById("hub", model);
+  const smallFrame = shownBounds(smallLay, model, { collapseAps: true });
+  const smallBounds = { w: smallFrame.w, h: Math.max(1, smallFrame.h - 72) };
+  const smallFit = fitScale(smallBounds, avail);
+  const smallOpen = hubOpeningScale(smallBounds, avail);
+  assert.ok(smallFit < floor, "the 19-switch fit is below the 11px floor");
+  assert.ok(Math.abs(smallOpen - smallFit) < 1e-9, "19-switch sample opens fully fitted");
+  assert.ok(smallOpen <= smallFit + 1e-9, "never open the 19-switch sample above fit");
 });
 
 test("opening scale fits only while labels stay at the readable floor", () => {

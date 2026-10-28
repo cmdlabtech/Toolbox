@@ -49,6 +49,27 @@ export function fitScale(bounds, avail) {
   return Number.isFinite(s) && s > 0 ? s : 1;
 }
 
+/** Card name size in user units. On-screen px is this times the view scale. */
+export const CARD_NAME_FONT = 12.5;
+/** Smallest on-screen size for a card name. */
+export const CARD_NAME_MIN_PX = 11;
+
+/**
+ * Absolute zoom floor: the scale at which card names are 11px.
+ * It does not depend on the pane or on another layout's fit scale.
+ */
+export function nameFloorScale() {
+  return CARD_NAME_MIN_PX / CARD_NAME_FONT;
+}
+
+/**
+ * A drawing that stays under this multiple of the floor viewport on both
+ * axes is still a whole diagram (the 19-switch sample). Opening above fit
+ * would only clip its outer clusters. A larger drawing opens at the floor,
+ * which is a neighborhood around the district core.
+ */
+const FLOOR_SPAN = 2;
+
 /** PR #6 readable floor: how the left-to-right tree fits this pane. */
 export function readableScale(avail, reference) {
   if (!reference || !(reference.w > 0) || !(reference.h > 0)) return 0;
@@ -56,13 +77,32 @@ export function readableScale(avail, reference) {
 }
 
 /**
- * Open fitted when that still keeps labels at or above the readable floor.
- * Otherwise open at the floor and let the user pan.
+ * Other layouts: open fitted when that still keeps labels at or above the
+ * left-to-right floor. Otherwise open at that floor and let the user pan.
  */
 export function openingScale(bounds, avail, reference) {
   const fit = fitScale(bounds, avail);
   const floor = readableScale(avail, reference);
   if (!Number.isFinite(floor) || floor <= 0 || fit >= floor) return fit;
+  return floor;
+}
+
+/**
+ * Hub and spoke opening scale.
+ * If fit already draws names at 11px or larger, open at fit.
+ * If fit is below that absolute floor, open at the floor — centered on the
+ * district core, with the rest left to pan and Fit — unless that would zoom
+ * past fit on a diagram the pane can still hold. Never open above fit in
+ * that case. Never open above the floor.
+ */
+export function hubOpeningScale(bounds, avail) {
+  const fit = fitScale(bounds, avail);
+  const floor = nameFloorScale();
+  if (!Number.isFinite(fit) || fit <= 0) return 1;
+  if (!Number.isFinite(floor) || floor <= 0 || fit >= floor) return fit;
+  const spanW = (bounds.w * floor) / avail.w;
+  const spanH = (bounds.h * floor) / avail.h;
+  if (!(spanW >= FLOOR_SPAN || spanH >= FLOOR_SPAN)) return fit;
   return floor;
 }
 
@@ -75,7 +115,7 @@ export function coreScroll(core, bounds, scale, avail) {
 }
 
 export function apChipLabel(count) {
-  return `+${count} APs`;
+  return count === 1 ? "+1 AP" : `+${count} APs`;
 }
 
 /** True once the user has zoomed in past the scale the view opened at. */

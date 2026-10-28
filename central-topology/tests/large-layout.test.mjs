@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { buildModel } from "../site/js/model.js";
 import { largeSample } from "../site/js/large-sample.js";
 import {
-  GEOM, accessChipBoxes, accessNeighborGroups, apChipLabel, chipsExpanded, fitScale, labelBox, layoutById, openingScale, readableScale, shownBounds,
+  CARD_NAME_FONT, GEOM, accessChipBoxes, accessNeighborGroups, apChipLabel, chipsExpanded, coreScroll, fitScale, hubOpeningScale, labelBox, layoutById, nameFloorScale, shownBounds,
 } from "../site/js/layout.js";
 import { renderSvg } from "../site/js/render.js";
 
@@ -35,7 +35,7 @@ test("large sample is a second campus, not a replacement for the small mock", ()
   assert.ok(model.nodes.some((n) => n.name === "BLDG-A-SW-01"));
 });
 
-test("large hub-and-spoke places every node, keeps cards and labels apart, and fits the open view", () => {
+test("large hub-and-spoke places every node, keeps cards and labels apart, and opens at the name floor", () => {
   const lay = layoutById("hub", model);
   const again = layoutById("hub", model);
   assert.equal(lay.pos.size, model.nodes.length);
@@ -130,14 +130,21 @@ test("large hub-and-spoke places every node, keeps cards and labels apart, and f
 
   // 1440px window: diagram column beside the 340px switch list, minus the card padding.
   const avail = { w: 1440 - 340 - 32, h: 900 - 160 - 32 };
-  const reference = layoutById("tree-lr", model).bounds;
   const visible = shownBounds(lay, model, { collapseAps: true });
-  const scale = openingScale(visible, avail, reference);
-  const floor = readableScale(avail, reference);
-  const fit = fitScale(visible, avail);
-  assert.ok(scale + 1e-9 >= floor, "opening scale drops below the readable floor");
-  if (fit + 1e-9 >= floor) assert.ok(Math.abs(scale - fit) < 1e-9);
-  else assert.ok(Math.abs(scale - floor) < 1e-9);
+  const frame = { x: visible.x, y: visible.y, w: visible.w, h: Math.max(1, visible.h - 72) };
+  const scale = hubOpeningScale(frame, avail);
+  const floor = nameFloorScale();
+  const fit = fitScale(frame, avail);
+  assert.ok(fit < floor, "the large sample fits below the 11px floor");
+  assert.ok(Math.abs(scale - floor) < 1e-9, "large sample opens at the floor");
+  assert.ok(scale <= floor + 1e-9, "never open above the floor");
+  assert.ok(CARD_NAME_FONT * scale >= 11 - 1e-9);
+  const core = lay.pos.get(model.coreSerial);
+  const scroll = coreScroll(core, frame, scale, avail);
+  const midX = (core.x - frame.x) * scale - scroll.left;
+  const midY = (core.y - frame.y) * scale - scroll.top;
+  assert.ok(Math.abs(midX - avail.w / 2) < 1e-6, "opening view centers the district core");
+  assert.ok(Math.abs(midY - avail.h / 2) < 1e-6);
 
   const svg = renderSvg(model, lay, { tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "Hub and spoke" });
   assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
@@ -154,12 +161,16 @@ test("access neighbors collapse to one chip and expand on zoom or click", () => 
   for (const [serial, ids] of groups) {
     assert.equal(model.byId.get(serial).role, "access");
     assert.ok(ids.length >= 1);
-    assert.equal(apChipLabel(ids.length), `+${ids.length} APs`);
+    const expected = ids.length === 1 ? "+1 AP" : `+${ids.length} APs`;
+    assert.equal(apChipLabel(ids.length), expected);
   }
+  assert.equal(apChipLabel(1), "+1 AP");
+  assert.equal(apChipLabel(2), "+2 APs");
   const [serial, ids] = groups.entries().next().value;
   const ghostName = model.externals.find((e) => e.serial === ids[0]).name;
   const opts = { tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "Hub and spoke" };
   const collapsed = renderSvg(model, lay, { ...opts, collapseAps: true });
+  assert.match(collapsed, /\+1 AP(?!s)/);
   assert.match(collapsed, /\+\d+ APs/);
   assert.equal(collapsed.includes(ghostName), false);
   const clicked = renderSvg(model, lay, { ...opts, collapseAps: true, openChips: new Set([serial]) });

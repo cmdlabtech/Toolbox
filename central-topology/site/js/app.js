@@ -1,6 +1,6 @@
 import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED } from "./model.js";
 import { largeSample } from "./large-sample.js";
-import { LAYOUTS, applyPositionOverrides, chipsExpanded, clearPosition, fitScale, layoutById, openingScale, orthoBend, shownBounds, writePosition } from "./layout.js";
+import { LAYOUTS, applyPositionOverrides, chipsExpanded, clearPosition, fitScale, hubOpeningScale, layoutById, openingScale, orthoBend, shownBounds, writePosition } from "./layout.js";
 import { renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, apiRequest, createVault, mintToken, normalise, tokenValid } from "./creds.js";
@@ -191,12 +191,21 @@ function mountDiagram(scrollAfter) {
   host.innerHTML = `<div class="diagram-card scrolls">${diagramHead(tokens)}<div class="diagram-scroll"></div></div>`;
   const scroller = host.querySelector(".diagram-scroll");
   const avail = graphAvail(scroller, host);
-  const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
   if (!state.view) {
     const opened = shownBounds(lay, model, { collapseAps: true, openChips: state.openChips });
-    const scale = openingScale(cropped(opened), avail, cropped(reference));
+    const frame = cropped(opened);
+    let scale;
+    if (lay.id === "hub") scale = hubOpeningScale(frame, avail);
+    else {
+      const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
+      scale = openingScale(frame, avail, cropped(reference));
+    }
     state.view = { scale, openedAt: scale, user: false };
-    if (scrollAfter === undefined) scrollAfter = "core";
+    if (scrollAfter === undefined) {
+      const fit = fitScale(frame, avail);
+      // Fitted drawings stay put. A floor zoom centers the district core.
+      scrollAfter = scale > fit + 1e-6 ? "core" : { left: 0, top: 0 };
+    }
   }
   const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
   const bounds = shownBounds(lay, model, { collapseAps: !expanded, openChips: state.openChips });
