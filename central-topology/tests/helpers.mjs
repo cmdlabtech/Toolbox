@@ -8,6 +8,7 @@ const fx = (f) => JSON.parse(readFileSync(new URL(`../worker/fixtures/${f}`, imp
 export const FIX = {
   sites: fx("sites-health.json"), topology: fx("topology.json"), detail: fx("switch-detail.json"),
   neighbours: fx("neighbours.json"), vlans: fx("vlans.json"), interfaces: fx("interfaces.json"),
+  inventory: fx("device-inventory.json"),
 };
 
 export function fixtureGetter(calls = []) {
@@ -15,6 +16,7 @@ export function fixtureGetter(calls = []) {
     calls.push(path);
     let m;
     if (path === "/network-monitoring/v1/sites-health") return FIX.sites;
+    if (path === "/network-monitoring/v1/device-inventory") return FIX.inventory;
     if ((m = path.match(/topology\/([^/]+)$/))) return FIX.topology[m[1]];
     if ((m = path.match(/neighbours\/([^/]+)$/))) return FIX.neighbours[m[1]];
     if ((m = path.match(/switches\/([^/]+)\/vlans$/))) return FIX.vlans[m[1]];

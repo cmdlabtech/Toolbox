@@ -46,7 +46,7 @@ export function jsonExport(model, mgmt, overrides, meta) {
     buildings: model.buildings.map((b) => ({ name: b, hub: model.hubs[b] ?? null })),
     switches: model.nodes.map((n) => {
       const m = resolveMgmt(n, mgmt);
-      return { serial: n.serial, name: n.name, model: n.model, status: n.status, site: n.site, building: n.building,
+      return { serial: n.serial, name: n.name, model: n.model, status: n.status, site: n.site, group: n.group ?? null, building: n.building,
         role: n.role, roleSource: n.roleSource, hop: n.hop, parent: n.parent, mgmtIp: m.ip, mgmtIpSource: m.source,
         mgmtFallback: m.fallback, flags: n.flags };
     }),

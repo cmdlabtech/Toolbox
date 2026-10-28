@@ -1,11 +1,20 @@
 // Merge per-site topology into one tenant graph.
 import { isSwitch, type Central, type Site, type TopoDevice, type TopoLink } from "./central.ts";
 
-export interface MergedSwitch extends TopoDevice { siteId: string | null; site: string | null; siteSource: string }
+export interface MergedSwitch extends TopoDevice {
+  siteId: string | null;
+  site: string | null;
+  siteSource: string;
+  group: string | null;
+}
 
 const key = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[], n: number, f: (x: T) => Promise<R>) => Promise<R[]>, warn: (m: string) => void) {
+  const groupTask = c.deviceGroups().then(
+    (rows) => rows,
+    (e) => { warn(`Device groups unavailable (${(e as Error).message})`); return [] as { serial: string; group: string | null }[]; },
+  );
   const perSite = await pool(sites, 4, async (s) => {
     try { return { site: s, ...(await c.topology(s.id)) }; }
     catch (e) { warn(`Site ${s.name}: topology unavailable (${(e as Error).message})`); return { site: s, devices: [], links: [] }; }
@@ -34,10 +43,17 @@ export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[
     if (!isSwitch(d)) continue;
     const seen = seenIn.get(d.serial) ?? [];
     const det = detail.get(d.serial);
-    if (seen.length === 1) switches.push({ ...d, siteId: seen[0].id, site: seen[0].name, siteSource: "topology" });
-    else if (det?.siteName) switches.push({ ...d, siteId: det.siteId, site: det.siteName, siteSource: "switch-detail" });
-    else switches.push({ ...d, siteId: seen[0]?.id ?? null, site: seen[0]?.name ?? null, siteSource: "ambiguous" });
+    if (seen.length === 1) switches.push({ ...d, siteId: seen[0].id, site: seen[0].name, siteSource: "topology", group: null });
+    else if (det?.siteName) switches.push({ ...d, siteId: det.siteId, site: det.siteName, siteSource: "switch-detail", group: null });
+    else switches.push({ ...d, siteId: seen[0]?.id ?? null, site: seen[0]?.name ?? null, siteSource: "ambiguous", group: null });
   }
+
+  const groupBySerial = new Map<string, string | null>();
+  for (const row of await groupTask) {
+    const prev = groupBySerial.get(row.serial);
+    if (prev === undefined || (prev === null && row.group)) groupBySerial.set(row.serial, row.group);
+  }
+  for (const sw of switches) sw.group = groupBySerial.get(sw.serial) ?? null;
 
   // LLDP fill-in: switches cut off from the biggest switch component.
   const sw = new Set(switches.map((s) => s.serial));

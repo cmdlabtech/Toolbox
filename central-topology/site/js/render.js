@@ -1,7 +1,7 @@
 // SVG renderer. Produces one self-contained SVG string: every color is
 // resolved from theme tokens at render time, so a downloaded file looks the
 // same outside the page. Pure function except for tokens passed in.
-import { CARD_NAME_FONT, GEOM, accessChipBoxes, orthoBend } from "./layout.js";
+import { CARD_NAME_FONT, GEOM, accessChipBoxes, linkLeavesBucket, orthoBend } from "./layout.js";
 import { resolveMgmt } from "./model.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -72,7 +72,7 @@ export function renderSvg(model, lay, opts) {
     const lldp = e.source === "neighbours";
     const fromN = model.byId.get(e.from);
     const toN = model.byId.get(e.to);
-    const cross = !e.external && fromN && toN && fromN.building !== toN.building;
+    const cross = !e.external && linkLeavesBucket(lay, fromN, toN);
     const stroke = e.external ? T["--node-ext"] : T["--edge"];
     const width = e.external ? 1.2 : 2;
     drawEdge(a.x, a.y, b.x, b.y, e.from, e.to, `stroke="${stroke}" stroke-width="${width}"${cross ? ` stroke-opacity="0.28"` : ""}${lldp ? ` stroke-dasharray="7 5"` : ""}`, esc(`${e.fromPort ?? "?"} ↔ ${e.toPort ?? "?"}${lldp ? " (LLDP fill-in)" : ""}`));

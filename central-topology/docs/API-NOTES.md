@@ -54,11 +54,12 @@ Checked on 2026-10-27 at about 18:15 EDT with curl and obviously fake values onl
 | Site list (site id → name). Not an inventory call. | `GET /network-monitoring/v1/sites-health?limit&offset` → `items[].id`, `items[].siteName`, `total` | https://developer.arubanetworks.com/new-central/reference/listsiteshealthv1 | Path and fields verified in spec |
 | **Switches, sites, links (inventory)** | `GET /network-monitoring/v1/topology/{site-id}` | https://developer.arubanetworks.com/new-central/reference/getlinktopology | Path and fields verified in spec. See the caveats below |
 | Home site of a switch listed in more than one site topology | `GET /network-monitoring/v1/switches/{serial-number}` → `siteId`, `siteName` | https://developer.arubanetworks.com/new-central/reference/getswitchv1 | Verified in spec |
+| Device group name only. Not the switch inventory. | `GET /network-monitoring/v1/device-inventory?filter=deviceType eq 'SWITCH'&limit&next` → `items[].deviceGroupName`, matched on `items[].serialNumber` (else `items[].id`) | https://developer.arubanetworks.com/new-central/reference/getdeviceinventoryv1 | Path and `deviceGroupName` verified in the us4 spec. A missing or blank name is ungrouped |
 | LLDP fill-in, only for switches the merged topology leaves disconnected | `GET /network-monitoring/v1/neighbours/{serial-number}` → `neighbours[].serial`, `localPort`, `toPort` | https://developer.arubanetworks.com/new-central/reference/getneighbours | Verified in spec |
 | VLAN SVI addresses (mgmt candidates) | `GET /network-monitoring/v1/switches/{serial-number}/vlans?limit&offset` → `items[].id`, `name`, `ipv4` | https://developer.arubanetworks.com/new-central/reference/listvlansv1 | Verified in spec |
 | OOBM / loopback addresses (mgmt candidates) | `GET /network-monitoring/v1/switches/{serial-number}/interfaces?limit&offset` → `items[].name`, `type`, `ipv4` | https://developer.arubanetworks.com/new-central/reference/listinterfacesv1 | Fields verified. Whether OOBM or loopback rows appear is **unverified** |
 
-The app makes **no** device-inventory call. It never calls `GET /network-monitoring/v1/devices`, `GET /network-monitoring/v1/switches` (the list) or the device-inventory endpoints. The tests assert this.
+Switches, sites, and links still do **not** come from a device list. The app never calls `GET /network-monitoring/v1/devices` or `GET /network-monitoring/v1/switches` (the list). It does call `GET /network-monitoring/v1/device-inventory`, and only to read `items[].deviceGroupName`. The tests assert both.
 
 ### Topology response fields (getlinktopology)
 
@@ -74,7 +75,7 @@ The app makes **no** device-inventory call. It never calls `GET /network-monitor
 4. **`type` values.** Only the example "Switch" is documented. The Worker treats any `type` that contains "switch" as a switch. Everything else (APs, gateways, `tpd_` devices) is drawn as an external device.
 5. **OOBM and loopback in `interfaces`.** The type enum is not documented. Rows are classified by `type` or `name` (`mgmt`, `oobm`, `loopback*`, `lo*`). If none match, the option does not appear.
 6. **Rate limits.** The spec lists 429 responses for each call. The Worker caps concurrency at 4 and reports 429 to the UI. The documented quota has not been checked.
-7. **Large tenants.** The call count is 1 (sites) + N sites + up to 2 × switches (vlans, interfaces) + a few detail and neighbour calls.
+7. **Large tenants.** The call count is 1 (sites) + paged device-inventory (group names only) + N sites + up to 2 × switches (vlans, interfaces) + a few detail and neighbour calls.
 
 ## Management IP: end to end
 

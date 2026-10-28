@@ -9,8 +9,12 @@ const LAYOUT_FNS = {
   "tree-tb": (model) => layoutTree(model, "tb"),
   "tree-lr": (model) => layoutTree(model, "lr"),
   radial: (model) => layoutRadial(model),
-  sites: (model) => layoutSites(model),
   force: (model) => layoutForce(model),
+};
+
+const COLUMN_FNS = {
+  sites: (model, opts) => layoutSites(model, opts),
+  groups: (model, opts) => layoutGroups(model, opts),
 };
 
 export const LAYOUTS = [
@@ -19,13 +23,34 @@ export const LAYOUTS = [
   { id: "tree-lr", label: "Tiered tree, left to right" },
   { id: "radial", label: "Radial rings" },
   { id: "sites", label: "Grouped by site" },
+  { id: "groups", label: "Grouped by group" },
   { id: "force", label: "Force-directed" },
 ];
 
 export function layoutById(id, model, opts) {
   const spec = LAYOUTS.find((l) => l.id === id) ?? LAYOUTS[0];
-  const lay = spec.id === "sites" ? layoutSites(model, opts) : LAYOUT_FNS[spec.id](model);
+  const column = COLUMN_FNS[spec.id];
+  const lay = column ? column(model, opts) : LAYOUT_FNS[spec.id](model);
   return { ...lay, id: spec.id };
+}
+
+/** Hub, site boxes, and group boxes open at the 11px name floor. */
+export function opensAtNameFloor(id) {
+  return id === "hub" || id === "sites" || id === "groups";
+}
+
+/** Site and group boxes reflow when the container width changes. */
+export function refillsOnWidth(id) {
+  return id === "sites" || id === "groups";
+}
+
+/** Bucket label for a switch with no Central device group. */
+export const UNGROUPED = "Ungrouped";
+
+/** Central device group, or Ungrouped when the name is missing. */
+export function deviceGroup(node) {
+  const g = typeof node?.group === "string" ? node.group.trim() : "";
+  return g || UNGROUPED;
 }
 
 /** Padding between the page edge and the diagram when the card fills the column. */
@@ -161,6 +186,13 @@ export function accessNeighborGroups(model) {
   }
   for (const list of groups.values()) list.sort();
   return groups;
+}
+
+/** True when a switch-to-switch link leaves the layout's bucket. */
+export function linkLeavesBucket(lay, fromN, toN) {
+  if (!fromN || !toN) return false;
+  if (lay?.bucket === "group") return deviceGroup(fromN) !== deviceGroup(toN);
+  return fromN.building !== toN.building;
 }
 
 export function chipMetrics(count) {
@@ -807,10 +839,10 @@ export function layoutRadial(model) {
   return pack(pos, extPos, sectors);
 }
 
-// One labelled box per site. Switches stack in a column. Cross-site links are
-// routed through the gutter and a lane above the boxes (see render.js).
-export function layoutSites(model, opts = {}) {
-  const { nodes, coreSerial } = model;
+// One labelled box per bucket. Switches stack in a column. Links that leave
+// the bucket are routed through the gutter and a lane above the boxes.
+function layoutColumns(model, ordered, opts, bucket) {
+  const { coreSerial } = model;
   if (!coreSerial) return emptyLay();
   const pos = new Map();
   const extPos = new Map();
@@ -826,8 +858,8 @@ export function layoutSites(model, opts = {}) {
   const pillW = 120;
   const laneY = 0;
   const prepared = [];
-  for (const b of model.buildings) {
-    const members = nodes.filter((n) => n.building === b).sort((a, c) => {
+  for (const entry of ordered) {
+    const members = [...entry.members].sort((a, c) => {
       const rank = (n) => (n.role === "district-core" || n.role === "building-core" ? 0 : 1);
       return rank(a) - rank(c) || (a.hop ?? 99) - (c.hop ?? 99) || a.name.localeCompare(c.name);
     });
@@ -836,7 +868,7 @@ export function layoutSites(model, opts = {}) {
     const boxW = exts.length ? padX + GEOM.nodeW + extGap + pillW + extInset : padX * 2 + GEOM.nodeW;
     const h = padTop + members.length * GEOM.nodeH + Math.max(0, members.length - 1) * rowGap + padBot
       + Math.max(0, exts.length - 1) * (GEOM.nodeH + rowGap);
-    prepared.push({ building: b, members, exts, boxW, h });
+    prepared.push({ building: entry.label, members, exts, boxW, h });
   }
   const widest = Math.max(1, ...prepared.map((p) => p.boxW));
   const cols = opts.width > 0 ? siteColumnCount(prepared.length, opts.width, widest, gapX) : Math.max(1, prepared.length);
@@ -877,7 +909,37 @@ export function layoutSites(model, opts = {}) {
   }
   const span = sectors.reduce((m, s) => Math.max(m, s.box.x + s.box.w), 0);
   const extra = [{ x: -24, y: laneY }, { x: span + 24, y: laneY }];
-  return { ...pack(pos, extPos, sectors, extra), laneY, boxBySerial, route: "gutter", columns: cols };
+  return { ...pack(pos, extPos, sectors, extra), laneY, boxBySerial, route: "gutter", columns: cols, bucket };
+}
+
+export function layoutSites(model, opts = {}) {
+  const ordered = [];
+  for (const b of model.buildings) {
+    const members = model.nodes.filter((n) => n.building === b);
+    if (members.length) ordered.push({ label: b, members });
+  }
+  return layoutColumns(model, ordered, opts, "site");
+}
+
+export function layoutGroups(model, opts = {}) {
+  const by = new Map();
+  for (const n of model.nodes) {
+    const label = deviceGroup(n);
+    const list = by.get(label) ?? [];
+    list.push(n);
+    by.set(label, list);
+  }
+  const coreLabel = deviceGroup(model.byId.get(model.coreSerial));
+  const labels = [...by.keys()].sort((a, b) => {
+    if (a === b) return 0;
+    if (a === coreLabel) return -1;
+    if (b === coreLabel) return 1;
+    if (a === UNGROUPED) return 1;
+    if (b === UNGROUPED) return -1;
+    return a.localeCompare(b);
+  });
+  const ordered = labels.map((label) => ({ label, members: by.get(label) }));
+  return layoutColumns(model, ordered, opts, "group");
 }
 
 // Fruchterman–Reingold with a fixed seed. Runs until movement falls under
