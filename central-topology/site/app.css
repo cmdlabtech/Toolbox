@@ -3,7 +3,7 @@ html, body { height: 100%; }
 body { margin: 0; font-family: var(--font-sans); background: var(--bg); color: var(--fg); font-size: 14px; display: flex; flex-direction: column; }
 header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
 header .brand { font-weight: 800; letter-spacing: .08em; font-size: 13px; color: var(--muted); }
-header h1 { font-size: 17px; margin: 0; }
+header h1 { font-family: var(--font-heading); font-weight: 500; font-size: 17px; margin: 0; }
 header label.check {
   display: inline-flex;
   align-items: center;

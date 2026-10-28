@@ -3,14 +3,15 @@
    reuse the same palette by copying this file. */
 :root {
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-heading: "Unbounded", "Inter", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
-  --bg: #f6f7f9;
+  --bg: #eef0f4;      /* brand Mist */
   --surface: #ffffff;
-  --fg: #16181d;
-  --muted: #5d6573;
+  --fg: #2a2f3a;      /* brand Ink */
+  --muted: #5b606b;   /* brand Slate Gray */
   --border: #dfe3ea;
-  --accent: #1f6feb;
+  --accent: #2e62f0;  /* brand Cobalt */
   --radius: 10px;
 
   --diagram-bg: #ffffff;
@@ -26,7 +27,7 @@
   --warn: #c77700;
 }
 :root[data-theme="dark"] {
-  --bg: #0f1115;
+  --bg: #161a22;      /* brand Night */
   --surface: #171a21;
   --fg: #e7eaf0;
   --muted: #9aa3b2;
