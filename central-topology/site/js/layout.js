@@ -22,9 +22,44 @@ export const LAYOUTS = [
   { id: "force", label: "Force-directed" },
 ];
 
-export function layoutById(id, model) {
+export function layoutById(id, model, opts) {
   const spec = LAYOUTS.find((l) => l.id === id) ?? LAYOUTS[0];
-  return { ...LAYOUT_FNS[spec.id](model), id: spec.id };
+  const lay = spec.id === "sites" ? layoutSites(model, opts) : LAYOUT_FNS[spec.id](model);
+  return { ...lay, id: spec.id };
+}
+
+/** Padding between the page edge and the diagram when the card fills the column. */
+export const CANVAS_PAD = 16;
+
+/** Inner canvas size for a container that already includes its padding box. */
+export function canvasSize(container) {
+  const w = Math.max(0, Number(container?.w) || 0);
+  const h = Math.max(0, Number(container?.h) || 0);
+  return {
+    w: Math.max(1, w - CANVAS_PAD * 2),
+    h: Math.max(1, h - CANVAS_PAD * 2),
+  };
+}
+
+/** Keep the previous measurement when the container did not change. */
+export function replaceMeasure(prev, next) {
+  const w = Math.round(Number(next?.w) || 0);
+  const h = Math.round(Number(next?.h) || 0);
+  if (prev && Math.abs(prev.w - w) <= 1 && Math.abs(prev.h - h) <= 1) return prev;
+  return { w, h };
+}
+
+/**
+ * How many site columns fit across `availW` at the 11px name floor.
+ * One column only when a second column would not fit.
+ */
+export function siteColumnCount(count, availW, boxW, gap = 72) {
+  if (count <= 1) return 1;
+  if (!(availW > 0) || !(boxW > 0)) return Math.max(1, count);
+  const floor = nameFloorScale();
+  const slot = (boxW + gap) * floor;
+  const fit = Math.floor((availW + gap * floor) / slot);
+  return Math.max(1, Math.min(count, fit || 1));
 }
 
 // On-screen px per user unit. `bounds` and `reference` are {w, h}.
@@ -774,23 +809,23 @@ export function layoutRadial(model) {
 
 // One labelled box per site. Switches stack in a column. Cross-site links are
 // routed through the gutter and a lane above the boxes (see render.js).
-export function layoutSites(model) {
+export function layoutSites(model, opts = {}) {
   const { nodes, coreSerial } = model;
   if (!coreSerial) return emptyLay();
   const pos = new Map();
   const extPos = new Map();
   const boxBySerial = new Map();
-  const sectors = [];
   const gapX = 72;
   const padX = 28;
   const padTop = 36;
   const padBot = 28;
   const rowGap = 18;
+  const rowGapY = 48;
   const extGap = 28;
   const extInset = 40;
   const pillW = 120;
   const laneY = 0;
-  let x = 0;
+  const prepared = [];
   for (const b of model.buildings) {
     const members = nodes.filter((n) => n.building === b).sort((a, c) => {
       const rank = (n) => (n.role === "district-core" || n.role === "building-core" ? 0 : 1);
@@ -799,32 +834,50 @@ export function layoutSites(model) {
     if (!members.length) continue;
     const exts = externalsOf(model, members);
     const boxW = exts.length ? padX + GEOM.nodeW + extGap + pillW + extInset : padX * 2 + GEOM.nodeW;
-    const box = { x, y: 40, w: boxW, h: 0 };
-    const cx = box.x + padX + GEOM.nodeW / 2;
-    members.forEach((n, i) => {
-      const y = box.y + padTop + GEOM.nodeH / 2 + i * (GEOM.nodeH + rowGap);
-      pos.set(n.serial, { x: Math.round(cx), y: Math.round(y) });
-      boxBySerial.set(n.serial, box);
-    });
-    let bottom = box.y + padTop + members.length * GEOM.nodeH + Math.max(0, members.length - 1) * rowGap + padBot;
-    exts.forEach((ext, i) => {
-      const anchor = pos.get(ext.local);
-      const y = anchor.y + i * (GEOM.nodeH + rowGap);
-      const px = Math.round(box.x + padX + GEOM.nodeW + extGap + pillW / 2);
-      extPos.set(ext.id, { x: px, y });
-      bottom = Math.max(bottom, y + 15 + padBot);
-    });
-    box.h = bottom - box.y;
-    sectors.push({
-      building: b,
-      box,
-      anchor: "middle",
-      labelAt: { x: box.x + box.w / 2, y: box.y + 20 },
-    });
-    x += box.w + gapX;
+    const h = padTop + members.length * GEOM.nodeH + Math.max(0, members.length - 1) * rowGap + padBot
+      + Math.max(0, exts.length - 1) * (GEOM.nodeH + rowGap);
+    prepared.push({ building: b, members, exts, boxW, h });
   }
-  const extra = [{ x: -24, y: laneY }, { x: Math.max(0, x - gapX) + 24, y: laneY }];
-  return { ...pack(pos, extPos, sectors, extra), laneY, boxBySerial, route: "gutter" };
+  const widest = Math.max(1, ...prepared.map((p) => p.boxW));
+  const cols = opts.width > 0 ? siteColumnCount(prepared.length, opts.width, widest, gapX) : Math.max(1, prepared.length);
+  const rows = [];
+  for (let i = 0; i < prepared.length; i += cols) rows.push(prepared.slice(i, i + cols));
+  let y = 48;
+  const sectors = [];
+  for (const row of rows) {
+    let x = 0;
+    let rowH = 0;
+    for (const group of row) {
+      const box = { x, y, w: group.boxW, h: 0 };
+      const cx = box.x + padX + GEOM.nodeW / 2;
+      group.members.forEach((n, i) => {
+        const ny = box.y + padTop + GEOM.nodeH / 2 + i * (GEOM.nodeH + rowGap);
+        pos.set(n.serial, { x: Math.round(cx), y: Math.round(ny) });
+        boxBySerial.set(n.serial, box);
+      });
+      let bottom = box.y + padTop + group.members.length * GEOM.nodeH + Math.max(0, group.members.length - 1) * rowGap + padBot;
+      group.exts.forEach((ext, i) => {
+        const anchor = pos.get(ext.local);
+        const ny = anchor.y + i * (GEOM.nodeH + rowGap);
+        const px = Math.round(box.x + padX + GEOM.nodeW + extGap + pillW / 2);
+        extPos.set(ext.id, { x: px, y: ny });
+        bottom = Math.max(bottom, ny + 15 + padBot);
+      });
+      box.h = bottom - box.y;
+      rowH = Math.max(rowH, box.h);
+      sectors.push({
+        building: group.building,
+        box,
+        anchor: "middle",
+        labelAt: { x: box.x + box.w / 2, y: box.y + 20 },
+      });
+      x += group.boxW + gapX;
+    }
+    y += rowH + rowGapY;
+  }
+  const span = sectors.reduce((m, s) => Math.max(m, s.box.x + s.box.w), 0);
+  const extra = [{ x: -24, y: laneY }, { x: span + 24, y: laneY }];
+  return { ...pack(pos, extPos, sectors, extra), laneY, boxBySerial, route: "gutter", columns: cols };
 }
 
 // Fruchterman–Reingold with a fixed seed. Runs until movement falls under

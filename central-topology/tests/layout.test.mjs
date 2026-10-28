@@ -5,7 +5,7 @@ import { buildModel, parseOverrides } from "../site/js/model.js";
 import { jsonExport } from "../site/js/export.js";
 import { renderSvg } from "../site/js/render.js";
 import {
-  CARD_NAME_FONT, CARD_NAME_MIN_PX, GEOM, HUB_FRAME, LAYOUTS, applyPositionOverrides, clearPosition, coreScroll, displayScale, fitScale, hubOpeningScale, labelBox, layout, layoutById, nameFloorScale, openingScale, orthoBend, readableScale, shownBounds, writePosition,
+  CANVAS_PAD, CARD_NAME_FONT, CARD_NAME_MIN_PX, GEOM, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, clearPosition, coreScroll, displayScale, fitScale, hubOpeningScale, labelBox, layout, layoutById, layoutSites, nameFloorScale, openingScale, orthoBend, readableScale, replaceMeasure, shownBounds, siteColumnCount, writePosition,
 } from "../site/js/layout.js";
 
 const data = await topologyFromFixtures();
@@ -369,6 +369,36 @@ test("force-directed graph is centered, with every node inside the frame", () =>
       assert.ok(Math.hypot(nearestX - c.x, nearestY - c.y) >= 9, `${ghost.id} sits on ${node.id}'s badge`);
     }
   }
+});
+
+test("canvas size tracks the container and updates when the panel or window changes", () => {
+  const column = { w: 860, h: 640 };
+  const open = canvasSize(column);
+  assert.equal(open.w, 860 - CANVAS_PAD * 2);
+  assert.equal(open.h, 640 - CANVAS_PAD * 2);
+  assert.ok(open.w > 700, "the card uses the column, not about half of it");
+  const wider = replaceMeasure(column, { w: 1100, h: 640 });
+  assert.equal(wider.w, 1100);
+  assert.equal(canvasSize(wider).w, 1100 - CANVAS_PAD * 2);
+  const panel = replaceMeasure(wider, { w: 1100, h: 420 });
+  assert.equal(panel.h, 420);
+  assert.equal(canvasSize(panel).h, 420 - CANVAS_PAD * 2);
+  assert.equal(replaceMeasure(panel, { w: 1100, h: 420 }), panel);
+});
+
+test("grouped by site lays groups across the available width", () => {
+  const availW = 1000;
+  const lay = layoutSites(model, { width: availW });
+  const boxes = (lay.sectors ?? []).filter((s) => s.box).map((s) => s.box);
+  assert.ok(boxes.length >= 2);
+  const cols = new Set(boxes.map((b) => b.x)).size;
+  assert.ok(cols >= 2, "sites share the width instead of one narrow column");
+  const span = Math.max(...boxes.map((b) => b.x + b.w)) - Math.min(...boxes.map((b) => b.x));
+  const one = Math.max(...boxes.map((b) => b.w));
+  assert.ok(span > one * 1.5, "the grid is wider than a single strip");
+  const count = siteColumnCount(boxes.length, availW, one);
+  assert.equal(lay.columns, count);
+  assert.ok(span * nameFloorScale() <= availW + one, "columns stay within the pane at the 11px floor");
 });
 
 test("site ghosts sit fully inside their box with a gap, and tree ghosts sit off other links", () => {

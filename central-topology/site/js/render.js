@@ -131,7 +131,7 @@ export function renderSvg(model, lay, opts) {
 
   // Legend
   const lx = x + w - 230, ly = y + 20;
-  const items = [["District core", T["--node-core"]], ["Building core", T["--node-bcore"]], ["Access", T["--node-access"]], ["Other device", T["--node-ext"]]];
+  const items = [["District core", T["--node-core"]], ["Building core", T["--node-bcore"]], ["Access", T["--node-access"]]];
   items.forEach(([label, c], i) => {
     out.push(`<rect x="${lx}" y="${ly + i * 18}" width="12" height="12" rx="3" fill="${c}"/><text x="${lx + 18}" y="${ly + i * 18 + 10}" font-size="11" fill="${T["--diagram-muted"]}">${label}</text>`);
   });
