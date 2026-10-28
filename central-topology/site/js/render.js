@@ -75,7 +75,7 @@ export function renderSvg(model, lay, opts) {
     const cross = !e.external && fromN && toN && fromN.building !== toN.building;
     const stroke = e.external ? T["--node-ext"] : T["--edge"];
     const width = e.external ? 1.2 : 2;
-    drawEdge(a.x, a.y, b.x, b.y, e.from, e.to, `stroke="${stroke}" stroke-width="${width}"${cross ? ` stroke-opacity="0.45"` : ""}${lldp ? ` stroke-dasharray="7 5"` : ""}`, esc(`${e.fromPort ?? "?"} ↔ ${e.toPort ?? "?"}${lldp ? " (LLDP fill-in)" : ""}`));
+    drawEdge(a.x, a.y, b.x, b.y, e.from, e.to, `stroke="${stroke}" stroke-width="${width}"${cross ? ` stroke-opacity="0.28"` : ""}${lldp ? ` stroke-dasharray="7 5"` : ""}`, esc(`${e.fromPort ?? "?"} ↔ ${e.toPort ?? "?"}${lldp ? " (LLDP fill-in)" : ""}`));
   }
   for (const chip of chips) {
     const parent = lay.pos.get(chip.serial);

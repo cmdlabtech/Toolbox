@@ -5,7 +5,7 @@ import { buildModel, parseOverrides } from "../site/js/model.js";
 import { jsonExport } from "../site/js/export.js";
 import { renderSvg } from "../site/js/render.js";
 import {
-  CARD_NAME_FONT, CARD_NAME_MIN_PX, GEOM, LAYOUTS, applyPositionOverrides, clearPosition, coreScroll, displayScale, fitScale, hubOpeningScale, labelBox, layout, layoutById, nameFloorScale, openingScale, orthoBend, readableScale, shownBounds, writePosition,
+  CARD_NAME_FONT, CARD_NAME_MIN_PX, GEOM, HUB_FRAME, LAYOUTS, applyPositionOverrides, clearPosition, coreScroll, displayScale, fitScale, hubOpeningScale, labelBox, layout, layoutById, nameFloorScale, openingScale, orthoBend, readableScale, shownBounds, writePosition,
 } from "../site/js/layout.js";
 
 const data = await topologyFromFixtures();
@@ -246,13 +246,17 @@ test("hub opening scale is an absolute 11px name floor", () => {
 
   assert.equal(model.nodes.length, 19);
   const smallLay = layoutById("hub", model);
-  const smallFrame = shownBounds(smallLay, model, { collapseAps: true });
+  const smallFrame = shownBounds(smallLay, model, { collapseAps: true, ...HUB_FRAME });
   const smallBounds = { w: smallFrame.w, h: Math.max(1, smallFrame.h - 72) };
-  const smallFit = fitScale(smallBounds, avail);
-  const smallOpen = hubOpeningScale(smallBounds, avail);
-  assert.ok(smallFit < floor, "the 19-switch fit is below the 11px floor");
-  assert.ok(Math.abs(smallOpen - smallFit) < 1e-9, "19-switch sample opens fully fitted");
-  assert.ok(smallOpen <= smallFit + 1e-9, "never open the 19-switch sample above fit");
+  // The diagram pane beside the switch list on a 1440px window.
+  const pane = { w: 1051, h: 590 };
+  const smallFit = fitScale(smallBounds, pane);
+  const smallOpen = hubOpeningScale(smallBounds, pane);
+  assert.ok(smallFit + 1e-9 >= floor, "19-switch clusters pull in until fit meets the 11px floor");
+  assert.ok(smallOpen + 1e-9 >= floor, "19-switch sample opens at or above the 11px floor");
+  assert.ok(Math.abs(smallOpen - smallFit) < 1e-9, "fit above the floor opens at fit");
+  assert.ok(smallOpen <= smallFit + 1e-9, "never open above fit");
+  assert.ok(CARD_NAME_FONT * smallOpen + 1e-9 >= CARD_NAME_MIN_PX);
 });
 
 test("opening scale fits only while labels stay at the readable floor", () => {

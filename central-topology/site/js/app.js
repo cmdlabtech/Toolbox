@@ -1,6 +1,6 @@
 import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED } from "./model.js";
 import { largeSample } from "./large-sample.js";
-import { LAYOUTS, applyPositionOverrides, chipsExpanded, clearPosition, fitScale, hubOpeningScale, layoutById, openingScale, orthoBend, shownBounds, writePosition } from "./layout.js";
+import { HUB_FRAME, LAYOUTS, applyPositionOverrides, chipsExpanded, clearPosition, fitScale, hubOpeningScale, layoutById, openingScale, orthoBend, shownBounds, writePosition } from "./layout.js";
 import { renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, apiRequest, createVault, mintToken, normalise, tokenValid } from "./creds.js";
@@ -192,7 +192,8 @@ function mountDiagram(scrollAfter) {
   const scroller = host.querySelector(".diagram-scroll");
   const avail = graphAvail(scroller, host);
   if (!state.view) {
-    const opened = shownBounds(lay, model, { collapseAps: true, openChips: state.openChips });
+    const frameOpts = lay.id === "hub" ? HUB_FRAME : {};
+    const opened = shownBounds(lay, model, { collapseAps: true, openChips: state.openChips, ...frameOpts });
     const frame = cropped(opened);
     let scale;
     if (lay.id === "hub") scale = hubOpeningScale(frame, avail);
@@ -208,7 +209,8 @@ function mountDiagram(scrollAfter) {
     }
   }
   const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
-  const bounds = shownBounds(lay, model, { collapseAps: !expanded, openChips: state.openChips });
+  const frameOpts = lay.id === "hub" ? HUB_FRAME : {};
+  const bounds = shownBounds(lay, model, { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
   scroller.innerHTML = renderSvg(model, { ...lay, bounds }, {
     tokens, mgmt: state.mgmt, title: "Switch topology", subtitle: state.subtitle,
     collapseAps: !expanded, openChips: state.openChips,
@@ -246,7 +248,8 @@ function stepZoom(factor) {
   const cy = (scroller?.scrollTop ?? 0) + avail.h / 2;
   const old = state.view.scale;
   const expanded = chipsExpanded(old, state.view.openedAt);
-  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips });
+  const frameOpts = state.lay.id === "hub" ? HUB_FRAME : {};
+  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
   const fit = fitScale(cropped(bounds), avail);
   const next = Math.min(Math.max(old * factor, Math.min(fit, state.view.openedAt) * 0.5), Math.max(state.view.openedAt * 8, fit));
   state.view.scale = next;
@@ -260,7 +263,8 @@ function fitView() {
   const scroller = document.querySelector("#diagram .diagram-scroll");
   const avail = graphAvail(scroller, $("diagram"));
   const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
-  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips });
+  const frameOpts = state.lay.id === "hub" ? HUB_FRAME : {};
+  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
   state.view.scale = fitScale(cropped(bounds), avail);
   state.view.user = true;
   mountDiagram({ left: 0, top: 0 });
