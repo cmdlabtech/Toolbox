@@ -11,7 +11,9 @@
   --fg: #2a2f3a;      /* brand Ink */
   --muted: #5b606b;   /* brand Slate Gray */
   --border: #dfe3ea;
-  --accent: #2e62f0;  /* brand Cobalt */
+  --accent: #2e62f0;  /* brand Cobalt: text, links, focus */
+  --accent-fill: #2e62f0;  /* brand Cobalt: filled controls (white text on it) */
+  --header-bg: var(--surface);
   --radius: 10px;
 
   --diagram-bg: #ffffff;
@@ -32,7 +34,12 @@
   --fg: #e7eaf0;
   --muted: #9aa3b2;
   --border: #2a2f3a;
+  /* Dark-mode accessibility tint of Cobalt, NOT a new brand color. Used only for
+     dark-mode text, links and focus rings on Night, where brand Cobalt #2E62F0
+     is 3.4:1 (below 4.5:1 for small text). Filled controls stay Cobalt. */
   --accent: #4c8dff;
+  --accent-fill: #2e62f0;  /* brand Cobalt */
+  --header-bg: #161a22;    /* brand Night */
 
   --diagram-bg: #12151b;
   --diagram-fg: #e7eaf0;
