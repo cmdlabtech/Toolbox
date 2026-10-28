@@ -2,11 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { topologyFromFixtures } from "./helpers.mjs";
 import { asList, central, interfaceKind, portList, scrub } from "../worker/src/central.ts";
+import { isCentralSwitch } from "../worker/src/merge.ts";
 
 test("switch list still comes from sites-health + per-site topology", async () => {
   const calls = [];
   const data = await topologyFromFixtures(calls);
   assert.equal(data.switches.length, 19);
+  for (const s of data.switches) assert.equal(s.central, true, s.name);
   assert.ok(calls.includes("/network-monitoring/v1/sites-health"));
   assert.equal(calls.filter((c) => c.startsWith("/network-monitoring/v1/topology/")).length, 5);
   assert.ok(calls.includes("/network-monitoring/v1/device-inventory"));
@@ -119,6 +121,19 @@ test("topology port lists keep lag members", async () => {
   assert.deepEqual(portList(links[0].fromPorts), [{ name: "1/1/49", lag: "lag1" }, { name: "1/1/50", lag: "lag1" }]);
   assert.equal(links[0].fromPort, "1/1/49");
   assert.equal(links[0].toPorts[1].name, "1/1/2");
+});
+
+test("LLDP-only switch cards are not Central switches", () => {
+  const inv = new Set(["CORE1"]);
+  const centralSw = { serial: "CORE1", name: "CORE-01", model: "Aruba 8360", deviceFunction: "Core Switch" };
+  const spare = { serial: "SPARE1", name: "SPARE-SW-01", model: "Aruba 6100", deviceFunction: "Access Switch" };
+  const fallback = { serial: "CNFALLBACK1", name: "CNFALLBACK1", model: null, deviceFunction: null };
+  const unmanaged = { serial: "tpd_aabbccddeeff", name: "tpd_aabbccddeeff", model: null, deviceFunction: null };
+  assert.equal(isCentralSwitch(centralSw, inv), true);
+  assert.equal(isCentralSwitch(spare, inv), true);
+  assert.equal(isCentralSwitch(fallback, inv), false);
+  assert.equal(isCentralSwitch(unmanaged, null), false);
+  assert.equal(isCentralSwitch({ ...centralSw, model: null, deviceFunction: null }, null), true);
 });
 
 test("helpers", () => {

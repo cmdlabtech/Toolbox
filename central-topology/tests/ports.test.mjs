@@ -5,7 +5,7 @@ import { topologyFromFixtures } from "./helpers.mjs";
 import { buildModel, switchLinks } from "../site/js/model.js";
 import { jsonExport, svgBlob } from "../site/js/export.js";
 import { renderSvg } from "../site/js/render.js";
-import { LAYOUTS, layoutById, modelForNeighborToggle } from "../site/js/layout.js";
+import { GEOM, LAYOUTS, layoutById, modelForNeighborToggle } from "../site/js/layout.js";
 import { compactPortNames, formatPortEnd, portsVisible, readShowPorts, writeShowPorts } from "../site/js/ports.js";
 import { UI_KEYS, readUiPrefs, writeUiPref } from "../site/js/prefs.js";
 
@@ -197,4 +197,50 @@ test("every layout and the SVG export include port labels", async () => {
   assert.match(text, /<rect [^>]*fill="#fff"/);
   const body = jsonExport(model, "monitor", { coreSerial: null, switches: {} }, { mock: true, generatedAt: data.generatedAt, layout: "hub", positions: {} });
   assert.ok(body.links.some((l) => l.fromLabel === "lag1 (1/1/49-50)" || l.toLabel === "lag1 (1/1/49-50)"));
+});
+
+function overlaps(a, b) {
+  return a.x + a.w > b.x + 0.5 && b.x + b.w > a.x + 0.5 && a.y + a.h > b.y + 0.5 && b.y + b.h > a.y + 0.5;
+}
+
+test("export bounds include port labels and links, and labels do not collide", () => {
+  for (const spec of LAYOUTS) {
+    const lay = layoutById(spec.id, model, { width: 1100, height: 760 });
+    const svg = renderSvg(model, lay, {
+      tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: spec.label, showPorts: true, portScale: 1,
+    });
+    const frameMatch = svg.match(/viewBox="(-?[\d.]+) (-?[\d.]+) ([\d.]+) ([\d.]+)"/);
+    assert.ok(frameMatch, spec.id);
+    const frame = { x: Number(frameMatch[1]), y: Number(frameMatch[2]), w: Number(frameMatch[3]), h: Number(frameMatch[4]) };
+    const inside = (b) => b.x >= frame.x - 0.5 && b.y >= frame.y - 0.5
+      && b.x + b.w <= frame.x + frame.w + 0.5 && b.y + b.h <= frame.y + frame.h + 0.5;
+    const labels = [];
+    const re = /<g data-port-end="[^"]+" data-port-link="[^"]+">([\s\S]*?)<\/g>/g;
+    let m;
+    while ((m = re.exec(svg))) {
+      const rect = m[1].match(/<rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)"/);
+      assert.ok(rect, spec.id);
+      assert.match(m[1], /font-size="10"/);
+      labels.push({ x: Number(rect[1]), y: Number(rect[2]), w: Number(rect[3]), h: Number(rect[4]) });
+    }
+    assert.ok(labels.length >= 2, spec.id);
+    const cards = model.nodes.map((n) => {
+      const p = lay.pos.get(n.serial);
+      return { x: p.x - GEOM.nodeW / 2, y: p.y - GEOM.nodeH / 2, w: GEOM.nodeW, h: GEOM.nodeH };
+    });
+    for (const card of cards) assert.equal(inside(card), true, `${spec.id} card`);
+    for (let i = 0; i < labels.length; i++) {
+      assert.equal(inside(labels[i]), true, `${spec.id} label clipped`);
+      for (const card of cards) assert.equal(overlaps(labels[i], card), false, `${spec.id} label on card`);
+      for (let j = i + 1; j < labels.length; j++) assert.equal(overlaps(labels[i], labels[j]), false, `${spec.id} labels overlap`);
+    }
+    if (spec.id === "sites" || spec.id === "groups") {
+      for (const pt of svg.matchAll(/[ML]\s*(-?[\d.]+)\s+(-?[\d.]+)/g)) {
+        const x = Number(pt[1]);
+        const y = Number(pt[2]);
+        assert.ok(x >= frame.x - 0.5 && x <= frame.x + frame.w + 0.5, `${spec.id} link x`);
+        assert.ok(y >= frame.y - 0.5 && y <= frame.y + frame.h + 0.5, `${spec.id} link y`);
+      }
+    }
+  }
 });

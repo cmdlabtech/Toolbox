@@ -305,8 +305,10 @@ test("display scale uses the floor only when fit-to-canvas would drop below it",
       assert.equal(Number.isFinite(p.x) && Number.isFinite(p.y), true, spec.id);
     }
     const svg = renderSvg(model, lay, { tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: spec.label });
-    assert.match(svg, new RegExp(`width="${Math.round(lay.bounds.w)}"`), `${spec.id} export width`);
-    assert.match(svg, new RegExp(`height="${Math.round(lay.bounds.h)}"`), `${spec.id} export height`);
+    const box = svg.match(/viewBox="(-?[\d.]+) (-?[\d.]+) ([\d.]+) ([\d.]+)"/);
+    assert.ok(box, `${spec.id} export viewBox`);
+    assert.ok(Number(box[3]) + 1 >= lay.bounds.w, `${spec.id} export width`);
+    assert.ok(Number(box[4]) + 1 >= lay.bounds.h, `${spec.id} export height`);
     for (const n of model.nodes) assert.ok(svg.includes(n.name), `${spec.id} export ${n.name}`);
   }
   const radial = layoutById("radial", model);

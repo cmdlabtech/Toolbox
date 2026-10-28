@@ -1,7 +1,7 @@
 import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED, switchLinks } from "./model.js";
 import { largeSample } from "./large-sample.js";
-import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, shownBounds, writePosition } from "./layout.js";
-import { renderSvg, readTokens } from "./render.js";
+import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, writePosition } from "./layout.js";
+import { contentBounds, renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, connectionState, createVault, fetchWithAuth, mintToken, normalise, reuseSavedToken, tokenPlaceholder } from "./creds.js";
 import { UI_KEYS as KEYS, loadPref, readUiPrefs, savePref, writeUiPref } from "./prefs.js";
@@ -19,7 +19,7 @@ const state = {
   positions: load(KEYS.positions, {}),
   layout: prefs.layout,
   mgmt: prefs.mgmt,
-  showAccessNeighbors: prefs.showAccessNeighbors,
+  showLldpNeighbors: prefs.showLldpNeighbors,
   showPorts: prefs.showPorts,
   model: null, lay: null, svg: "",
   view: null,
@@ -123,7 +123,7 @@ connState();
 function persist() { save(KEYS.overrides, state.overrides); draw(); }
 
 function diagramModel() {
-  return modelForNeighborToggle(state.model, state.showAccessNeighbors);
+  return modelForNeighborToggle(state.model, state.showLldpNeighbors);
 }
 
 function paint() {
@@ -133,12 +133,14 @@ function paint() {
   const mgmtLabel = opts.find((o) => o.id === state.mgmt)?.label ?? state.mgmt;
   const layoutLabel = LAYOUTS.find((l) => l.id === state.layout)?.label ?? "Hub and spoke";
   const box = readContainer();
-  const lay = (state.lay = applyPositionOverrides(layoutById(state.layout, model, { width: box.w, height: box.h }), state.positions[state.layout]));
+  const placed = applyPositionOverrides(layoutById(state.layout, model, { width: box.w, height: box.h }), state.positions[state.layout]);
   const subtitle = `${model.nodes.length} switches · ${model.buildings.length} buildings · ${layoutLabel} · Mgmt: ${mgmtLabel} · ${state.data.mock ? "MOCK DATA · " : ""}${new Date(state.data.generatedAt).toLocaleString()}`;
-  state.svg = renderSvg(model, lay, {
+  const renderOpts = {
     tokens: readTokens(), mgmt: state.mgmt, title: "Switch topology", subtitle,
     showPorts: state.showPorts !== false,
-  });
+  };
+  const lay = (state.lay = { ...placed, bounds: contentBounds(model, placed, renderOpts) });
+  state.svg = renderSvg(model, lay, renderOpts);
   state.subtitle = subtitle;
   mountDiagram();
 }
@@ -203,7 +205,10 @@ function mountDiagram(scrollAfter) {
   const avail = graphAvail(scroller, host);
   if (!state.view) {
     const frameOpts = lay.id === "hub" ? HUB_FRAME : {};
-    const opened = shownBounds(lay, model, { collapseAps: true, openChips: state.openChips, ...frameOpts });
+    const opened = contentBounds(model, lay, {
+      collapseAps: true, openChips: state.openChips, showPorts: state.showPorts !== false,
+      mgmt: state.mgmt, portScale: 1, ...frameOpts,
+    });
     const frame = cropped(opened);
     let scale;
     if (opensAtNameFloor(lay.id)) scale = hubOpeningScale(frame, avail);
@@ -220,11 +225,14 @@ function mountDiagram(scrollAfter) {
   }
   const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
   const frameOpts = lay.id === "hub" ? HUB_FRAME : {};
-  const bounds = shownBounds(lay, model, { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
+  const frameOptsForBounds = {
+    collapseAps: !expanded, openChips: state.openChips, showPorts: state.showPorts !== false,
+    mgmt: state.mgmt, portScale: state.view.scale, ...frameOpts,
+  };
+  const bounds = contentBounds(model, lay, frameOptsForBounds);
   scroller.innerHTML = renderSvg(model, { ...lay, bounds }, {
     tokens, mgmt: state.mgmt, title: "Switch topology", subtitle: state.subtitle,
-    collapseAps: !expanded, openChips: state.openChips,
-    showPorts: state.showPorts !== false, portScale: state.view.scale,
+    ...frameOptsForBounds,
   });
   const svg = scroller.querySelector("svg");
   if (!svg) return;
@@ -260,7 +268,10 @@ function stepZoom(factor) {
   const old = state.view.scale;
   const expanded = chipsExpanded(old, state.view.openedAt);
   const frameOpts = state.lay.id === "hub" ? HUB_FRAME : {};
-  const bounds = shownBounds(state.lay, diagramModel(), { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
+  const bounds = contentBounds(diagramModel(), state.lay, {
+    collapseAps: !expanded, openChips: state.openChips, showPorts: state.showPorts !== false,
+    mgmt: state.mgmt, portScale: state.view.scale, ...frameOpts,
+  });
   const fit = fitScale(cropped(bounds), avail);
   const next = Math.min(Math.max(old * factor, Math.min(fit, state.view.openedAt) * 0.5), Math.max(state.view.openedAt * 8, fit));
   state.view.scale = next;
@@ -275,7 +286,10 @@ function fitView() {
   const avail = graphAvail(scroller, $("diagram"));
   const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
   const frameOpts = state.lay.id === "hub" ? HUB_FRAME : {};
-  const bounds = shownBounds(state.lay, diagramModel(), { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
+  const bounds = contentBounds(diagramModel(), state.lay, {
+    collapseAps: !expanded, openChips: state.openChips, showPorts: state.showPorts !== false,
+    mgmt: state.mgmt, portScale: state.view.scale, ...frameOpts,
+  });
   state.view.scale = fitScale(cropped(bounds), avail);
   state.view.user = true;
   mountDiagram({ left: 0, top: 0 });
@@ -337,8 +351,9 @@ function draw() {
   if (!state.data) return;
   state.view = null;
   state.openChips = new Set();
-  const model = (state.model = buildModel(state.data, state.overrides));
-  const opts = mgmtOptions(state.data.switches);
+  const built = buildModel(state.data, state.overrides);
+  const model = (state.model = modelForNeighborToggle(built, state.showLldpNeighbors));
+  const opts = mgmtOptions(model.nodes);
   if (!opts.some((o) => o.id === state.mgmt)) state.mgmt = opts[0]?.id ?? "monitor";
   $("mgmtSel").innerHTML = opts.map((o) => `<option value="${esc(o.id)}"${o.id === state.mgmt ? " selected" : ""}>${esc(o.label)} — ${o.count}/${o.total}</option>`).join("");
   const sorted = [...model.nodes].sort((a, b) => a.name.localeCompare(b.name));
@@ -408,10 +423,10 @@ $("portsToggle").addEventListener("change", (e) => {
   writeUiPref(localStorage, "showPorts", state.showPorts);
   if (state.model) { paint(); side(state.model); }
 });
-$("showAccessNeighbors").checked = state.showAccessNeighbors;
-$("showAccessNeighbors").addEventListener("change", (e) => {
-  state.showAccessNeighbors = e.target.checked;
-  writeUiPref(localStorage, "showAccessNeighbors", state.showAccessNeighbors);
+$("showLldpNeighbors").checked = state.showLldpNeighbors;
+$("showLldpNeighbors").addEventListener("change", (e) => {
+  state.showLldpNeighbors = e.target.checked;
+  writeUiPref(localStorage, "showLldpNeighbors", state.showLldpNeighbors);
   draw();
 });
 $("themeBtn").addEventListener("click", () => {
