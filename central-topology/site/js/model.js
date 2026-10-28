@@ -66,6 +66,7 @@ export function buildModel(data, overrides = {}) {
       ...s,
       building,
       buildingSource: o.building ? "override" : s.site ? "site" : "none",
+      group: typeof s.group === "string" && s.group.trim() ? s.group.trim() : null,
       hop: hop.get(s.serial) ?? null,
       degree: adj.get(s.serial).size,
       flags: [],

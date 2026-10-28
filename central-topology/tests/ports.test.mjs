@@ -152,30 +152,32 @@ test("hiding access neighbors keeps port labels on the remaining switch links", 
   const view = modelForNeighborToggle(model, false);
   assert.ok(view.externals.length < model.externals.length);
   assert.equal(view.edges.filter((e) => !e.external).length, model.edges.filter((e) => !e.external).length);
-  const lay = layoutById("hub", view);
-  const svg = renderSvg(view, lay, {
-    tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "neighbors off", collapseAps: true,
-  });
-  assert.match(svg, /lag1 \(1\/1\/49-50\)/);
-  assert.doesNotMatch(svg, /data-chip/);
-  const labels = labelsOf(svg);
-  assert.ok(labels.length >= 2);
-  const ext = new Set(model.externals.map((d) => d.serial));
-  for (const l of labels) {
-    const [u, v] = l.link.split("|");
-    assert.equal(ext.has(l.end) || ext.has(u) || ext.has(v), false);
-  }
   const ap = model.externals.find((d) => d.name === "WHS-AP-114");
   assert.equal(view.externals.some((d) => d.serial === ap.serial), false);
-  assert.equal(svg.includes(ap.name), false);
+  const ext = new Set(model.externals.map((d) => d.serial));
   const acc = byName("DO-ACC-02");
   const core = byName("DO-CORE-01");
   const edge = view.edges.find((e) => !e.external && [e.from, e.to].includes(acc.serial) && [e.from, e.to].includes(core.serial));
   const link = [edge.from, edge.to].sort().join("|");
-  const ends = labels.filter((l) => l.link === link);
-  assert.equal(ends.length, 2);
-  assert.equal(ends.find((l) => l.end === edge.from).text, edge.fromLabel);
-  assert.equal(ends.find((l) => l.end === edge.to).text, edge.toLabel);
+  for (const id of ["hub", "groups"]) {
+    const lay = layoutById(id, view);
+    const svg = renderSvg(view, lay, {
+      tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: id, collapseAps: true,
+    });
+    assert.match(svg, /lag1 \(1\/1\/49-50\)/, id);
+    assert.doesNotMatch(svg, /data-chip/, id);
+    assert.equal(svg.includes(ap.name), false, id);
+    const labels = labelsOf(svg);
+    assert.ok(labels.length >= 2, id);
+    for (const l of labels) {
+      const [u, v] = l.link.split("|");
+      assert.equal(ext.has(l.end) || ext.has(u) || ext.has(v), false, id);
+    }
+    const ends = labels.filter((l) => l.link === link);
+    assert.equal(ends.length, 2, id);
+    assert.equal(ends.find((l) => l.end === edge.from).text, edge.fromLabel, id);
+    assert.equal(ends.find((l) => l.end === edge.to).text, edge.toLabel, id);
+  }
 });
 
 test("every layout and the SVG export include port labels", async () => {

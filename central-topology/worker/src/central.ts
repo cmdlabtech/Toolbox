@@ -111,12 +111,50 @@ async function paged(get: GetJson, path: string, limit = 100): Promise<any[]> {
   return out;
 }
 
+// Device inventory pages with `limit` and a `next` cursor, not offset.
+async function pagedCursor(get: GetJson, path: string, extra?: Record<string, string>, limit = 100): Promise<any[]> {
+  const out: any[] = [];
+  const seen = new Set<string>();
+  let cursor: string | null = null;
+  for (let guard = 0; guard < 100; guard++) {
+    const params: Record<string, string> = { limit: String(limit), ...(extra ?? {}) };
+    if (cursor) params.next = cursor;
+    const body = await get(path, params);
+    const page = asList(body?.items);
+    out.push(...page);
+    const next = body?.next;
+    if (next === undefined || next === null || String(next).trim() === "") break;
+    const token = String(next).trim();
+    if (seen.has(token) || page.length === 0) break;
+    seen.add(token);
+    if (typeof body?.total === "number" && out.length >= body.total) break;
+    cursor = token;
+  }
+  return out;
+}
+
 export function central(get: GetJson) {
   return {
     async sites(): Promise<Site[]> {
       return (await paged(get, "/network-monitoring/v1/sites-health"))
         .filter((s) => str(s.id))
         .map((s) => ({ id: String(s.id), name: str(s.siteName) ?? String(s.id) }));
+    },
+
+    // Central device group name. Not used as the switch inventory.
+    // GET /network-monitoring/v1/device-inventory → items[].deviceGroupName,
+    // matched on items[].serialNumber (else items[].id).
+    async deviceGroups(): Promise<{ serial: string; group: string | null }[]> {
+      const items = await pagedCursor(get, "/network-monitoring/v1/device-inventory", {
+        filter: "deviceType eq 'SWITCH'",
+      });
+      const out: { serial: string; group: string | null }[] = [];
+      for (const d of items) {
+        const serial = str(d?.serialNumber) ?? str(d?.id);
+        if (!serial) continue;
+        out.push({ serial, group: str(d?.deviceGroupName) });
+      }
+      return out;
     },
 
     async topology(siteId: string): Promise<{ devices: TopoDevice[]; links: TopoLink[] }> {

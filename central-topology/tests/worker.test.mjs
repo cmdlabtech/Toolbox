@@ -3,16 +3,50 @@ import assert from "node:assert/strict";
 import { topologyFromFixtures } from "./helpers.mjs";
 import { asList, central, interfaceKind, portList, scrub } from "../worker/src/central.ts";
 
-test("inventory comes only from sites-health + per-site topology (no device inventory call)", async () => {
+test("switch list still comes from sites-health + per-site topology", async () => {
   const calls = [];
   const data = await topologyFromFixtures(calls);
   assert.equal(data.switches.length, 19);
   assert.ok(calls.includes("/network-monitoring/v1/sites-health"));
   assert.equal(calls.filter((c) => c.startsWith("/network-monitoring/v1/topology/")).length, 5);
+  assert.ok(calls.includes("/network-monitoring/v1/device-inventory"));
   for (const c of calls) {
     assert.doesNotMatch(c, /\/network-monitoring\/v1\/(devices|switches)$/, `inventory call made: ${c}`);
-    assert.doesNotMatch(c, /device-inventory|\/monitoring\/v1\//);
+    assert.doesNotMatch(c, /\/monitoring\/v1\//);
   }
+});
+
+test("device group names come from device-inventory deviceGroupName", async () => {
+  const data = await topologyFromFixtures();
+  const byName = (n) => data.switches.find((s) => s.name === n);
+  assert.equal(byName("DO-CORE-01").group, "Group 1");
+  assert.equal(byName("WHS-ACC-01").group, "Group 2");
+  assert.equal(byName("MES-CORE-01").group, "Group 3");
+  assert.equal(byName("DO-ACC-02").group, null);
+  assert.equal(byName("SPARE-SW-07").group, null);
+  for (const s of data.switches) if (s.group) assert.match(s.group, /^Group \d+$/);
+});
+
+test("device inventory pages with the next cursor", async () => {
+  const pages = [
+    { items: [{ serialNumber: "A", deviceGroupName: "Group 1" }], count: 1, total: 2, next: "2" },
+    { items: [{ serialNumber: "B", deviceGroupName: "  " }, { serialNumber: "C" }], count: 2, total: 2, next: null },
+  ];
+  let i = 0;
+  const c = central(async (path, params) => {
+    assert.equal(path, "/network-monitoring/v1/device-inventory");
+    assert.equal(params.filter, "deviceType eq 'SWITCH'");
+    assert.equal(params.limit, "100");
+    if (i === 0) assert.equal(params.next, undefined);
+    else assert.equal(params.next, "2");
+    return pages[i++];
+  });
+  assert.deepEqual(await c.deviceGroups(), [
+    { serial: "A", group: "Group 1" },
+    { serial: "B", group: null },
+    { serial: "C", group: null },
+  ]);
+  assert.equal(i, 2);
 });
 
 test("switches seen in several site topologies get their home site from switch detail", async () => {

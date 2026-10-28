@@ -1,6 +1,6 @@
 # Central Topology
 
-A switch topology diagram for a new Central (HPE GreenLake) tenant. A layout picker draws the same switches six ways. Hub and spoke is the default: the district core sits in the middle, each building core is a hub, and access switches are spokes. Each node is labeled with its name and a management IP you choose. You can download the diagram as SVG, PNG or JSON.
+A switch topology diagram for a new Central (HPE GreenLake) tenant. A layout picker draws the same switches seven ways. Hub and spoke is the default: the district core sits in the middle, each building core is a hub, and access switches are spokes. Each node is labeled with its name and a management IP you choose. You can download the diagram as SVG, PNG or JSON.
 
 - `site/`: a static page with no build step, hosted on Cloudflare Pages.
 - `worker/`: a stateless, read-only pass-through on Cloudflare Workers. It holds no credentials. It is new Central only, and the topology API is the inventory source.
@@ -47,6 +47,7 @@ With no credentials entered and `MOCK=1` (the default in `wrangler.toml`), the W
    - If a switch shows up in more than one site, the Worker asks switch detail for its home site.
    - If a switch is still disconnected, it fills the gap from LLDP (`neighbours/{serial}`).
    - It adds VLAN SVI and OOBM/loopback IPs as management candidates.
+   - Device group names come from one read-only `GET /network-monitoring/v1/device-inventory` (`items[].deviceGroupName`, matched on `items[].serialNumber`). A blank or missing name stays unset. The same bearer token is used. Nothing from that response is stored or logged.
 2. `site/js/model.js` infers roles:
    - The district core is the highest-degree switch, unless you pick one.
    - Building is the site assignment.
@@ -54,7 +55,7 @@ With no credentials entered and `MOCK=1` (the default in `wrangler.toml`), the W
    - Everything else is access.
    - Ambiguous switches are flagged: no site, linked into another building, multi-homed, or no path to the core.
 3. Overrides are stored in `localStorage` under `ct-overrides`. You can set the district core, or a switch's building or role, then export or import them as JSON. Those apply in every layout.
-4. `layout.js` places nodes. The Layout picker selects one of the six layouts below; the choice is kept in `localStorage` under `ct-layout`. `render.js` produces one self-contained SVG with colors taken from the `theme.css` tokens.
+4. `layout.js` places nodes. The Layout picker selects one of the seven layouts below; the choice is kept in `localStorage` under `ct-layout`. `render.js` produces one self-contained SVG with colors taken from the `theme.css` tokens.
 5. Downloads follow the layout on screen:
    - SVG is that string.
    - PNG is the SVG drawn onto a 2× canvas.
@@ -64,15 +65,16 @@ With no credentials entered and `MOCK=1` (the default in `wrangler.toml`), the W
 
 The toolbar Layout control redraws the current switches and links. Hub and spoke is the default. Drag a node to pin it; double-click it to let the layout place it again. Pinned positions are stored per layout in `localStorage` under `ct-positions`. Switching layouts leaves every other layout's pins in place. Export overrides writes the pins into the same JSON file; an older file with no pins leaves them as they are.
 
-The header control Show access neighbors is on by default. It is stored in `localStorage` under `ct-show-access-neighbors`, with the same load and save as the layout, theme, and management-IP choices. Turn it off to drop APs and every other LLDP neighbor that hangs off an access switch, including the chips that stand in for them. Every layout is placed again without those nodes and links, and the view fits what remains. Neighbors of the district core and of building cores stay, and so do links between switches.
+The header control Show access neighbors is on by default. It is stored in `localStorage` under `ct-show-access-neighbors`, with the same load and save as the layout, theme, and management-IP choices. Turn it off to drop APs and every other LLDP neighbor that hangs off an access switch, including the chips that stand in for them. Every layout, including Grouped by group, is placed again without those nodes and links, and the view fits what remains. Neighbors of the district core and of building cores stay, and so do links between switches.
 
-Hub and spoke sizes the ring to the cluster. A small network pulls each cluster in toward the district core so the fitted view already draws card names at 11px or larger, and that view opens fitted. A larger drawing, whose fit is still below that absolute floor, opens at the floor, centered on the district core, and you pan or press Fit for the rest. It never opens zoomed past fit when fit already meets the floor, and it never opens past the floor. The other five layouts still open fitted when that scale stays at least as large as the left-to-right tree in the same pane, and a larger drawing opens at that floor, centered on the district core. Fit, +, and − change the zoom. The title, the detail line, and the legend stay above the pan area. SVG, PNG, and JSON downloads still contain the whole graph.
+Hub and spoke sizes the ring to the cluster. A small network pulls each cluster in toward the district core so the fitted view already draws card names at 11px or larger, and that view opens fitted. A larger drawing, whose fit is still below that absolute floor, opens at the floor, centered on the district core, and you pan or press Fit for the rest. It never opens zoomed past fit when fit already meets the floor, and it never opens past the floor. Grouped by site and Grouped by group open at that same 11px name floor. The tiered trees, radial rings, and the force-directed layout still open fitted when that scale stays at least as large as the left-to-right tree in the same pane, and a larger drawing opens at that floor, centered on the district core. Fit, +, and − change the zoom. The title, the detail line, and the legend stay above the pan area. SVG, PNG, and JSON downloads still contain the whole graph.
 
 - **Hub and spoke.** The district core is in the center. Each building is a cluster sized to its cards: access switches toward the core, the building core and its label on the outer edge of that cluster. LLDP neighbors of an access switch collapse to one chip, "+1 AP" or "+N APs", until you zoom in or click the chip.
 - **Tiered tree, top-down.** The district core is the root. The next tier is every switch one hop away (the building cores, plus any access switch linked directly to the district core). Access switches sit on the tiers below their parent, so a daisy-chained switch adds a tier. Switches on a tier stay grouped under their parent, with a link that leaves the site placed on the side facing that neighbor. Links run in the gap between tiers.
 - **Tiered tree, left to right.** The same tiers, with hops running left to right. It stays readable on a wide viewport, where the depth fits across the page.
 - **Radial rings.** Tiers are concentric rings: district core, then building cores, then access switches. Each building's switches share an arc.
-- **Grouped by site.** Each site is a labelled box with that site's switches stacked inside. Links that stay in the site run through the gutter beside the box. Links that leave the site run through the lane above the boxes.
+- **Grouped by site.** Each site is a labelled box with that site's switches stacked inside. Links that stay in the site run through the gutter beside the box. Links that leave the site run through the lane above the boxes. The boxes wrap across the width of the diagram.
+- **Grouped by group.** The same boxes and full-width grid, with one box per Central device group. A switch with no group sits in Ungrouped. The district core keeps its core mark. Links that leave the group are drawn lighter, the same way links that leave a site are. The view opens at the 11px name floor. Show access neighbors uses the same toggle as the other layouts: off removes access-switch neighbor chips and their links, and the boxes are placed again.
 - **Force-directed.** Links act as springs and nodes repel. The simulation starts from a fixed seed and stops when it settles, so the same data always produces the same picture. It does not keep moving. The settled graph is centered in the frame, with at least a 16px gap between node boxes.
 
 The header control **Show ports** is on by default. It is stored in `localStorage` under `ct-ports`, with the same JSON load and save as the layout, theme, and management-IP choices. Each switch-to-switch link is labeled at both ends with that switch's interface. A LAG is the LAG name and its member ports, for example `lag1 (1/1/49-50)`. Links to access points and other neighbor devices are not labeled. Labels drop out when zoom would draw them smaller than about 10px. SVG and PNG downloads include them, and each switch card lists the same ports.
@@ -90,7 +92,7 @@ Data routes are GET only. Live data needs both `Authorization: Bearer <token>` a
 | `/api/switches/:serial/neighbors` | `GET /network-monitoring/v1/neighbours/{serial-number}` |
 | `/api/switches/:serial/vlans` | `GET /network-monitoring/v1/switches/{serial-number}/vlans` |
 | `/api/switches/:serial/interfaces` | `GET /network-monitoring/v1/switches/{serial-number}/interfaces` |
-| `/api/topology?include=vlans,interfaces` | sites-health, then topology per site, plus switch detail, neighbours, vlans and interfaces as described above |
+| `/api/topology?include=vlans,interfaces` | sites-health, device-inventory (group names only), then topology per site, plus switch detail, neighbours, vlans and interfaces as described above |
 
 Doc links for each call are in `docs/API-NOTES.md`.
 

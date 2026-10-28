@@ -6,6 +6,8 @@
   neighbours.json    GET /network-monitoring/v1/neighbours/{serial}  (keyed by serial)
   vlans.json         GET /network-monitoring/v1/switches/{serial}/vlans
   interfaces.json    GET /network-monitoring/v1/switches/{serial}/interfaces
+  device-inventory.json  GET /network-monitoring/v1/device-inventory
+                         items[].deviceGroupName, keyed later by serialNumber
 
 All names, serials, MACs and IPs are made up. Private (RFC 1918) addresses only.
 Run: python3 worker/fixtures/gen_fixtures.py   (rewrites the JSON files next to it)
@@ -197,8 +199,35 @@ for s in SW:
                       "operStatus": "Up", "adminStatus": "Up", "uplink": False, "ipv4": s["loop"]})
     interfaces[s["serial"]] = {"items": items, "count": len(items), "total": len(items), "offset": None}
 
+def device_group(name):
+    # Generic Central device-group names. One switch is blank, one is absent.
+    if name == "SPARE-SW-07":
+        return None
+    if name == "DO-ACC-02":
+        return ""
+    if name.startswith("DO-"):
+        return "Group 1"
+    if name.startswith("WHS-") or name.startswith("OMS-"):
+        return "Group 2"
+    return "Group 3"
+
+items = []
+for s in SW:
+    group = device_group(s["name"])
+    if group is None:
+        continue
+    items.append({
+        "serialNumber": s["serial"],
+        "id": s["serial"],
+        "deviceType": "SWITCH",
+        "deviceGroupName": group,
+        "type": "network-monitoring/device-monitoring",
+    })
+inventory = {"items": items, "count": len(items), "total": len(items), "next": None}
+
 for fname, obj in [("sites-health.json", sites_health), ("topology.json", topology),
-                   ("neighbours.json", neighbours), ("switch-detail.json", detail), ("vlans.json", vlans), ("interfaces.json", interfaces)]:
+                   ("neighbours.json", neighbours), ("switch-detail.json", detail), ("vlans.json", vlans),
+                   ("interfaces.json", interfaces), ("device-inventory.json", inventory)]:
     with open(os.path.join(HERE, fname), "w") as f:
         json.dump(obj, f, indent=1)
-print(f"{len(SW)} switches in {len(sites)} sites, {len(LINKS)} switch links, {len(EXTERNAL)} external neighbours")
+print(f"{len(SW)} switches in {len(sites)} sites, {len(LINKS)} switch links, {len(EXTERNAL)} external neighbours, {len(items)} inventory rows")

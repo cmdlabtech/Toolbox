@@ -1,7 +1,7 @@
 // SVG renderer. Produces one self-contained SVG string: every color is
 // resolved from theme tokens at render time, so a downloaded file looks the
 // same outside the page. Pure function except for tokens passed in.
-import { CARD_NAME_FONT, GEOM, accessChipBoxes, orthoBend } from "./layout.js";
+import { CARD_NAME_FONT, GEOM, accessChipBoxes, linkLeavesBucket, orthoBend } from "./layout.js";
 import { resolveMgmt } from "./model.js";
 import { PORT_FONT, portsVisible } from "./ports.js";
 
@@ -136,7 +136,7 @@ export function renderSvg(model, lay, opts) {
     const lldp = e.source === "neighbours";
     const fromN = model.byId.get(e.from);
     const toN = model.byId.get(e.to);
-    const cross = !e.external && fromN && toN && fromN.building !== toN.building;
+    const cross = !e.external && linkLeavesBucket(lay, fromN, toN);
     const stroke = e.external ? T["--node-ext"] : T["--edge"];
     const width = e.external ? 1.2 : 2;
     const fromL = e.fromLabel || e.fromPort || "?";
