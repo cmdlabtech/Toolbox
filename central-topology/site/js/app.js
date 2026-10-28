@@ -3,7 +3,7 @@ import { largeSample } from "./large-sample.js";
 import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, fitScale, hubOpeningScale, layoutById, openingScale, orthoBend, replaceMeasure, shownBounds, writePosition } from "./layout.js";
 import { renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
-import { CLUSTERS, apiRequest, createVault, mintToken, normalise, tokenValid } from "./creds.js";
+import { CLUSTERS, connectionState, createVault, fetchWithAuth, mintToken, normalise, reuseSavedToken, tokenPlaceholder } from "./creds.js";
 
 const $ = (id) => document.getElementById(id);
 // Device data comes from the tenant; escape it before it touches innerHTML.
@@ -33,21 +33,11 @@ const apiBase = (window.CT_CONFIG?.apiBase ?? "").replace(/\/+$/, "");
 const vault = createVault({ session: sessionStorage, local: localStorage });
 vault.load();
 
-/** Current credentials with a usable token, minting one if needed. Null = mock. */
-async function activeCreds() {
-  const c = vault.get();
-  if (!c) return null;
-  if (tokenValid(c)) return c;
-  if (c.method !== "client") throw new Error("The bearer token has expired. Paste a new one in Credentials.");
-  const fresh = await mintToken(c, { apiBase });
-  vault.save(fresh);
-  return fresh;
-}
-
 function connState() {
-  const c = vault.get(); const el = $("connState");
-  el.textContent = c ? `Live: ${new URL(c.baseUrl).hostname.split(".")[0]}${vault.remembered() ? " (remembered)" : ""}` : "Not connected (mock)";
-  el.className = c ? "conn live" : "conn";
+  const view = connectionState(vault.get(), vault.remembered());
+  const el = $("connState");
+  el.textContent = view.text;
+  el.className = view.live ? "conn live" : "conn";
 }
 
 async function refresh() {
@@ -63,16 +53,19 @@ async function refresh() {
       draw();
       return;
     }
-    const creds = await activeCreds();
-    const { url, init } = apiRequest(apiBase, "/api/topology?include=vlans,interfaces", creds);
-    const resp = await fetch(url, init);
-    const body = await resp.json();
-    if (resp.status === 401 && creds) vault.save({ ...creds, token: null, expiresAt: null });
-    if (!resp.ok) throw new Error(body.error ?? `HTTP ${resp.status}`);
-    state.data = body;
-    $("mockBadge").hidden = !body.mock;
+    const result = await fetchWithAuth(vault.get(), { apiBase });
+    if (result.creds) vault.save(result.creds);
+    state.data = result.body;
+    $("mockBadge").hidden = !result.body.mock;
     draw();
+    connState();
   } catch (e) {
+    if (e?.creds) vault.save(e.creds);
+    connState();
+    const panelOpen = !$("credsPanel").hidden;
+    const typing = panelOpen && [$("cToken"), $("cSecret"), $("cId")].some((el) => el.value.trim());
+    if (e?.reopen && !(panelOpen && typing)) togglePanel(true, e.message);
+    else if (panelOpen) cMsg(e.message, true);
     status(`Could not load topology: ${e.message}`, true);
   }
 }
@@ -90,13 +83,13 @@ function fillPanel() {
   $("cId").value = c?.clientId ?? "";
   $("cSecret").value = ""; $("cToken").value = "";
   $("cSecret").placeholder = c?.clientSecret ? "(saved in this browser)" : "";
-  $("cToken").placeholder = c?.method === "token" ? "(saved in this browser)" : "";
+  $("cToken").placeholder = tokenPlaceholder(c);
   $("cRemember").checked = vault.remembered();
   showMethod();
 }
-function togglePanel(open = $("credsPanel").hidden) {
+function togglePanel(open = $("credsPanel").hidden, message = "") {
   $("credsPanel").hidden = !open; $("credsBtn").setAttribute("aria-expanded", String(open));
-  if (open) { fillPanel(); cMsg(""); }
+  if (open) { fillPanel(); cMsg(message, Boolean(message)); }
 }
 $("credsBtn").addEventListener("click", () => togglePanel());
 $("cClose").addEventListener("click", () => togglePanel(false));
@@ -108,7 +101,7 @@ $("cConnect").addEventListener("click", async () => {
     const creds = normalise({
       method: method(), baseUrl: $("cBase").value, clientId: $("cId").value,
       clientSecret: $("cSecret").value || (prev?.clientId === $("cId").value.trim() ? prev?.clientSecret : ""),
-      token: $("cToken").value || (prev?.method === "token" ? prev.token : ""),
+      token: method() === "token" ? reuseSavedToken($("cToken").value, prev) : "",
     });
     cMsg(creds.method === "client" ? "Requesting a token from HPE GreenLake…" : "Saved.");
     const ready = creds.method === "client" ? await mintToken(creds, { apiBase }) : creds;
