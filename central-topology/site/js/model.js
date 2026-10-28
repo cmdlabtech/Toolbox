@@ -5,6 +5,25 @@ import { formatPortEnd } from "./ports.js";
 export const ROLES = ["district-core", "building-core", "access"];
 export const UNASSIGNED = "Unassigned";
 
+function blankField(v) {
+  return v == null || String(v).trim() === "";
+}
+
+/**
+ * Switch card that is not a Central-managed switch: an explicit `central: false`
+ * mark, an unmanaged `tpd_` / `mac:` serial, or a serial-shaped name with no
+ * model and no device function. `central: true` is never treated as LLDP-only.
+ */
+export function isLldpOnlySwitch(sw) {
+  if (!sw || sw.central === true) return false;
+  if (sw.central === false) return true;
+  const serial = String(sw.serial ?? "");
+  if (/^(tpd_|mac:)/i.test(serial)) return true;
+  const name = String(sw.name ?? "").trim();
+  const serialLike = name.length >= 8 && (name.toUpperCase() === serial.toUpperCase() || /^[A-Z0-9]+$/.test(name));
+  return blankField(sw.model) && blankField(sw.deviceFunction) && serialLike;
+}
+
 /** Undirected switch-to-switch adjacency from merged topology links. */
 export function adjacency(switches, links) {
   const ids = new Set(switches.map((s) => s.serial));
@@ -47,7 +66,13 @@ export function bfs(adj, root) {
  * data: /api/topology response. overrides: { coreSerial, switches: { serial: { building, role } } }
  */
 export function buildModel(data, overrides = {}) {
-  const switches = data.switches ?? [];
+  const switches = [];
+  const seenSerial = new Set();
+  for (const s of data.switches ?? []) {
+    if (!s?.serial || seenSerial.has(s.serial)) continue;
+    seenSerial.add(s.serial);
+    switches.push(s);
+  }
   const links = data.links ?? [];
   const ov = overrides.switches ?? {};
   const adj = adjacency(switches, links);

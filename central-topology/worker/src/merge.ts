@@ -6,6 +6,32 @@ export interface MergedSwitch extends TopoDevice {
   site: string | null;
   siteSource: string;
   group: string | null;
+  central: boolean;
+}
+
+function blank(v: string | null | undefined) {
+  return v == null || v.trim() === "";
+}
+
+/**
+ * True for a switch Central manages. Unmanaged LLDP cards (`tpd_` / `mac:`
+ * serials, or a device missing from a successful inventory that has no model
+ * and no device function, or a serial-shaped name and no device function)
+ * are false. A failed or empty inventory does not mark managed switches false.
+ */
+export function isCentralSwitch(
+  sw: { serial: string; name: string; model: string | null; deviceFunction: string | null },
+  inventory: Set<string> | null,
+): boolean {
+  if (/^(tpd_|mac:)/i.test(sw.serial)) return false;
+  if (inventory?.has(sw.serial)) return true;
+  if (inventory && !inventory.has(sw.serial)) {
+    const name = (sw.name ?? "").trim();
+    const serialLike = name.length >= 8 && (name.toUpperCase() === sw.serial.toUpperCase() || /^[A-Z0-9]+$/.test(name));
+    if (blank(sw.model) && blank(sw.deviceFunction)) return false;
+    if (serialLike && blank(sw.deviceFunction)) return false;
+  }
+  return true;
 }
 
 const key = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
@@ -39,9 +65,10 @@ function keepRicher(prev: TopoLink, next: TopoLink): TopoLink {
 }
 
 export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[], n: number, f: (x: T) => Promise<R>) => Promise<R[]>, warn: (m: string) => void) {
+  let inventoryFailed = false;
   const groupTask = c.deviceGroups().then(
     (rows) => rows,
-    (e) => { warn(`Device groups unavailable (${(e as Error).message})`); return [] as { serial: string; group: string | null }[]; },
+    (e) => { inventoryFailed = true; warn(`Device groups unavailable (${(e as Error).message})`); return [] as { serial: string; group: string | null }[]; },
   );
   const perSite = await pool(sites, 4, async (s) => {
     try { return { site: s, ...(await c.topology(s.id)) }; }
@@ -76,13 +103,14 @@ export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[
     if (!isSwitch(d)) continue;
     const seen = seenIn.get(d.serial) ?? [];
     const det = detail.get(d.serial);
-    if (seen.length === 1) switches.push({ ...d, siteId: seen[0].id, site: seen[0].name, siteSource: "topology", group: null });
-    else if (det?.siteName) switches.push({ ...d, siteId: det.siteId, site: det.siteName, siteSource: "switch-detail", group: null });
-    else switches.push({ ...d, siteId: seen[0]?.id ?? null, site: seen[0]?.name ?? null, siteSource: "ambiguous", group: null });
+    if (seen.length === 1) switches.push({ ...d, siteId: seen[0].id, site: seen[0].name, siteSource: "topology", group: null, central: true });
+    else if (det?.siteName) switches.push({ ...d, siteId: det.siteId, site: det.siteName, siteSource: "switch-detail", group: null, central: true });
+    else switches.push({ ...d, siteId: seen[0]?.id ?? null, site: seen[0]?.name ?? null, siteSource: "ambiguous", group: null, central: true });
   }
 
+  const groupRows = await groupTask;
   const groupBySerial = new Map<string, string | null>();
-  for (const row of await groupTask) {
+  for (const row of groupRows) {
     const prev = groupBySerial.get(row.serial);
     if (prev === undefined || (prev === null && row.group)) groupBySerial.set(row.serial, row.group);
   }
@@ -106,6 +134,11 @@ export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[
       else if (prev.source !== "topology" || portCount(prev) === 0) links.set(k, keepRicher(prev, l));
     }
   }
+
+  const inventory = inventoryFailed || groupRows.length === 0
+    ? null
+    : new Set(groupRows.map((r) => r.serial));
+  for (const sw of switches) sw.central = isCentralSwitch(sw, inventory);
 
   const externals = [...devices.values()].filter((d) => !isSwitch(d));
   return { switches, externals, links: [...links.values()] };

@@ -297,9 +297,12 @@ test("campus hub fits eight buildings at the 11px floor, and access chips are no
     tokens: TOKENS, mgmt: "monitor", title: "t", subtitle: "s", showPorts: false, portScale: 1,
   });
   assert.equal(hiddenPorts.includes("data-port-end"), false);
+  const viewMatch = zoomed.match(/viewBox="(-?[\d.]+) (-?[\d.]+) ([\d.]+) ([\d.]+)"/);
+  assert.ok(viewMatch, "export viewBox");
+  const frameBox = { x: Number(viewMatch[1]), y: Number(viewMatch[2]), w: Number(viewMatch[3]), h: Number(viewMatch[4]) };
   for (const lab of ports) {
-    assert.ok(lab.x >= opened.x - 0.5 && lab.y >= opened.y - 0.5, "port label clipped");
-    assert.ok(lab.x + lab.w <= opened.x + opened.w + 0.5 && lab.y + lab.h <= opened.y + opened.h + 0.5, "port label clipped");
+    assert.ok(lab.x >= frameBox.x - 0.5 && lab.y >= frameBox.y - 0.5, "port label clipped");
+    assert.ok(lab.x + lab.w <= frameBox.x + frameBox.w + 0.5 && lab.y + lab.h <= frameBox.y + frameBox.h + 0.5, "port label clipped");
     for (const card of cards) {
       assert.equal(intersects(lab, card), false, `port label covers ${card.id}`);
     }

@@ -1,8 +1,12 @@
 // Layouts for the topology diagram. Each one is a pure function: model in,
 // positions out. Hub and spoke is the default. Position overrides are applied
 // afterwards, per layout, and never written back into the model.
+import { isLldpOnlySwitch } from "./model.js";
 
 export const GEOM = { r1: 290, r2: 600, rExt: 740, nodeW: 156, nodeH: 46, pad: 40 };
+
+/** Left margin reserved so grouped layouts can stack port labels beside a site box. */
+export const PORT_LANE = 128;
 
 const LAYOUT_FNS = {
   hub: (model) => layout(model),
@@ -199,7 +203,8 @@ export function linkLeavesBucket(lay, fromN, toN) {
 
 /**
  * External devices whose only switch attachments are access-layer switches.
- * A device that also links to the district core or a building core is kept.
+ * Used to chip those neighbors while LLDP neighbors are shown. The hide
+ * toggle drops every LLDP neighbor, not only this set.
  */
 export function accessOnlyNeighborIds(model) {
   const onAccess = new Set();
@@ -218,23 +223,42 @@ export function accessOnlyNeighborIds(model) {
 }
 
 /**
- * Copy of the model for layout and drawing with access-only LLDP neighbors removed.
- * Switch nodes and switch-to-switch edges are unchanged. Returns the same model
- * when there is nothing to drop.
+ * Copy of the model with every LLDP and non-Central neighbor removed.
+ * That includes external devices on any switch role, their links, and switch
+ * cards that exist only because of LLDP. Central-managed switches stay.
+ * Returns the same model when there is nothing to drop.
  */
-export function withoutAccessNeighbors(model) {
-  const drop = accessOnlyNeighborIds(model);
+export function withoutLldpNeighbors(model) {
+  const drop = new Set();
+  for (const n of model.nodes) if (isLldpOnlySwitch(n)) drop.add(n.serial);
+  for (const d of model.externals ?? []) drop.add(d.serial);
+  for (const e of model.edges) {
+    if (!model.byId.has(e.from)) drop.add(e.from);
+    if (!model.byId.has(e.to)) drop.add(e.to);
+  }
   if (!drop.size) return model;
-  return {
-    ...model,
-    edges: model.edges.filter((e) => !drop.has(e.from) && !drop.has(e.to)),
-    externals: (model.externals ?? []).filter((d) => !drop.has(d.serial)),
-  };
+  const coreSerial = drop.has(model.coreSerial) ? null : model.coreSerial;
+  const nodes = [];
+  for (const n of model.nodes) {
+    if (drop.has(n.serial)) continue;
+    if (n.parent && drop.has(n.parent)) {
+      const next = coreSerial && coreSerial !== n.serial ? coreSerial : null;
+      nodes.push({ ...n, parent: next, parentInferred: Boolean(next) });
+    } else nodes.push(n);
+  }
+  const byId = new Map(nodes.map((n) => [n.serial, n]));
+  const edges = model.edges.filter((e) => byId.has(e.from) && byId.has(e.to)).map((e) => (
+    e.external ? { ...e, external: false } : e
+  ));
+  const buildings = model.buildings.filter((b) => nodes.some((n) => n.building === b));
+  const hubs = {};
+  for (const [b, id] of Object.entries(model.hubs ?? {})) if (byId.has(id)) hubs[b] = id;
+  return { ...model, nodes, byId, edges, externals: [], buildings, hubs, coreSerial };
 }
 
-/** On by default. Off passes a model the layouts place without those neighbors. */
-export function modelForNeighborToggle(model, showAccessNeighbors) {
-  return showAccessNeighbors === false ? withoutAccessNeighbors(model) : model;
+/** Off by default. On passes the full model through; off strips LLDP neighbors. */
+export function modelForNeighborToggle(model, showLldpNeighbors) {
+  return showLldpNeighbors === false ? withoutLldpNeighbors(model) : model;
 }
 
 export function chipMetrics(count) {
@@ -414,7 +438,7 @@ export function layout(model, opts) {
   const { nodes, coreSerial, byId } = model;
   if (!coreSerial) return { pos, extPos, sectors: [], bounds: { x: -300, y: -300, w: 600, h: 600 } };
   // Large graphs: pack building blocks across the pane. Access-layer neighbors
-  // become chips, so dropping them (Show access neighbors off) closes the gaps.
+  // become chips. Hiding LLDP neighbors removes those chips and the uplink pills.
   if (nodes.length >= 40) return layoutPackedHub(model, opts);
   pos.set(coreSerial, { x: 0, y: 0 });
 
@@ -467,10 +491,11 @@ export function layout(model, opts) {
 
 // Large hub. Building blocks sit on a grid around the district core, using the
 // pane's aspect so a wide window spreads sideways and a tall one stacks.
-// Access-only neighbors take a chip row under their switch. Their full pills
-// sit in a band below the blocks: the opening fit drops that band (see
-// shownBounds) so it cannot blow the scale out. Hiding those neighbors removes
-// the chip row and the band, and the blocks close up.
+// Access-layer neighbors take a chip row under their switch while LLDP
+// neighbors are shown. Their full pills sit in a band below the blocks: the
+// opening fit drops that band (see shownBounds) so it cannot blow the scale
+// out. Hiding LLDP neighbors removes the chip row and the band, and the blocks
+// close up.
 const PACK_GAP_X = 52;
 const PACK_PITCH_CHIP = 70;
 const PACK_PITCH_TIGHT = GEOM.nodeH + 14;
@@ -1299,7 +1324,7 @@ function layoutColumns(model, ordered, opts, bucket) {
   let y = 48;
   const sectors = [];
   for (const row of rows) {
-    let x = 0;
+    let x = PORT_LANE;
     let rowH = 0;
     for (const group of row) {
       const box = { x, y, w: group.boxW, h: 0 };
@@ -1330,7 +1355,7 @@ function layoutColumns(model, ordered, opts, bucket) {
     y += rowH + rowGapY;
   }
   const span = sectors.reduce((m, s) => Math.max(m, s.box.x + s.box.w), 0);
-  const extra = [{ x: -24, y: laneY }, { x: span + 24, y: laneY }];
+  const extra = [{ x: 0, y: laneY }, { x: span + 24, y: laneY }];
   return { ...pack(pos, extPos, sectors, extra), laneY, boxBySerial, route: "gutter", columns: cols, bucket };
 }
 
