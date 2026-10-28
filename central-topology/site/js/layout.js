@@ -22,9 +22,44 @@ export const LAYOUTS = [
   { id: "force", label: "Force-directed" },
 ];
 
-export function layoutById(id, model) {
+export function layoutById(id, model, opts) {
   const spec = LAYOUTS.find((l) => l.id === id) ?? LAYOUTS[0];
-  return { ...LAYOUT_FNS[spec.id](model), id: spec.id };
+  const lay = spec.id === "sites" ? layoutSites(model, opts) : LAYOUT_FNS[spec.id](model);
+  return { ...lay, id: spec.id };
+}
+
+/** Padding between the page edge and the diagram when the card fills the column. */
+export const CANVAS_PAD = 16;
+
+/** Inner canvas size for a container that already includes its padding box. */
+export function canvasSize(container) {
+  const w = Math.max(0, Number(container?.w) || 0);
+  const h = Math.max(0, Number(container?.h) || 0);
+  return {
+    w: Math.max(1, w - CANVAS_PAD * 2),
+    h: Math.max(1, h - CANVAS_PAD * 2),
+  };
+}
+
+/** Keep the previous measurement when the container did not change. */
+export function replaceMeasure(prev, next) {
+  const w = Math.round(Number(next?.w) || 0);
+  const h = Math.round(Number(next?.h) || 0);
+  if (prev && Math.abs(prev.w - w) <= 1 && Math.abs(prev.h - h) <= 1) return prev;
+  return { w, h };
+}
+
+/**
+ * How many site columns fit across `availW` at the 11px name floor.
+ * One column only when a second column would not fit.
+ */
+export function siteColumnCount(count, availW, boxW, gap = 72) {
+  if (count <= 1) return 1;
+  if (!(availW > 0) || !(boxW > 0)) return Math.max(1, count);
+  const floor = nameFloorScale();
+  const slot = (boxW + gap) * floor;
+  const fit = Math.floor((availW + gap * floor) / slot);
+  return Math.max(1, Math.min(count, fit || 1));
 }
 
 // On-screen px per user unit. `bounds` and `reference` are {w, h}.
@@ -49,6 +84,19 @@ export function fitScale(bounds, avail) {
   return Number.isFinite(s) && s > 0 ? s : 1;
 }
 
+/** Card name size in user units. On-screen px is this times the view scale. */
+export const CARD_NAME_FONT = 12.5;
+/** Smallest on-screen size for a card name. */
+export const CARD_NAME_MIN_PX = 11;
+
+/**
+ * Absolute zoom floor: the scale at which card names are 11px.
+ * It does not depend on the pane or on another layout's fit scale.
+ */
+export function nameFloorScale() {
+  return CARD_NAME_MIN_PX / CARD_NAME_FONT;
+}
+
 /** PR #6 readable floor: how the left-to-right tree fits this pane. */
 export function readableScale(avail, reference) {
   if (!reference || !(reference.w > 0) || !(reference.h > 0)) return 0;
@@ -56,12 +104,26 @@ export function readableScale(avail, reference) {
 }
 
 /**
- * Open fitted when that still keeps labels at or above the readable floor.
- * Otherwise open at the floor and let the user pan.
+ * Other layouts: open fitted when that still keeps labels at or above the
+ * left-to-right floor. Otherwise open at that floor and let the user pan.
  */
 export function openingScale(bounds, avail, reference) {
   const fit = fitScale(bounds, avail);
   const floor = readableScale(avail, reference);
+  if (!Number.isFinite(floor) || floor <= 0 || fit >= floor) return fit;
+  return floor;
+}
+
+/**
+ * Hub and spoke opening scale. The floor is absolute (card names at 11px).
+ * Open at fit when that already meets the floor. Otherwise open at the floor,
+ * centered on the district core. Never open above fit when fit is the larger
+ * of the two, and never open above the floor.
+ */
+export function hubOpeningScale(bounds, avail) {
+  const fit = fitScale(bounds, avail);
+  const floor = nameFloorScale();
+  if (!Number.isFinite(fit) || fit <= 0) return 1;
   if (!Number.isFinite(floor) || floor <= 0 || fit >= floor) return fit;
   return floor;
 }
@@ -75,7 +137,7 @@ export function coreScroll(core, bounds, scale, avail) {
 }
 
 export function apChipLabel(count) {
-  return `+${count} APs`;
+  return count === 1 ? "+1 AP" : `+${count} APs`;
 }
 
 /** True once the user has zoomed in past the scale the view opened at. */
@@ -161,6 +223,9 @@ export function accessChipBoxes(model, lay) {
   return chips;
 }
 
+/** Opening frame for hub-and-spoke. No minimum width, and only the header band above the cards. */
+export const HUB_FRAME = { minWidth: 0, padX: 24, padTop: 72, padBottom: 16 };
+
 /** Bounds of what the opening view draws: hidden access neighbors drop out, chips stay. */
 export function shownBounds(lay, model, opts = {}) {
   const ext = new Map(lay.extPos ?? []);
@@ -178,7 +243,7 @@ export function shownBounds(lay, model, opts = {}) {
       extra.push({ x: chip.box.x, y: chip.box.y }, { x: chip.box.x + chip.box.w, y: chip.box.y + chip.box.h });
     }
   }
-  return boundsFor(lay.pos, ext, lay.sectors ?? [], extra);
+  return boundsFor(lay.pos, ext, lay.sectors ?? [], extra, opts);
 }
 
 // Hub and spoke. The district core stays at the origin. Each building is one
@@ -192,6 +257,64 @@ const PITCH_Y = GEOM.nodeH + HUB_GAP + HUB_BADGE;
 const GHOST_W = 120;
 const GHOST_H = 30;
 const CLUSTER_GAP = 20;
+
+function compactHubLabels(model, pos, sectors, extPos) {
+  const cards = [];
+  for (const n of model.nodes) {
+    const p = pos.get(n.serial);
+    if (!p) continue;
+    cards.push({ x: p.x - GEOM.nodeW / 2, y: p.y - GEOM.nodeH / 2, w: GEOM.nodeW, h: GEOM.nodeH });
+  }
+  for (const p of extPos.values()) cards.push({ x: p.x - GHOST_W / 2, y: p.y - GHOST_H / 2, w: GHOST_W, h: GHOST_H });
+  const miss = (a, b, gap) => a.x + a.w + gap <= b.x || b.x + b.w + gap <= a.x || a.y + a.h + gap <= b.y || b.y + b.h + gap <= a.y;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const c of cards) {
+    minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x + c.w);
+    minY = Math.min(minY, c.y); maxY = Math.max(maxY, c.y + c.h);
+  }
+  const placed = [];
+  for (const sector of sectors) {
+    const text = String(sector.building ?? "");
+    const w = Math.ceil(text.length * 8.4);
+    const h = 14;
+    const hubId = model.hubs?.[sector.building];
+    let anchor = hubId && hubId !== model.coreSerial ? pos.get(hubId) : null;
+    if (!anchor) {
+      let best = null;
+      for (const n of model.nodes) {
+        if (n.building !== sector.building || n.serial === model.coreSerial) continue;
+        const p = pos.get(n.serial);
+        if (!p) continue;
+        const d = p.x * p.x + p.y * p.y;
+        if (!best || d < best.d) best = { p, d };
+      }
+      anchor = best?.p;
+    }
+    if (!anchor) continue;
+    const gap = 8;
+    const candidates = [
+      { x: anchor.x - w / 2, y: anchor.y + GEOM.nodeH / 2 + gap },
+      { x: anchor.x - w / 2, y: anchor.y - GEOM.nodeH / 2 - gap - h },
+      { x: anchor.x + GEOM.nodeW / 2 + gap, y: anchor.y - h / 2 },
+      { x: anchor.x - GEOM.nodeW / 2 - gap - w, y: anchor.y - h / 2 },
+    ];
+    let choice = null;
+    for (const c of candidates) {
+      const box = { x: c.x, y: c.y, w, h };
+      if (cards.some((o) => !miss(box, o, 4)) || placed.some((o) => !miss(box, o, 4))) continue;
+      const growW = Math.max(0, minX - box.x) + Math.max(0, box.x + box.w - maxX);
+      const growH = Math.max(0, minY - box.y) + Math.max(0, box.y + box.h - maxY);
+      const rank = growW * 4 + growH;
+      if (!choice || rank < choice.rank) choice = { box, rank };
+    }
+    if (!choice) continue;
+    sector.labelAt = { x: choice.box.x + w / 2, y: choice.box.y + 11 };
+    sector.anchor = "middle";
+    placed.push(choice.box);
+    minX = Math.min(minX, choice.box.x); maxX = Math.max(maxX, choice.box.x + choice.box.w);
+    minY = Math.min(minY, choice.box.y); maxY = Math.max(maxY, choice.box.y + choice.box.h);
+  }
+}
 
 export function layout(model) {
   const pos = new Map();
@@ -214,9 +337,11 @@ export function layout(model) {
   }
 
   const locals = convergeSectors(sectorsIn, ghosts);
-  const R = sectorDistance(locals, coreRing.keep);
+  const radii = sectorRadii(locals, coreRing, nodes.length);
   const sectors = [];
-  for (const L of locals) {
+  for (let i = 0; i < locals.length; i++) {
+    const L = locals[i];
+    const R = radii[i];
     const o = orient(L.theta);
     const c = { x: R * Math.cos(L.theta), y: R * Math.sin(L.theta) };
     for (const item of L.items) {
@@ -237,6 +362,10 @@ export function layout(model) {
   loose.forEach((n, i) => {
     pos.set(n.serial, { x: Math.round(coreRing.keep + GEOM.nodeW + i * (GEOM.nodeW + HUB_GAP)), y: 0 });
   });
+
+  // Long building names on the outer edge made small rings wider than the pane.
+  // Tuck those labels beside the building core so the fit scale can reach 11px.
+  if (nodes.length < 40) compactHubLabels(model, pos, sectors, extPos);
 
   return { pos, extPos, sectors, bounds: hubBounds(pos, extPos, sectors) };
 }
@@ -473,6 +602,44 @@ function sectorDistance(locals, keep) {
   return hi + 4;
 }
 
+// Small graphs sit each cluster's inner edge near the core, so a shallow
+// sector is not pushed out to the radius of the deepest one. From about 40
+// switches up, every cluster shares one ring — that is the large sample.
+function sectorRadii(locals, coreRing, nodeCount) {
+  const shared = sectorDistance(locals, coreRing.keep);
+  if (!locals.length || nodeCount >= 40) return locals.map(() => shared);
+  const pull = nodeCount <= 20 ? 1 : (40 - nodeCount) / 20;
+  const obstacles = [{ x: -GEOM.nodeW / 2, y: -GEOM.nodeH / 2, w: GEOM.nodeW, h: GEOM.nodeH }];
+  for (const g of coreRing.placed) {
+    obstacles.push({ x: g.x - GHOST_W / 2, y: g.y - GHOST_H / 2, w: GHOST_W, h: GHOST_H });
+  }
+  const hits = (box, ob, gap) => !(box.maxX + gap <= ob.minX || ob.maxX + gap <= box.minX
+    || box.maxY + gap <= ob.minY || ob.maxY + gap <= box.minY);
+  const fits = (base) => {
+    const boxes = locals.map((L) => sectorBox(L, base + L.halfV));
+    for (const box of boxes) {
+      for (const ob of obstacles) {
+        const o = { minX: ob.x, minY: ob.y, maxX: ob.x + ob.w, maxY: ob.y + ob.h };
+        if (hits(box, o, CLUSTER_GAP)) return false;
+      }
+    }
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) if (!boxesClear(boxes[i], boxes[j])) return false;
+    }
+    return true;
+  };
+  let hi = CLUSTER_GAP;
+  for (let n = 0; n < 32 && !fits(hi); n++) hi *= 1.5;
+  let lo = 0;
+  for (let n = 0; n < 42; n++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) hi = mid;
+    else lo = mid;
+  }
+  const base = hi + 4;
+  return locals.map((L) => shared * (1 - pull) + (base + L.halfV) * pull);
+}
+
 function hubBounds(pos, extPos, sectors) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const take = (x, y) => {
@@ -642,23 +809,23 @@ export function layoutRadial(model) {
 
 // One labelled box per site. Switches stack in a column. Cross-site links are
 // routed through the gutter and a lane above the boxes (see render.js).
-export function layoutSites(model) {
+export function layoutSites(model, opts = {}) {
   const { nodes, coreSerial } = model;
   if (!coreSerial) return emptyLay();
   const pos = new Map();
   const extPos = new Map();
   const boxBySerial = new Map();
-  const sectors = [];
   const gapX = 72;
   const padX = 28;
   const padTop = 36;
   const padBot = 28;
   const rowGap = 18;
+  const rowGapY = 48;
   const extGap = 28;
   const extInset = 40;
   const pillW = 120;
   const laneY = 0;
-  let x = 0;
+  const prepared = [];
   for (const b of model.buildings) {
     const members = nodes.filter((n) => n.building === b).sort((a, c) => {
       const rank = (n) => (n.role === "district-core" || n.role === "building-core" ? 0 : 1);
@@ -667,32 +834,50 @@ export function layoutSites(model) {
     if (!members.length) continue;
     const exts = externalsOf(model, members);
     const boxW = exts.length ? padX + GEOM.nodeW + extGap + pillW + extInset : padX * 2 + GEOM.nodeW;
-    const box = { x, y: 40, w: boxW, h: 0 };
-    const cx = box.x + padX + GEOM.nodeW / 2;
-    members.forEach((n, i) => {
-      const y = box.y + padTop + GEOM.nodeH / 2 + i * (GEOM.nodeH + rowGap);
-      pos.set(n.serial, { x: Math.round(cx), y: Math.round(y) });
-      boxBySerial.set(n.serial, box);
-    });
-    let bottom = box.y + padTop + members.length * GEOM.nodeH + Math.max(0, members.length - 1) * rowGap + padBot;
-    exts.forEach((ext, i) => {
-      const anchor = pos.get(ext.local);
-      const y = anchor.y + i * (GEOM.nodeH + rowGap);
-      const px = Math.round(box.x + padX + GEOM.nodeW + extGap + pillW / 2);
-      extPos.set(ext.id, { x: px, y });
-      bottom = Math.max(bottom, y + 15 + padBot);
-    });
-    box.h = bottom - box.y;
-    sectors.push({
-      building: b,
-      box,
-      anchor: "middle",
-      labelAt: { x: box.x + box.w / 2, y: box.y + 20 },
-    });
-    x += box.w + gapX;
+    const h = padTop + members.length * GEOM.nodeH + Math.max(0, members.length - 1) * rowGap + padBot
+      + Math.max(0, exts.length - 1) * (GEOM.nodeH + rowGap);
+    prepared.push({ building: b, members, exts, boxW, h });
   }
-  const extra = [{ x: -24, y: laneY }, { x: Math.max(0, x - gapX) + 24, y: laneY }];
-  return { ...pack(pos, extPos, sectors, extra), laneY, boxBySerial, route: "gutter" };
+  const widest = Math.max(1, ...prepared.map((p) => p.boxW));
+  const cols = opts.width > 0 ? siteColumnCount(prepared.length, opts.width, widest, gapX) : Math.max(1, prepared.length);
+  const rows = [];
+  for (let i = 0; i < prepared.length; i += cols) rows.push(prepared.slice(i, i + cols));
+  let y = 48;
+  const sectors = [];
+  for (const row of rows) {
+    let x = 0;
+    let rowH = 0;
+    for (const group of row) {
+      const box = { x, y, w: group.boxW, h: 0 };
+      const cx = box.x + padX + GEOM.nodeW / 2;
+      group.members.forEach((n, i) => {
+        const ny = box.y + padTop + GEOM.nodeH / 2 + i * (GEOM.nodeH + rowGap);
+        pos.set(n.serial, { x: Math.round(cx), y: Math.round(ny) });
+        boxBySerial.set(n.serial, box);
+      });
+      let bottom = box.y + padTop + group.members.length * GEOM.nodeH + Math.max(0, group.members.length - 1) * rowGap + padBot;
+      group.exts.forEach((ext, i) => {
+        const anchor = pos.get(ext.local);
+        const ny = anchor.y + i * (GEOM.nodeH + rowGap);
+        const px = Math.round(box.x + padX + GEOM.nodeW + extGap + pillW / 2);
+        extPos.set(ext.id, { x: px, y: ny });
+        bottom = Math.max(bottom, ny + 15 + padBot);
+      });
+      box.h = bottom - box.y;
+      rowH = Math.max(rowH, box.h);
+      sectors.push({
+        building: group.building,
+        box,
+        anchor: "middle",
+        labelAt: { x: box.x + box.w / 2, y: box.y + 20 },
+      });
+      x += group.boxW + gapX;
+    }
+    y += rowH + rowGapY;
+  }
+  const span = sectors.reduce((m, s) => Math.max(m, s.box.x + s.box.w), 0);
+  const extra = [{ x: -24, y: laneY }, { x: span + 24, y: laneY }];
+  return { ...pack(pos, extPos, sectors, extra), laneY, boxBySerial, route: "gutter", columns: cols };
 }
 
 // Fruchterman–Reingold with a fixed seed. Runs until movement falls under
@@ -854,7 +1039,7 @@ function pack(pos, extPos, sectors, extra = []) {
   return { pos, extPos, sectors, extra, bounds: boundsFor(pos, extPos, sectors, extra) };
 }
 
-function boundsFor(pos, extPos, sectors, extra) {
+function boundsFor(pos, extPos, sectors, extra, opts = {}) {
   const edges = [...(extra ?? [])];
   for (const s of sectors ?? []) {
     if (s.box) edges.push({ x: s.box.x, y: s.box.y }, { x: s.box.x + s.box.w, y: s.box.y + s.box.h });
@@ -875,13 +1060,16 @@ function boundsFor(pos, extPos, sectors, extra) {
     take(p.x + GEOM.nodeW / 2, p.y + GEOM.nodeH / 2);
   }
   for (const p of edges) take(p.x, p.y);
-  minX -= GEOM.pad;
-  maxX += GEOM.pad;
-  minY -= GEOM.pad + 70;
-  maxY += GEOM.pad + 30;
+  const padX = opts.padX ?? GEOM.pad;
+  const padTop = opts.padTop ?? GEOM.pad + 70;
+  const padBottom = opts.padBottom ?? GEOM.pad + 30;
+  minX -= padX;
+  maxX += padX;
+  minY -= padTop;
+  maxY += padBottom;
   // Title on the left, legend on the right, both in the header band.
-  const minW = 1240;
-  if (maxX - minX < minW) {
+  const minW = opts.minWidth ?? 1240;
+  if (minW > 0 && maxX - minX < minW) {
     const grow = (minW - (maxX - minX)) / 2;
     minX -= grow;
     maxX += grow;

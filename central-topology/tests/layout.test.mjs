@@ -5,7 +5,7 @@ import { buildModel, parseOverrides } from "../site/js/model.js";
 import { jsonExport } from "../site/js/export.js";
 import { renderSvg } from "../site/js/render.js";
 import {
-  GEOM, LAYOUTS, applyPositionOverrides, clearPosition, coreScroll, displayScale, fitScale, labelBox, layout, layoutById, openingScale, orthoBend, readableScale, writePosition,
+  CANVAS_PAD, CARD_NAME_FONT, CARD_NAME_MIN_PX, GEOM, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, clearPosition, coreScroll, displayScale, fitScale, hubOpeningScale, labelBox, layout, layoutById, layoutSites, nameFloorScale, openingScale, orthoBend, readableScale, replaceMeasure, shownBounds, siteColumnCount, writePosition,
 } from "../site/js/layout.js";
 
 const data = await topologyFromFixtures();
@@ -213,6 +213,52 @@ test("mock trees have no crossing links and no link through another node", () =>
   }
 });
 
+test("hub opening scale is an absolute 11px name floor", () => {
+  const avail = { w: 1068, h: 708 };
+  const floor = nameFloorScale();
+  assert.equal(CARD_NAME_MIN_PX, 11);
+  assert.equal(CARD_NAME_FONT, 12.5);
+  assert.ok(Math.abs(floor - 11 / 12.5) < 1e-12);
+  assert.equal(nameFloorScale(), floor);
+  const reference = layoutById("tree-lr", model).bounds;
+  const relative = readableScale(avail, reference);
+  assert.ok(Math.abs(floor - relative) > 1e-3, "floor must not be the left-to-right fit");
+
+  const roomy = { w: 400, h: 280 };
+  const roomyFit = fitScale(roomy, avail);
+  assert.ok(roomyFit > floor);
+  assert.ok(Math.abs(hubOpeningScale(roomy, avail) - roomyFit) < 1e-9);
+  assert.ok(hubOpeningScale(roomy, avail) <= roomyFit + 1e-9);
+
+  const huge = { w: 9000, h: 7000 };
+  const hugeFit = fitScale(huge, avail);
+  assert.ok(hugeFit < floor);
+  const opened = hubOpeningScale(huge, avail);
+  assert.ok(Math.abs(opened - floor) < 1e-9, "fit below the floor opens at the floor");
+  assert.ok(opened <= floor + 1e-9, "never open above the floor");
+  const core = { x: 40, y: -20 };
+  const frame = { x: -2000, y: -1500, w: 9000, h: 7000 };
+  const scroll = coreScroll(core, frame, opened, avail);
+  const midX = (core.x - frame.x) * opened - scroll.left;
+  const midY = (core.y - frame.y) * opened - scroll.top;
+  assert.ok(Math.abs(midX - avail.w / 2) < 1e-6);
+  assert.ok(Math.abs(midY - avail.h / 2) < 1e-6);
+
+  assert.equal(model.nodes.length, 19);
+  const smallLay = layoutById("hub", model);
+  const smallFrame = shownBounds(smallLay, model, { collapseAps: true, ...HUB_FRAME });
+  const smallBounds = { w: smallFrame.w, h: Math.max(1, smallFrame.h - 72) };
+  // The diagram pane beside the switch list on a 1440px window.
+  const pane = { w: 1051, h: 590 };
+  const smallFit = fitScale(smallBounds, pane);
+  const smallOpen = hubOpeningScale(smallBounds, pane);
+  assert.ok(smallFit + 1e-9 >= floor, "19-switch clusters pull in until fit meets the 11px floor");
+  assert.ok(smallOpen + 1e-9 >= floor, "19-switch sample opens at or above the 11px floor");
+  assert.ok(Math.abs(smallOpen - smallFit) < 1e-9, "fit above the floor opens at fit");
+  assert.ok(smallOpen <= smallFit + 1e-9, "never open above fit");
+  assert.ok(CARD_NAME_FONT * smallOpen + 1e-9 >= CARD_NAME_MIN_PX);
+});
+
 test("opening scale fits only while labels stay at the readable floor", () => {
   const avail = { w: 1068, h: 708 };
   const reference = layoutById("tree-lr", model).bounds;
@@ -323,6 +369,36 @@ test("force-directed graph is centered, with every node inside the frame", () =>
       assert.ok(Math.hypot(nearestX - c.x, nearestY - c.y) >= 9, `${ghost.id} sits on ${node.id}'s badge`);
     }
   }
+});
+
+test("canvas size tracks the container and updates when the panel or window changes", () => {
+  const column = { w: 860, h: 640 };
+  const open = canvasSize(column);
+  assert.equal(open.w, 860 - CANVAS_PAD * 2);
+  assert.equal(open.h, 640 - CANVAS_PAD * 2);
+  assert.ok(open.w > 700, "the card uses the column, not about half of it");
+  const wider = replaceMeasure(column, { w: 1100, h: 640 });
+  assert.equal(wider.w, 1100);
+  assert.equal(canvasSize(wider).w, 1100 - CANVAS_PAD * 2);
+  const panel = replaceMeasure(wider, { w: 1100, h: 420 });
+  assert.equal(panel.h, 420);
+  assert.equal(canvasSize(panel).h, 420 - CANVAS_PAD * 2);
+  assert.equal(replaceMeasure(panel, { w: 1100, h: 420 }), panel);
+});
+
+test("grouped by site lays groups across the available width", () => {
+  const availW = 1000;
+  const lay = layoutSites(model, { width: availW });
+  const boxes = (lay.sectors ?? []).filter((s) => s.box).map((s) => s.box);
+  assert.ok(boxes.length >= 2);
+  const cols = new Set(boxes.map((b) => b.x)).size;
+  assert.ok(cols >= 2, "sites share the width instead of one narrow column");
+  const span = Math.max(...boxes.map((b) => b.x + b.w)) - Math.min(...boxes.map((b) => b.x));
+  const one = Math.max(...boxes.map((b) => b.w));
+  assert.ok(span > one * 1.5, "the grid is wider than a single strip");
+  const count = siteColumnCount(boxes.length, availW, one);
+  assert.equal(lay.columns, count);
+  assert.ok(span * nameFloorScale() <= availW + one, "columns stay within the pane at the 11px floor");
 });
 
 test("site ghosts sit fully inside their box with a gap, and tree ghosts sit off other links", () => {

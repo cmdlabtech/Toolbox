@@ -1,7 +1,7 @@
 // SVG renderer. Produces one self-contained SVG string: every color is
 // resolved from theme tokens at render time, so a downloaded file looks the
 // same outside the page. Pure function except for tokens passed in.
-import { GEOM, accessChipBoxes, orthoBend } from "./layout.js";
+import { CARD_NAME_FONT, GEOM, accessChipBoxes, orthoBend } from "./layout.js";
 import { resolveMgmt } from "./model.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -75,7 +75,7 @@ export function renderSvg(model, lay, opts) {
     const cross = !e.external && fromN && toN && fromN.building !== toN.building;
     const stroke = e.external ? T["--node-ext"] : T["--edge"];
     const width = e.external ? 1.2 : 2;
-    drawEdge(a.x, a.y, b.x, b.y, e.from, e.to, `stroke="${stroke}" stroke-width="${width}"${cross ? ` stroke-opacity="0.45"` : ""}${lldp ? ` stroke-dasharray="7 5"` : ""}`, esc(`${e.fromPort ?? "?"} ↔ ${e.toPort ?? "?"}${lldp ? " (LLDP fill-in)" : ""}`));
+    drawEdge(a.x, a.y, b.x, b.y, e.from, e.to, `stroke="${stroke}" stroke-width="${width}"${cross ? ` stroke-opacity="0.28"` : ""}${lldp ? ` stroke-dasharray="7 5"` : ""}`, esc(`${e.fromPort ?? "?"} ↔ ${e.toPort ?? "?"}${lldp ? " (LLDP fill-in)" : ""}`));
   }
   for (const chip of chips) {
     const parent = lay.pos.get(chip.serial);
@@ -119,7 +119,7 @@ export function renderSvg(model, lay, opts) {
     out.push(`<title>${esc(`${n.name} · ${n.role} · ${n.building}${n.flags.length ? " · " + n.flags.join("; ") : ""}`)}</title>`);
     out.push(`<rect x="${p.x - W / 2}" y="${p.y - H / 2}" width="${W}" height="${H}" rx="8" fill="${T["--node-fill"]}" stroke="${stroke}" stroke-width="${n.role === "access" ? 1.5 : 2.5}"${offline ? ` opacity="0.6"` : ""}/>`);
     out.push(`<rect x="${p.x - W / 2}" y="${p.y - H / 2}" width="6" height="${H}" rx="3" fill="${stroke}"/>`);
-    out.push(`<text x="${p.x + 3}" y="${p.y - 4}" text-anchor="middle" font-size="12.5" font-weight="700" fill="${T["--diagram-fg"]}">${esc(n.name)}</text>`);
+    out.push(`<text x="${p.x + 3}" y="${p.y - 4}" text-anchor="middle" font-size="${CARD_NAME_FONT}" font-weight="700" fill="${T["--diagram-fg"]}">${esc(n.name)}</text>`);
     const ipText = m.ip ? m.ip + (m.fallback ? " (fallback)" : "") : "no IP";
     out.push(`<text x="${p.x + 3}" y="${p.y + 13}" text-anchor="middle" font-size="11" font-family="${esc(T["--font-mono"])}" fill="${m.fallback ? T["--warn"] : T["--diagram-muted"]}">${esc(ipText)}</text>`);
     if (m.fallback) out.push(`<rect x="${p.x - W / 2 - 4}" y="${p.y - H / 2 - 4}" width="${W + 8}" height="${H + 8}" rx="11" fill="none" stroke="${T["--warn"]}" stroke-width="1.5" stroke-dasharray="5 4"/>`);
@@ -131,7 +131,7 @@ export function renderSvg(model, lay, opts) {
 
   // Legend
   const lx = x + w - 230, ly = y + 20;
-  const items = [["District core", T["--node-core"]], ["Building core", T["--node-bcore"]], ["Access", T["--node-access"]], ["Other device", T["--node-ext"]]];
+  const items = [["District core", T["--node-core"]], ["Building core", T["--node-bcore"]], ["Access", T["--node-access"]]];
   items.forEach(([label, c], i) => {
     out.push(`<rect x="${lx}" y="${ly + i * 18}" width="12" height="12" rx="3" fill="${c}"/><text x="${lx + 18}" y="${ly + i * 18 + 10}" font-size="11" fill="${T["--diagram-muted"]}">${label}</text>`);
   });

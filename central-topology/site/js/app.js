@@ -1,6 +1,6 @@
 import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED } from "./model.js";
 import { largeSample } from "./large-sample.js";
-import { LAYOUTS, applyPositionOverrides, chipsExpanded, clearPosition, fitScale, layoutById, openingScale, orthoBend, shownBounds, writePosition } from "./layout.js";
+import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, fitScale, hubOpeningScale, layoutById, openingScale, orthoBend, replaceMeasure, shownBounds, writePosition } from "./layout.js";
 import { renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, apiRequest, createVault, mintToken, normalise, tokenValid } from "./creds.js";
@@ -21,6 +21,7 @@ const state = {
   model: null, lay: null, svg: "",
   view: null,
   openChips: new Set(),
+  container: null,
 };
 if (!LAYOUTS.some((l) => l.id === state.layout)) state.layout = "hub";
 if (!state.positions || typeof state.positions !== "object" || Array.isArray(state.positions)) state.positions = {};
@@ -131,7 +132,8 @@ function paint() {
   const opts = mgmtOptions(state.data.switches);
   const mgmtLabel = opts.find((o) => o.id === state.mgmt)?.label ?? state.mgmt;
   const layoutLabel = LAYOUTS.find((l) => l.id === state.layout)?.label ?? "Hub and spoke";
-  const lay = (state.lay = applyPositionOverrides(layoutById(state.layout, model), state.positions[state.layout]));
+  const box = readContainer();
+  const lay = (state.lay = applyPositionOverrides(layoutById(state.layout, model, { width: box.w, height: box.h }), state.positions[state.layout]));
   const subtitle = `${model.nodes.length} switches · ${model.buildings.length} buildings · ${layoutLabel} · Mgmt: ${mgmtLabel} · ${state.data.mock ? "MOCK DATA · " : ""}${new Date(state.data.generatedAt).toLocaleString()}`;
   state.svg = renderSvg(model, lay, {
     tokens: readTokens(), mgmt: state.mgmt, title: "Switch topology", subtitle,
@@ -144,13 +146,17 @@ function paint() {
 // band out of the scroller so it stays on screen.
 const HEADER_BAND = 72;
 
+function readContainer() {
+  const host = $("diagram");
+  if (!host || host.clientWidth < 2 || host.clientHeight < 2) return state.container ?? { w: 1080, h: 720 };
+  return replaceMeasure(null, { w: host.clientWidth, h: host.clientHeight });
+}
+
 function paneSize(host) {
-  const padX = 32;
-  const padY = 32;
-  let w = host.clientWidth - padX;
-  let h = host.clientHeight - padY;
-  if (h < 200) h = window.innerHeight - host.getBoundingClientRect().top - padY - 8;
-  return { w: Math.max(280, w), h: Math.max(280, h) };
+  const box = canvasSize(host ? { w: host.clientWidth, h: host.clientHeight } : readContainer());
+  let h = box.h;
+  if (host && h < 200) h = Math.max(200, window.innerHeight - host.getBoundingClientRect().top - CANVAS_PAD * 2 - 8);
+  return { w: Math.max(280, box.w), h: Math.max(280, h) };
 }
 
 function legendHtml(T) {
@@ -176,10 +182,13 @@ function cropped(bounds) {
 
 function graphAvail(scroller, host) {
   const pane = paneSize(host);
-  return {
-    w: scroller.clientWidth >= 160 ? scroller.clientWidth : pane.w,
-    h: scroller.clientHeight >= 160 ? scroller.clientHeight : Math.max(200, pane.h - 84),
-  };
+  const sw = scroller?.clientWidth ?? 0;
+  const sh = scroller?.clientHeight ?? 0;
+  // A scroller narrower than the column is shrink-wrapped content, not the
+  // space between the page edge and the switch list.
+  const w = sw >= pane.w * 0.9 ? sw : pane.w;
+  const h = sh >= 160 ? sh : Math.max(200, pane.h - 84);
+  return { w: Math.max(160, w), h: Math.max(160, h) };
 }
 
 function mountDiagram(scrollAfter) {
@@ -191,15 +200,26 @@ function mountDiagram(scrollAfter) {
   host.innerHTML = `<div class="diagram-card scrolls">${diagramHead(tokens)}<div class="diagram-scroll"></div></div>`;
   const scroller = host.querySelector(".diagram-scroll");
   const avail = graphAvail(scroller, host);
-  const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
   if (!state.view) {
-    const opened = shownBounds(lay, model, { collapseAps: true, openChips: state.openChips });
-    const scale = openingScale(cropped(opened), avail, cropped(reference));
+    const frameOpts = lay.id === "hub" ? HUB_FRAME : {};
+    const opened = shownBounds(lay, model, { collapseAps: true, openChips: state.openChips, ...frameOpts });
+    const frame = cropped(opened);
+    let scale;
+    if (lay.id === "hub" || lay.id === "sites") scale = hubOpeningScale(frame, avail);
+    else {
+      const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
+      scale = openingScale(frame, avail, cropped(reference));
+    }
     state.view = { scale, openedAt: scale, user: false };
-    if (scrollAfter === undefined) scrollAfter = "core";
+    if (scrollAfter === undefined) {
+      const fit = fitScale(frame, avail);
+      // Fitted drawings stay put. A floor zoom centers the district core.
+      scrollAfter = scale > fit + 1e-6 ? "core" : { left: 0, top: 0 };
+    }
   }
   const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
-  const bounds = shownBounds(lay, model, { collapseAps: !expanded, openChips: state.openChips });
+  const frameOpts = lay.id === "hub" ? HUB_FRAME : {};
+  const bounds = shownBounds(lay, model, { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
   scroller.innerHTML = renderSvg(model, { ...lay, bounds }, {
     tokens, mgmt: state.mgmt, title: "Switch topology", subtitle: state.subtitle,
     collapseAps: !expanded, openChips: state.openChips,
@@ -237,7 +257,8 @@ function stepZoom(factor) {
   const cy = (scroller?.scrollTop ?? 0) + avail.h / 2;
   const old = state.view.scale;
   const expanded = chipsExpanded(old, state.view.openedAt);
-  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips });
+  const frameOpts = state.lay.id === "hub" ? HUB_FRAME : {};
+  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
   const fit = fitScale(cropped(bounds), avail);
   const next = Math.min(Math.max(old * factor, Math.min(fit, state.view.openedAt) * 0.5), Math.max(state.view.openedAt * 8, fit));
   state.view.scale = next;
@@ -251,7 +272,8 @@ function fitView() {
   const scroller = document.querySelector("#diagram .diagram-scroll");
   const avail = graphAvail(scroller, $("diagram"));
   const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
-  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips });
+  const frameOpts = state.lay.id === "hub" ? HUB_FRAME : {};
+  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
   state.view.scale = fitScale(cropped(bounds), avail);
   state.view.user = true;
   mountDiagram({ left: 0, top: 0 });
@@ -276,10 +298,25 @@ function centerOpeningScroll() {
   scroller.scrollLeft += (nb.left + nb.width / 2) - (sb.left + sb.width / 2);
   scroller.scrollTop += (nb.top + nb.height / 2) - (sb.top + sb.height / 2);
 }
-window.addEventListener("resize", () => {
+function noteContainer() {
+  const host = $("diagram");
+  if (!host) return false;
+  const next = replaceMeasure(state.container, { w: host.clientWidth, h: host.clientHeight });
+  if (next === state.container) return false;
+  const widthChanged = !state.container || state.container.w !== next.w;
+  state.container = next;
   if (state.view && !state.view.user) state.view = null;
-  fitDiagram();
-});
+  if (state.layout === "sites" && widthChanged && state.model) paint();
+  else fitDiagram();
+  return true;
+}
+window.addEventListener("resize", () => noteContainer());
+if (typeof ResizeObserver === "function") {
+  const watch = new ResizeObserver(() => noteContainer());
+  watch.observe($("diagram"));
+}
+$("credsBtn").addEventListener("click", () => noteContainer());
+$("cClose").addEventListener("click", () => noteContainer());
 $("diagram").addEventListener("click", (ev) => {
   if (ev.target.closest?.("#zoomIn")) { stepZoom(1.25); return; }
   if (ev.target.closest?.("#zoomOut")) { stepZoom(1 / 1.25); return; }
