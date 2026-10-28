@@ -77,6 +77,8 @@ Hub and spoke sizes the ring to the cluster. A small network pulls each cluster 
 - **Grouped by group.** The same boxes and full-width grid, with one box per Central device group. A switch with no group sits in Ungrouped. The district core keeps its core mark. Links that leave the group are drawn lighter, the same way links that leave a site are. The view opens at the 11px name floor. Show access neighbors uses the same toggle as the other layouts: off removes access-switch neighbor chips and their links, and the boxes are placed again.
 - **Force-directed.** Links act as springs and nodes repel. The simulation starts from a fixed seed and stops when it settles, so the same data always produces the same picture. It does not keep moving. The settled graph is centered in the frame, with at least a 16px gap between node boxes.
 
+The header control **Show ports** is on by default. It is stored in `localStorage` under `ct-ports`, with the same JSON load and save as the layout, theme, and management-IP choices. Each switch-to-switch link is labeled at both ends with that switch's interface. A LAG is the LAG name and its member ports, for example `lag1 (1/1/49-50)`. Links to access points and other neighbor devices are not labeled. Labels drop out when zoom would draw them smaller than about 10px. SVG and PNG downloads include them, and each switch card lists the same ports.
+
 ## Worker endpoints
 
 Data routes are GET only. Live data needs both `Authorization: Bearer <token>` and `X-Central-Base: https://<cluster>.api.central.arubanetworks.com`. Without them, the Worker serves mock data (`MOCK=1`) or returns 401 (`MOCK=0`). The response header `X-Data-Source` is `mock` or `live`. Any credential sent in a query string is ignored.

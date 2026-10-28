@@ -1,5 +1,6 @@
 // Pure data model: role inference, building grouping, management-IP choice.
 // No DOM access, so tests/ can import it in Node.
+import { formatPortEnd } from "./ports.js";
 
 export const ROLES = ["district-core", "building-core", "access"];
 export const UNASSIGNED = "Unassigned";
@@ -125,8 +126,31 @@ export function buildModel(data, overrides = {}) {
     (coreNode && a === coreNode.building ? -1 : 0) - (coreNode && b === coreNode.building ? -1 : 0) || a.localeCompare(b));
   const edges = links
     .filter((l) => byId.has(l.from) || byId.has(l.to))
-    .map((l) => ({ ...l, external: !(byId.has(l.from) && byId.has(l.to)) }));
+    .map((l) => ({
+      ...l,
+      external: !(byId.has(l.from) && byId.has(l.to)),
+      fromLabel: formatPortEnd(l.fromPorts, l.fromPort),
+      toLabel: formatPortEnd(l.toPorts, l.toPort),
+    }));
   return { nodes, byId, coreSerial, coreSource, buildings, hubs: Object.fromEntries(hubs), edges, externals: data.externals ?? [] };
+}
+
+/** Switch-to-switch links for one switch, with the port label at each end. */
+export function switchLinks(model, serial) {
+  const out = [];
+  for (const e of model.edges) {
+    if (e.external || (e.from !== serial && e.to !== serial)) continue;
+    const local = e.from === serial;
+    const peer = local ? e.to : e.from;
+    out.push({
+      peer,
+      peerName: model.byId.get(peer)?.name ?? peer,
+      local: local ? e.fromLabel : e.toLabel,
+      remote: local ? e.toLabel : e.fromLabel,
+    });
+  }
+  out.sort((a, b) => a.peerName.localeCompare(b.peerName) || String(a.local ?? "").localeCompare(String(b.local ?? "")));
+  return out;
 }
 
 /** Management-IP choices the data actually supports, with coverage counts. */

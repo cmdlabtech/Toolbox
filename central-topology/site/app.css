@@ -57,6 +57,8 @@ aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; co
 .sw .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .sw .row select { font-size: 12px; padding: 3px 6px; flex: 1 1 140px; min-width: 0; max-width: 100%; }
 .flag { color: var(--warn); font-size: 11px; margin-top: 4px; }
+.linklist { list-style: none; margin: 6px 0 0; padding: 0; }
+.linklist li { font-family: var(--font-mono); font-size: 11px; color: var(--muted); line-height: 1.35; }
 .ovr { font-size: 10px; color: var(--accent); }
 #status { padding: 6px 20px; font-size: 12px; color: var(--muted); }
 #status.err { color: var(--node-core); }

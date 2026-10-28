@@ -48,8 +48,18 @@
     "name": "DO-ACC-01",
     "type": "Switch",
     "health": "Good",
-    "localPort": "1/1/10",
+    "localPort": "1/1/15",
     "toPort": "1/1/49",
+    "siteId": "2107231",
+    "siteName": "District Office"
+   },
+   {
+    "serial": "SG28851A9C",
+    "name": "DO-ACC-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/16",
+    "toPort": "1/1/50",
     "siteId": "2107231",
     "siteName": "District Office"
    },
@@ -75,7 +85,17 @@
     "type": "Switch",
     "health": "Good",
     "localPort": "1/1/49",
-    "toPort": "1/1/10",
+    "toPort": "1/1/15",
+    "siteId": "2107231",
+    "siteName": "District Office"
+   },
+   {
+    "serial": "SG188EFC07",
+    "name": "DO-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/50",
+    "toPort": "1/1/16",
     "siteId": "2107231",
     "siteName": "District Office"
    }

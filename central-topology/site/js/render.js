@@ -3,6 +3,7 @@
 // same outside the page. Pure function except for tokens passed in.
 import { CARD_NAME_FONT, GEOM, accessChipBoxes, linkLeavesBucket, orthoBend } from "./layout.js";
 import { resolveMgmt } from "./model.js";
+import { PORT_FONT, portsVisible } from "./ports.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -14,23 +15,83 @@ export function readTokens(el = document.documentElement) {
   return Object.fromEntries(TOKEN_NAMES.map((t) => [t, cs.getPropertyValue(t).trim()]));
 }
 
-function orthoPath(a, b, lay) {
-  const pts = orthoBend(a, b, lay.axis);
-  if (pts.length < 3) return null;
+function routeEdge(a, b, from, to, lay) {
+  if (lay.route !== "ortho" && lay.route !== "gutter") return null;
+  const pts = edgePoints(a, b, from, to, lay);
+  if (!pts || pts.length < 3) return null;
   return pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
 }
 
-function routeEdge(a, b, from, to, lay) {
-  if (lay.route === "ortho") return orthoPath(a, b, lay);
-  if (lay.route !== "gutter" || !lay.boxBySerial) return null;
-  const ba = lay.boxBySerial.get(from);
-  const bb = lay.boxBySerial.get(to);
-  if (!ba || !bb) return null;
-  const ga = ba.x - 22;
-  const gb = bb.x - 22;
-  if (ba === bb) return `M ${a.x} ${a.y} L ${ga} ${a.y} L ${ga} ${b.y} L ${b.x} ${b.y}`;
-  const lane = lay.laneY ?? Math.min(ba.y, bb.y) - 28;
-  return `M ${a.x} ${a.y} L ${ga} ${a.y} L ${ga} ${lane} L ${gb} ${lane} L ${gb} ${b.y} L ${b.x} ${b.y}`;
+function edgePoints(a, b, from, to, lay) {
+  if (lay.route === "ortho") {
+    const pts = orthoBend(a, b, lay.axis);
+    return pts.length >= 2 ? pts : [a, b];
+  }
+  if (lay.route === "gutter" && lay.boxBySerial) {
+    const ba = lay.boxBySerial.get(from);
+    const bb = lay.boxBySerial.get(to);
+    if (ba && bb) {
+      const ga = ba.x - 22;
+      const gb = bb.x - 22;
+      if (ba === bb) return [a, { x: ga, y: a.y }, { x: ga, y: b.y }, b];
+      const lane = lay.laneY ?? Math.min(ba.y, bb.y) - 28;
+      return [a, { x: ga, y: a.y }, { x: ga, y: lane }, { x: gb, y: lane }, { x: gb, y: b.y }, b];
+    }
+  }
+  return [a, b];
+}
+
+function pointAlong(points, dist) {
+  let left = dist;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], b = points[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) continue;
+    if (left <= len) return { x: a.x + (dx / len) * left, y: a.y + (dy / len) * left, ux: dx / len, uy: dy / len };
+    left -= len;
+  }
+  const a = points[Math.max(0, points.length - 2)];
+  const b = points[points.length - 1];
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  return { x: b.x, y: b.y, ux: dx / len, uy: dy / len };
+}
+
+function polyLength(points) {
+  let n = 0;
+  for (let i = 0; i < points.length - 1; i++) n += Math.hypot(points[i + 1].x - points[i].x, points[i + 1].y - points[i].y);
+  return n;
+}
+
+/** Label center just outside the node, beside the link, toward the other end. */
+function placePortLabel(points, text, slot) {
+  const w = Math.ceil(text.length * 6.15) + 8;
+  const h = 14;
+  const a = points[0];
+  const b = points[1] ?? a;
+  let dx = b.x - a.x, dy = b.y - a.y;
+  let len = Math.hypot(dx, dy);
+  if (len < 1) {
+    for (let i = 1; i < points.length - 1 && len < 1; i++) {
+      dx = points[i + 1].x - points[i].x;
+      dy = points[i + 1].y - points[i].y;
+      len = Math.hypot(dx, dy);
+    }
+  }
+  len = len || 1;
+  const ux = dx / len, uy = dy / len;
+  const tx = Math.abs(ux) > 1e-6 ? (GEOM.nodeW / 2) / Math.abs(ux) : Infinity;
+  const ty = Math.abs(uy) > 1e-6 ? (GEOM.nodeH / 2) / Math.abs(uy) : Infinity;
+  const exit = Math.min(tx, ty);
+  const along = Math.abs(ux) * w / 2 + Math.abs(uy) * h / 2;
+  const total = polyLength(points);
+  let dist = exit + 5 + along;
+  if (dist > total * 0.42) dist = Math.max(exit + 4, Math.min(dist, total * 0.3));
+  const p = pointAlong(points, dist);
+  const sign = slot % 2 === 0 ? 1 : -1;
+  const nudge = 9 + (slot % 3) * 11;
+  return { x: p.x + -p.uy * nudge * sign, y: p.y + p.ux * nudge * sign, w, h };
 }
 
 export function renderSvg(model, lay, opts) {
@@ -59,6 +120,9 @@ export function renderSvg(model, lay, opts) {
   // gutter so a straight segment does not cut across a column of switches.
   out.push(`<g stroke-linecap="round" fill="none">`);
   const drawn = new Set();
+  const portLabels = [];
+  const portSlots = new Map();
+  const showPorts = portsVisible(opts);
   const drawEdge = (x1, y1, x2, y2, from, to, attrs, title) => {
     const d = routeEdge({ x: x1, y: y1 }, { x: x2, y: y2 }, from, to, lay);
     if (d) out.push(`<path d="${d}" ${attrs}><title>${title}</title></path>`);
@@ -75,7 +139,21 @@ export function renderSvg(model, lay, opts) {
     const cross = !e.external && linkLeavesBucket(lay, fromN, toN);
     const stroke = e.external ? T["--node-ext"] : T["--edge"];
     const width = e.external ? 1.2 : 2;
-    drawEdge(a.x, a.y, b.x, b.y, e.from, e.to, `stroke="${stroke}" stroke-width="${width}"${cross ? ` stroke-opacity="0.28"` : ""}${lldp ? ` stroke-dasharray="7 5"` : ""}`, esc(`${e.fromPort ?? "?"} ↔ ${e.toPort ?? "?"}${lldp ? " (LLDP fill-in)" : ""}`));
+    const fromL = e.fromLabel || e.fromPort || "?";
+    const toL = e.toLabel || e.toPort || "?";
+    drawEdge(a.x, a.y, b.x, b.y, e.from, e.to, `stroke="${stroke}" stroke-width="${width}"${cross ? ` stroke-opacity="0.28"` : ""}${lldp ? ` stroke-dasharray="7 5"` : ""}`, esc(`${fromL} ↔ ${toL}${lldp ? " (LLDP fill-in)" : ""}`));
+    if (showPorts && !e.external) {
+      const link = [e.from, e.to].sort().join("|");
+      const pts = edgePoints(a, b, e.from, e.to, lay);
+      const add = (serial, text, points) => {
+        if (!text) return;
+        const slot = portSlots.get(serial) ?? 0;
+        portSlots.set(serial, slot + 1);
+        portLabels.push({ serial, link, text, ...placePortLabel(points, text, slot) });
+      };
+      add(e.from, e.fromLabel, pts);
+      add(e.to, e.toLabel, [...pts].reverse());
+    }
   }
   for (const chip of chips) {
     const parent = lay.pos.get(chip.serial);
@@ -127,6 +205,14 @@ export function renderSvg(model, lay, opts) {
       out.push(`<circle cx="${p.x + W / 2 - 2}" cy="${p.y - H / 2 + 2}" r="9" fill="${T["--warn"]}"/><text x="${p.x + W / 2 - 2}" y="${p.y - H / 2 + 6}" text-anchor="middle" font-size="12" font-weight="700" fill="${T["--diagram-bg"]}">!</text>`);
     }
     out.push(`</g>`);
+  }
+
+  for (const lab of portLabels) {
+    const x = lab.x - lab.w / 2;
+    const y = lab.y - lab.h / 2;
+    out.push(`<g data-port-end="${esc(lab.serial)}" data-port-link="${esc(lab.link)}">`);
+    out.push(`<rect x="${x}" y="${y}" width="${lab.w}" height="${lab.h}" rx="3" fill="${T["--diagram-bg"]}" stroke="${T["--diagram-muted"]}" stroke-width="0.75"/>`);
+    out.push(`<text x="${lab.x}" y="${lab.y}" text-anchor="middle" dominant-baseline="middle" font-size="${PORT_FONT}" font-family="${esc(T["--font-mono"])}" fill="${T["--diagram-fg"]}">${esc(lab.text)}</text></g>`);
   }
 
   // Legend

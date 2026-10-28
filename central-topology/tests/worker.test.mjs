@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { topologyFromFixtures } from "./helpers.mjs";
-import { asList, central, interfaceKind, scrub } from "../worker/src/central.ts";
+import { asList, central, interfaceKind, portList, scrub } from "../worker/src/central.ts";
 
 test("switch list still comes from sites-health + per-site topology", async () => {
   const calls = [];
@@ -71,6 +71,54 @@ test("LLDP fill-in reconnects a site whose topology omits the cross-site uplink"
 test("non-switch topology devices are kept as externals", async () => {
   const data = await topologyFromFixtures();
   assert.deepEqual(data.externals.map((e) => e.name).sort(), ["DO-FW-01", "WHS-AP-114"]);
+});
+
+test("topology links keep every member port and the LAG name", async () => {
+  const data = await topologyFromFixtures();
+  const acc = data.switches.find((s) => s.name === "DO-ACC-01").serial;
+  const core = data.switches.find((s) => s.name === "DO-CORE-01").serial;
+  const l = data.links.find((x) => [x.from, x.to].includes(acc) && [x.from, x.to].includes(core));
+  assert.ok(l);
+  const end = l.from === acc ? l.fromPorts : l.toPorts;
+  const other = l.from === acc ? l.toPorts : l.fromPorts;
+  assert.deepEqual(end.map((p) => p.name), ["1/1/49", "1/1/50"]);
+  assert.equal(end.every((p) => p.lag === "lag1"), true);
+  assert.deepEqual(other.map((p) => p.name), ["1/1/15", "1/1/16"]);
+  assert.equal(l.source, "topology");
+});
+
+test("LLDP rows for one neighbor collapse onto one link", async () => {
+  const get = async (path) => {
+    assert.match(path, /\/neighbours\/SW-A$/);
+    return { neighbours: [
+      { serial: "SW-B", localPort: "1/1/49", toPort: "1/1/1" },
+      { serial: "SW-B", localPort: "1/1/50", toPort: "1/1/2" },
+      { serial: "SW-C", localPort: "1/1/10", toPort: "1/1/20" },
+    ] };
+  };
+  const links = await central(get).neighbours("SW-A");
+  assert.equal(links.length, 2);
+  const lag = links.find((l) => l.to === "SW-B");
+  assert.deepEqual(lag.fromPorts.map((p) => p.name), ["1/1/49", "1/1/50"]);
+  assert.deepEqual(lag.toPorts.map((p) => p.name), ["1/1/1", "1/1/2"]);
+  assert.equal(lag.fromPort, "1/1/49");
+  assert.equal(lag.toPort, "1/1/1");
+});
+
+test("topology port lists keep lag members", async () => {
+  const get = async () => ({
+    devices: [],
+    links: [{
+      from: "A", to: "B", speed: 10,
+      fromPortList: [{ name: "1/1/49", lag: "lag1" }, { name: "1/1/50", lag: "lag1" }],
+      toPortList: [{ name: "1/1/1", lag: "lag1" }, { name: "1/1/2", lag: "lag1" }],
+    }],
+  });
+  const { links } = await central(get).topology("site");
+  assert.equal(links.length, 1);
+  assert.deepEqual(portList(links[0].fromPorts), [{ name: "1/1/49", lag: "lag1" }, { name: "1/1/50", lag: "lag1" }]);
+  assert.equal(links[0].fromPort, "1/1/49");
+  assert.equal(links[0].toPorts[1].name, "1/1/2");
 });
 
 test("helpers", () => {

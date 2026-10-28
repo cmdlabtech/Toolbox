@@ -1,4 +1,4 @@
-import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED } from "./model.js";
+import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED, switchLinks } from "./model.js";
 import { largeSample } from "./large-sample.js";
 import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, shownBounds, writePosition } from "./layout.js";
 import { renderSvg, readTokens } from "./render.js";
@@ -20,6 +20,7 @@ const state = {
   layout: prefs.layout,
   mgmt: prefs.mgmt,
   showAccessNeighbors: prefs.showAccessNeighbors,
+  showPorts: prefs.showPorts,
   model: null, lay: null, svg: "",
   view: null,
   openChips: new Set(),
@@ -136,6 +137,7 @@ function paint() {
   const subtitle = `${model.nodes.length} switches · ${model.buildings.length} buildings · ${layoutLabel} · Mgmt: ${mgmtLabel} · ${state.data.mock ? "MOCK DATA · " : ""}${new Date(state.data.generatedAt).toLocaleString()}`;
   state.svg = renderSvg(model, lay, {
     tokens: readTokens(), mgmt: state.mgmt, title: "Switch topology", subtitle,
+    showPorts: state.showPorts !== false,
   });
   state.subtitle = subtitle;
   mountDiagram();
@@ -222,6 +224,7 @@ function mountDiagram(scrollAfter) {
   scroller.innerHTML = renderSvg(model, { ...lay, bounds }, {
     tokens, mgmt: state.mgmt, title: "Switch topology", subtitle: state.subtitle,
     collapseAps: !expanded, openChips: state.openChips,
+    showPorts: state.showPorts !== false, portScale: state.view.scale,
   });
   const svg = scroller.querySelector("svg");
   if (!svg) return;
@@ -348,6 +351,16 @@ function draw() {
   status(`${model.nodes.length} switches, ${model.edges.length} links. Core: ${model.byId.get(model.coreSerial)?.name ?? "none"} (${model.coreSource}).${w.length ? ` ${w.length} warning(s).` : ""}`);
 }
 
+function linkListHtml(model, serial) {
+  const items = switchLinks(model, serial).map((l) => {
+    const ports = state.showPorts !== false && (l.local || l.remote)
+      ? ` · ${esc(l.local ?? "—")} ↔ ${esc(l.remote ?? "—")}`
+      : "";
+    return `<li>${esc(l.peerName)}${ports}</li>`;
+  }).join("");
+  return items ? `<ul class="linklist">${items}</ul>` : "";
+}
+
 function side(model) {
   const buildings = [...new Set([...model.buildings, ...(state.data.sites ?? []).map((s) => s.name)])].sort();
   const html = [];
@@ -360,6 +373,7 @@ function side(model) {
         <div class="meta">${esc(n.serial)} · ${esc(n.model)} · hop ${n.hop ?? "–"} · site ${esc(n.site ?? "none")} · ${esc(deviceGroup(n))}</div>
         <div class="row"><select data-k="role">${["", ...ROLES].map((r) => `<option value="${r}"${(o.role ?? "") === r ? " selected" : ""}>${r ? r : `role: ${n.role} (auto)`}</option>`).join("")}</select>
         <select data-k="building">${["", ...buildings, UNASSIGNED].map((x) => `<option value="${esc(x)}"${(o.building ?? "") === x ? " selected" : ""}>${esc(x ? x : `building: ${n.site ?? UNASSIGNED} (site)`)}</option>`).join("")}</select></div>
+        ${linkListHtml(model, n.serial)}
         ${n.flags.map((f) => `<div class="flag">⚠ ${esc(f)}</div>`).join("")}</div>`);
     }
   }
@@ -388,6 +402,12 @@ $("layoutSel").addEventListener("change", (e) => {
 });
 $("mgmtSel").addEventListener("change", (e) => { state.mgmt = e.target.value; save(KEYS.mgmt, state.mgmt); draw(); });
 $("refreshBtn").addEventListener("click", refresh);
+$("portsToggle").checked = state.showPorts !== false;
+$("portsToggle").addEventListener("change", (e) => {
+  state.showPorts = e.target.checked;
+  writeUiPref(localStorage, "showPorts", state.showPorts);
+  if (state.model) { paint(); side(state.model); }
+});
 $("showAccessNeighbors").checked = state.showAccessNeighbors;
 $("showAccessNeighbors").addEventListener("change", (e) => {
   state.showAccessNeighbors = e.target.checked;
