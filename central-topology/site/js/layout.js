@@ -43,79 +43,324 @@ export function displayScale(bounds, avail, reference) {
   return fit;
 }
 
-// Radial hub-and-spoke: district core in the middle, one sector per building
-// with its building core on the inner ring and access switches on the outer ring.
+// Hub and spoke. The district core stays at the origin. Each building is one
+// cluster on a ring sized to that cluster: switches sit on a grid pitched to
+// the card, and LLDP neighbors sit in a band further out. The ring grows
+// until those clusters no longer meet.
+const HUB_GAP = 16;
+const HUB_BADGE = 8;
+const PITCH_X = GEOM.nodeW + HUB_GAP + HUB_BADGE;
+const PITCH_Y = GEOM.nodeH + HUB_GAP + HUB_BADGE;
+const GHOST_W = 120;
+const GHOST_H = 30;
+const CLUSTER_GAP = 20;
+
 export function layout(model) {
   const pos = new Map();
+  const extPos = new Map();
   const { nodes, coreSerial, byId } = model;
-  if (!coreSerial) return { pos, sectors: [], bounds: { x: -300, y: -300, w: 600, h: 600 } };
+  if (!coreSerial) return { pos, extPos, sectors: [], bounds: { x: -300, y: -300, w: 600, h: 600 } };
   pos.set(coreSerial, { x: 0, y: 0 });
-  const core = byId.get(coreSerial);
 
-  const sectors = [];
+  const ghosts = ghostGroups(model);
+  const coreRing = placeCoreGhosts(ghosts.get(coreSerial) ?? []);
+  for (const g of coreRing.placed) extPos.set(g.id, { x: g.x, y: g.y });
+
+  const sectorsIn = [];
   for (const b of model.buildings) {
     const members = nodes.filter((n) => n.building === b && n.serial !== coreSerial);
     if (!members.length) continue;
     const hub = model.hubs[b] && model.hubs[b] !== coreSerial ? byId.get(model.hubs[b]) : null;
-    const spokes = members.filter((n) => n !== hub);
-    sectors.push({ building: b, hub, spokes, own: b === core.building, weight: Math.max(2, spokes.length + (hub ? 0.5 : 0)) });
+    const spokes = members.filter((n) => n !== hub).sort((a, c) => a.name.localeCompare(c.name));
+    sectorsIn.push({ building: b, hub, spokes });
   }
-  const total = sectors.reduce((a, s) => a + s.weight, 0);
-  let a0 = -Math.PI / 2 - (Math.PI * 2 * (sectors[0]?.weight ?? 0)) / total / 2;
-  for (const s of sectors) {
-    const span = (Math.PI * 2 * s.weight) / total;
-    s.mid = a0 + span / 2;
-    s.span = span;
-    if (s.hub) pos.set(s.hub.serial, polar(GEOM.r1, s.mid));
-    // The district core's own switches sit on the inner ring, others outer.
-    const r = s.hub ? GEOM.r2 : GEOM.r1 + 40;
-    const spread = span * 0.72;
-    s.spokes.sort((x, y) => (x.hop ?? 99) - (y.hop ?? 99) || x.name.localeCompare(y.name));
-    s.spokes.forEach((n, i) => {
-      const t = s.spokes.length === 1 ? 0 : i / (s.spokes.length - 1) - 0.5;
-      const stagger = s.spokes.length > 4 && i % 2 ? 70 : 0;
-      pos.set(n.serial, polar(r + stagger, s.mid + t * spread));
+
+  const locals = convergeSectors(sectorsIn, ghosts);
+  const R = sectorDistance(locals, coreRing.keep);
+  const sectors = [];
+  for (const L of locals) {
+    const o = orient(L.theta);
+    const c = { x: R * Math.cos(L.theta), y: R * Math.sin(L.theta) };
+    for (const item of L.items) {
+      const p = toWorld(item.u, item.v, o);
+      const pt = { x: Math.round(c.x + p.x), y: Math.round(c.y + p.y) };
+      if (item.kind === "ghost") extPos.set(item.id, pt);
+      else pos.set(item.id, pt);
+    }
+    const lp = toWorld(L.label.u, L.label.v, o);
+    sectors.push({
+      building: L.building,
+      anchor: L.label.anchor,
+      labelAt: { x: Math.round(c.x + lp.x), y: Math.round(c.y + lp.y) },
     });
-    const outer = Math.max(s.hub ? GEOM.r1 : 0, ...s.spokes.map((n) => Math.hypot(pos.get(n.serial).x, pos.get(n.serial).y)));
-    const label = sectorLabel(s.mid, outer);
-    s.labelAt = label.labelAt;
-    s.anchor = label.anchor;
-    a0 += span;
   }
 
-  // External (non-switch) neighbors: pushed outward from the switch they hang off.
-  const extPos = new Map();
-  for (const e of model.edges.filter((e) => e.external)) {
-    const local = byId.has(e.from) ? e.from : e.to;
+  const loose = nodes.filter((n) => !pos.has(n.serial));
+  loose.forEach((n, i) => {
+    pos.set(n.serial, { x: Math.round(coreRing.keep + GEOM.nodeW + i * (GEOM.nodeW + HUB_GAP)), y: 0 });
+  });
+
+  return { pos, extPos, sectors, bounds: hubBounds(pos, extPos, sectors) };
+}
+
+function ghostGroups(model) {
+  const owner = new Map();
+  for (const e of model.edges) {
+    if (!e.external) continue;
+    const local = model.byId.has(e.from) ? e.from : model.byId.has(e.to) ? e.to : null;
+    if (!local) continue;
     const other = local === e.from ? e.to : e.from;
-    const p = pos.get(local);
-    if (!p || extPos.has(other)) continue;
-    const ang = p.x === 0 && p.y === 0 ? Math.PI / 2 : Math.atan2(p.y, p.x);
-    const r = Math.hypot(p.x, p.y) + 140;
-    extPos.set(other, polar(r, ang + 0.06));
+    const prev = owner.get(other);
+    if (!prev || (prev === model.coreSerial && local !== model.coreSerial)) owner.set(other, local);
+  }
+  const groups = new Map();
+  for (const [ghost, local] of owner) {
+    const list = groups.get(local) ?? [];
+    list.push(ghost);
+    groups.set(local, list);
+  }
+  for (const list of groups.values()) list.sort();
+  return groups;
+}
+
+function placeCoreGhosts(ids) {
+  const cardR = Math.hypot(GEOM.nodeW / 2, GEOM.nodeH / 2);
+  const ghostR = Math.hypot(GHOST_W / 2, GHOST_H / 2);
+  if (!ids.length) return { placed: [], keep: cardR };
+  const chord = GHOST_W + HUB_GAP;
+  let r = cardR + CLUSTER_GAP + ghostR;
+  if (ids.length > 1) r = Math.max(r, chord / (2 * Math.sin(Math.PI / ids.length)));
+  const placed = ids.map((id, i) => {
+    const a = -Math.PI / 2 + (i / ids.length) * Math.PI * 2;
+    return { id, x: Math.round(r * Math.cos(a)), y: Math.round(r * Math.sin(a)) };
+  });
+  let keep = cardR;
+  for (const p of placed) keep = Math.max(keep, Math.hypot(p.x, p.y) + ghostR);
+  return { placed, keep };
+}
+
+function orient(theta) {
+  const c = Math.cos(theta);
+  const s = Math.sin(theta);
+  const radialIsX = Math.abs(c) >= Math.abs(s);
+  const sign = (radialIsX ? c : s) >= 0 ? 1 : -1;
+  return { radialIsX, sign };
+}
+
+function toWorld(u, v, o) {
+  return o.radialIsX ? { x: o.sign * v, y: u } : { x: u, y: o.sign * v };
+}
+
+function anglesFrom(weights) {
+  const total = weights.reduce((a, b) => a + b, 0) || 1;
+  let a = -Math.PI / 2 - (Math.PI * 2 * (weights[0] ?? 0)) / total / 2;
+  return weights.map((w) => {
+    const span = (Math.PI * 2 * w) / total;
+    const mid = a + span / 2;
+    a += span;
+    return mid;
+  });
+}
+
+function hubHalves(radialIsX, kind) {
+  if (kind === "ghost") {
+    return radialIsX
+      ? { halfU: GHOST_H / 2, halfV: GHOST_W / 2 }
+      : { halfU: GHOST_W / 2, halfV: GHOST_H / 2 };
+  }
+  return radialIsX
+    ? { halfU: GEOM.nodeH / 2, halfV: GEOM.nodeW / 2 }
+    : { halfU: GEOM.nodeW / 2, halfV: GEOM.nodeH / 2 };
+}
+
+function arcSlots(n, pitchT, pitchR) {
+  if (n <= 1) return Math.max(1, n);
+  if (n <= 4) return n;
+  let t = Math.round(Math.sqrt((n * pitchR) / pitchT));
+  if (t < 2) t = 2;
+  if (t > n) t = n;
+  if (t > 6) t = 6;
+  return t;
+}
+
+function buildLocal(sector, theta, ghosts) {
+  const o = orient(theta);
+  const { radialIsX } = o;
+  const pitchT = radialIsX ? PITCH_Y : PITCH_X;
+  const pitchR = radialIsX ? PITCH_X : PITCH_Y;
+  const ghostHalf = hubHalves(radialIsX, "ghost");
+  const cardHalf = hubHalves(radialIsX, "card");
+  const ghostPitch = ghostHalf.halfV * 2 + HUB_GAP;
+
+  const n = sector.spokes.length;
+  const tCount = n > 0 ? arcSlots(n, pitchT, pitchR) : 1;
+  const columns = [];
+  const u0 = -((tCount - 1) / 2) * pitchT;
+  for (let col = 0; col < tCount; col++) columns.push(u0 + col * pitchT);
+
+  const items = [];
+  if (sector.hub) items.push({ id: sector.hub.serial, u: 0, v: 0, kind: "card" });
+  const spokeOrigin = sector.hub ? pitchR : 0;
+  sector.spokes.forEach((sw, i) => {
+    const col = i % tCount;
+    const row = Math.floor(i / tCount);
+    items.push({ id: sw.serial, u: columns[col], v: spokeOrigin + row * pitchR, kind: "card" });
+  });
+
+  let maxCardV = -Infinity;
+  for (const item of items) maxCardV = Math.max(maxCardV, item.v + cardHalf.halfV);
+  if (!Number.isFinite(maxCardV)) maxCardV = 0;
+
+  // Neighbors sit in a band beyond the switches, ordered by the parent's
+  // place along the arc so a ghost stays outward of its own switch.
+  const parents = [...items].sort((a, b) => a.u - b.u || a.v - b.v || String(a.id).localeCompare(String(b.id)));
+  const orderedGhosts = [];
+  for (const parent of parents) {
+    for (const id of ghosts.get(parent.id) ?? []) orderedGhosts.push(id);
+  }
+  if (orderedGhosts.length) {
+    const gPitchT = ghostHalf.halfU * 2 + HUB_GAP;
+    const cols = Math.max(1, Math.ceil(orderedGhosts.length / 3));
+    const u0g = -((cols - 1) / 2) * gPitchT;
+    const base = maxCardV + HUB_GAP + ghostHalf.halfV;
+    orderedGhosts.forEach((id, i) => {
+      items.push({
+        id,
+        u: u0g + (i % cols) * gPitchT,
+        v: base + Math.floor(i / cols) * ghostPitch,
+        kind: "ghost",
+      });
+    });
   }
 
-  const all = [...pos.values(), ...extPos.values()];
+  let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+  const grow = (u, v, halfU, halfV) => {
+    minU = Math.min(minU, u - halfU);
+    maxU = Math.max(maxU, u + halfU);
+    minV = Math.min(minV, v - halfV);
+    maxV = Math.max(maxV, v + halfV);
+  };
+  for (const item of items) {
+    const h = item.kind === "ghost" ? ghostHalf : cardHalf;
+    grow(item.u, item.v, h.halfU, h.halfV);
+  }
+  if (!Number.isFinite(minU)) { minU = 0; maxU = 0; minV = 0; maxV = 0; }
+
+  const text = String(sector.building).toUpperCase();
+  const lw = Math.ceil(text.length * 8.4) + 8;
+  const lh = 14;
+  const uMid = (minU + maxU) / 2;
+  const v0 = maxV + HUB_GAP;
+  let label;
+  if (radialIsX) {
+    grow(uMid, v0 + lw / 2, lh / 2, lw / 2);
+    label = { u: uMid + 4, v: v0, anchor: o.sign > 0 ? "start" : "end" };
+  } else {
+    grow(uMid, v0 + lh / 2, lw / 2, lh / 2);
+    label = { u: uMid, v: o.sign > 0 ? v0 + 11 : v0 + 3, anchor: "middle" };
+  }
+
+  const cU = (minU + maxU) / 2;
+  const cV = (minV + maxV) / 2;
+  for (const item of items) { item.u -= cU; item.v -= cV; }
+  label.u -= cU;
+  label.v -= cV;
+  return {
+    building: sector.building,
+    theta,
+    tangential: Math.max(1, maxU - minU),
+    halfU: (maxU - minU) / 2,
+    halfV: (maxV - minV) / 2,
+    items,
+    label,
+  };
+}
+
+function convergeSectors(sectors, ghosts) {
+  if (!sectors.length) return [];
+  let weights = sectors.map((s) => Math.max(1, s.spokes.length + (s.hub ? 1 : 0)));
+  let locals = [];
+  for (let iter = 0; iter < 6; iter++) {
+    const thetas = anglesFrom(weights);
+    locals = sectors.map((s, i) => buildLocal(s, thetas[i], ghosts));
+    const next = locals.map((L) => Math.max(1, L.tangential));
+    const same = next.every((w, i) => Math.abs(w - weights[i]) < 0.5);
+    weights = next;
+    if (same) break;
+  }
+  return locals;
+}
+
+function sectorBox(L, R) {
+  const o = orient(L.theta);
+  const cx = R * Math.cos(L.theta);
+  const cy = R * Math.sin(L.theta);
+  const halfW = o.radialIsX ? L.halfV : L.halfU;
+  const halfH = o.radialIsX ? L.halfU : L.halfV;
+  return { minX: cx - halfW, maxX: cx + halfW, minY: cy - halfH, maxY: cy + halfH };
+}
+
+function boxesClear(a, b) {
+  return a.maxX + CLUSTER_GAP <= b.minX || b.maxX + CLUSTER_GAP <= a.minX
+    || a.maxY + CLUSTER_GAP <= b.minY || b.maxY + CLUSTER_GAP <= a.minY;
+}
+
+function outsideCore(box, keep) {
+  const dx = box.minX > 0 ? box.minX : box.maxX < 0 ? -box.maxX : 0;
+  const dy = box.minY > 0 ? box.minY : box.maxY < 0 ? -box.maxY : 0;
+  return Math.hypot(dx, dy) >= keep + CLUSTER_GAP;
+}
+
+function sectorDistance(locals, keep) {
+  if (!locals.length) return 0;
+  const fits = (R) => {
+    const boxes = locals.map((L) => sectorBox(L, R));
+    for (const box of boxes) if (!outsideCore(box, keep)) return false;
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) if (!boxesClear(boxes[i], boxes[j])) return false;
+    }
+    return true;
+  };
+  let hi = CLUSTER_GAP;
+  for (let n = 0; n < 32 && !fits(hi); n++) hi *= 1.5;
+  let lo = 0;
+  for (let n = 0; n < 42; n++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) hi = mid;
+    else lo = mid;
+  }
+  // Rounding the placed cards can close a fraction of the gap.
+  return hi + 4;
+}
+
+function hubBounds(pos, extPos, sectors) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of all) {
-    minX = Math.min(minX, p.x - GEOM.nodeW / 2);
-    maxX = Math.max(maxX, p.x + GEOM.nodeW / 2);
-    minY = Math.min(minY, p.y - GEOM.nodeH / 2);
-    maxY = Math.max(maxY, p.y + GEOM.nodeH / 2);
+  const take = (x, y) => {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  };
+  for (const p of pos.values()) {
+    take(p.x - GEOM.nodeW / 2, p.y - GEOM.nodeH / 2 - 7);
+    take(p.x + GEOM.nodeW / 2 + 7, p.y + GEOM.nodeH / 2);
+  }
+  for (const p of extPos.values()) {
+    take(p.x - GHOST_W / 2, p.y - GHOST_H / 2);
+    take(p.x + GHOST_W / 2, p.y + GHOST_H / 2);
   }
   for (const s of sectors) {
     const lb = labelBox(s);
     if (!lb) continue;
-    minX = Math.min(minX, lb.x);
-    maxX = Math.max(maxX, lb.x + lb.w);
-    minY = Math.min(minY, lb.y);
-    maxY = Math.max(maxY, lb.y + lb.h);
+    take(lb.x, lb.y);
+    take(lb.x + lb.w, lb.y + lb.h);
   }
+  if (!Number.isFinite(minX)) return { x: -300, y: -300, w: 600, h: 600 };
   minX -= GEOM.pad;
   maxX += GEOM.pad;
-  minY -= GEOM.pad + 70; // room for the title block
+  minY -= GEOM.pad + 70;
   maxY += GEOM.pad + 30;
-  return { pos, extPos, sectors, bounds: { x: minX, y: minY, w: maxX - minX, h: maxY - minY } };
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
 
 // Tiered tree. Top-down puts the root on the first row and each hop on the

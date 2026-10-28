@@ -1,4 +1,5 @@
 import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED } from "./model.js";
+import { largeSample } from "./large-sample.js";
 import { LAYOUTS, applyPositionOverrides, clearPosition, displayScale, layoutById, orthoBend, writePosition } from "./layout.js";
 import { renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
@@ -49,6 +50,16 @@ function connState() {
 async function refresh() {
   status("Loading topology…");
   try {
+    if (new URLSearchParams(location.search).get("sample") === "large") {
+      const sample = largeSample();
+      state.data = sample;
+      const saved = state.overrides.coreSerial;
+      const known = sample.switches.some((s) => s.serial === saved);
+      if (!known) state.overrides = { ...state.overrides, coreSerial: sample.coreSerial };
+      $("mockBadge").hidden = false;
+      draw();
+      return;
+    }
     const creds = await activeCreds();
     const { url, init } = apiRequest(apiBase, "/api/topology?include=vlans,interfaces", creds);
     const resp = await fetch(url, init);
