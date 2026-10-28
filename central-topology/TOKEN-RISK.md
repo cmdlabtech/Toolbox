@@ -13,7 +13,7 @@ The page (Cloudflare Pages) and the Worker can therefore be public without expos
    - `sessionStorage` (key `ct-auth`) by default. It clears when the tab closes.
    - **Remember on this device** moves the entry to `localStorage` and removes it from `sessionStorage`.
    - **Forget** removes it from both, plus the in-memory copy, and the page returns to mock data.
-3. **Token.** The browser POSTs the client ID and secret straight to `https://sso.common.cloud.hpe.com/as/token.oauth2`, which allows CORS (see `docs/API-NOTES.md`). It keeps the returned token and its expiry, and mints a new one when the token expires or is rejected.
+3. **Token.** The browser POSTs the client ID and secret straight to `https://sso.common.cloud.hpe.com/as/token.oauth2`, which allows CORS (see `docs/API-NOTES.md`). It keeps the returned token and its expiry. If Central rejects that token, the browser mints one new token and retries the data request once.
    - If that direct call fails at the network or CORS level, the browser falls back to `POST /api/token` on the Worker.
    - The fallback takes a JSON body only, relays it once, and returns the token to the browser with `Cache-Control: no-store`.
 4. **Data.** The new Central API does not allow CORS, so the browser calls the Worker with:
@@ -37,13 +37,17 @@ The page (Cloudflare Pages) and the Worker can therefore be public without expos
 - **No credentials:** mock data with `MOCK=1` (the default), or a clear 401 with `MOCK=0`.
 - **CORS:** the credential headers are allowed only for origins in `ALLOWED_ORIGINS`.
 
-`tests/creds-client.test.mjs` checks the browser side:
+`tests/creds-client.test.mjs` and `tests/creds-token-expiry.test.mjs` check the browser side:
 - sessionStorage is the default
 - remember moves the entry to localStorage
 - Forget clears both stores
 - credentials go in headers only, never in a URL
 - the cluster URL is checked against the allowlist
 - the token is minted directly first, with the Worker fallback used only on a network failure
+- a pasted JWT stores its `exp` claim; a non-JWT does not; a malformed token is refused
+- Connect does not reuse an expired or cleared bearer token
+- the bearer placeholder is shown only while the saved token is still valid
+- a bearer 401 clears the token and asks for a new one; a client 401 mints once and retries once
 
 ## Residual risks
 
@@ -52,7 +56,7 @@ The page (Cloudflare Pages) and the Worker can therefore be public without expos
 | **Credentials at rest in the browser** | A remembered client secret or token sits in `localStorage` on that device. Leave Remember unticked on shared machines. Forget clears it. Prefer a read-only API client so a leaked secret cannot change configuration |
 | **Cross-site scripting** | Script injected into the page could read the stored credentials. The page has no third-party scripts, and device data is escaped before display. A strict Content-Security-Policy on Pages (`script-src 'self'`) is recommended before going live |
 | **Credentials in transit through the Worker** | The token (and, in the fallback only, the client secret) passes through Cloudflare's edge for one request. It is not stored, logged or cached by this code. Cloudflare platform logs record URLs, not headers, and credentials are never placed in URLs |
-| **Token lifetime** | Tokens from a new Central personal API client last about 2 hours (`expires_in` 7199). Tokens from a GreenLake platform (GLP) API client last 15 minutes. HPE issues no refresh token. Client-credential sign-in re-mints automatically. Bearer-token sign-in needs a new paste |
+| **Token lifetime** | Tokens from a new Central personal API client last about 2 hours (`expires_in` 7199). Tokens from a GreenLake platform (GLP) API client last 15 minutes. HPE issues no refresh token. Client-credential sign-in mints one new token and retries once when a token expires or is rejected. A pasted bearer token that is a JWT stores its `exp` claim (the payload is decoded locally, with no signature check and no network call). Bearer sign-in does not reuse an expired or rejected token, including one remembered in localStorage; the panel asks for a new paste |
 | **Public Worker as a relay** | The Worker forwards only to new Central cluster hosts and only read-only GETs, so it cannot be used as a general proxy. Rate limiting (a Workers rate-limit binding or WAF rule on `/api/*`) is still advisable to protect the Central API quota |
 | **Over-privileged clients** | Users should create a new Central personal API client with the narrowest read-only role for Central monitoring |
 

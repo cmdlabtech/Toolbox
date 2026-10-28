@@ -16,7 +16,7 @@ This app uses the **new Central (HPE GreenLake) MRT API only**. Every call is a 
 - **Using the token:** send it as `Authorization: Bearer <token>` to the cluster base URL.
   - Base URLs come from the spec `servers` list, for example `https://us1.api.central.arubanetworks.com`, `us2`, `us4`, `us5`, `us6`, `de1`–`de3`, `gb1`, `ca1`, `in1`, `jp1`, `au1` and `ae1`.
   - The user picks the cluster in the browser's credentials panel. It reaches the Worker in the `X-Central-Base` header, and the Worker accepts only `https://<cluster>.api.central.arubanetworks.com` (or `.com.cn`).
-- **Where credentials live:** in the user's browser only (see `TOKEN-RISK.md`). The Worker has no secrets, never mints a token on its own, and never retries with stored credentials. A Central 401 or 403 is returned to the browser as 401, and the browser drops that token and mints a fresh one on the next refresh (client-credential sign-in), or asks for a new token (bearer sign-in).
+- **Where credentials live:** in the user's browser only (see `TOKEN-RISK.md`). The Worker has no secrets, never mints a token on its own, and never retries with stored credentials. A Central 401 or 403 is returned to the browser as 401, and the browser drops that token. Client-credential sign-in mints one new token and retries that request once. Bearer sign-in opens the credentials panel and asks for a new token. A pasted JWT stores its `exp` claim, so an expired token is not sent again.
 
 ## CORS check (direct browser calls vs pass-through)
 
