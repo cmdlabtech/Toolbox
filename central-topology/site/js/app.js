@@ -170,6 +170,10 @@ function diagramHead(tokens) {
   return `<div class="diagram-head"><div><div class="diagram-title">Switch topology</div><div class="diagram-sub">${esc(state.subtitle ?? "")}</div></div><div class="diagram-tools"><button type="button" id="zoomOut" aria-label="Zoom out">−</button><button type="button" id="zoomFit">Fit</button><button type="button" id="zoomIn" aria-label="Zoom in">+</button></div>${legendHtml(tokens)}</div>`;
 }
 
+function cropped(bounds) {
+  return { ...bounds, h: Math.max(1, bounds.h - HEADER_BAND) };
+}
+
 function graphAvail(scroller, host) {
   const pane = paneSize(host);
   return {
@@ -190,7 +194,7 @@ function mountDiagram(scrollAfter) {
   const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
   if (!state.view) {
     const opened = shownBounds(lay, model, { collapseAps: true, openChips: state.openChips });
-    const scale = openingScale(opened, avail, reference);
+    const scale = openingScale(cropped(opened), avail, cropped(reference));
     state.view = { scale, openedAt: scale, user: false };
     if (scrollAfter === undefined) scrollAfter = "core";
   }
@@ -234,7 +238,7 @@ function stepZoom(factor) {
   const old = state.view.scale;
   const expanded = chipsExpanded(old, state.view.openedAt);
   const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips });
-  const fit = fitScale(bounds, avail);
+  const fit = fitScale(cropped(bounds), avail);
   const next = Math.min(Math.max(old * factor, Math.min(fit, state.view.openedAt) * 0.5), Math.max(state.view.openedAt * 8, fit));
   state.view.scale = next;
   state.view.user = true;
@@ -248,7 +252,7 @@ function fitView() {
   const avail = graphAvail(scroller, $("diagram"));
   const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
   const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips });
-  state.view.scale = fitScale(bounds, avail);
+  state.view.scale = fitScale(cropped(bounds), avail);
   state.view.user = true;
   mountDiagram({ left: 0, top: 0 });
 }
