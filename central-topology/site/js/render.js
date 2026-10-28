@@ -1,7 +1,7 @@
 // SVG renderer. Produces one self-contained SVG string: every color is
 // resolved from theme tokens at render time, so a downloaded file looks the
 // same outside the page. Pure function except for tokens passed in.
-import { CARD_NAME_FONT, GEOM, accessChipBoxes, linkLeavesBucket, orthoBend } from "./layout.js";
+import { CARD_NAME_FONT, GEOM, accessChipBoxes, labelBox, linkLeavesBucket, orthoBend } from "./layout.js";
 import { resolveMgmt } from "./model.js";
 import { PORT_FONT, portsVisible } from "./ports.js";
 
@@ -64,8 +64,14 @@ function polyLength(points) {
   return n;
 }
 
-/** Label center just outside the node, beside the link, toward the other end. */
-function placePortLabel(points, text, slot) {
+function boxesMiss(a, b) {
+  return a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y;
+}
+
+/** Label center just outside the node, beside the link, toward the other end.
+ * The first candidate is the #12 spot. Later candidates step aside so a packed
+ * block does not land the label on a card. */
+function placePortLabel(points, text, slot, avoid = []) {
   const w = Math.ceil(text.length * 6.15) + 8;
   const h = 14;
   const a = points[0];
@@ -86,12 +92,64 @@ function placePortLabel(points, text, slot) {
   const exit = Math.min(tx, ty);
   const along = Math.abs(ux) * w / 2 + Math.abs(uy) * h / 2;
   const total = polyLength(points);
-  let dist = exit + 5 + along;
-  if (dist > total * 0.42) dist = Math.max(exit + 4, Math.min(dist, total * 0.3));
-  const p = pointAlong(points, dist);
-  const sign = slot % 2 === 0 ? 1 : -1;
-  const nudge = 9 + (slot % 3) * 11;
-  return { x: p.x + -p.uy * nudge * sign, y: p.y + p.ux * nudge * sign, w, h };
+  let capped = exit + 5 + along;
+  if (capped > total * 0.42) capped = Math.max(exit + 4, Math.min(capped, total * 0.3));
+  const clearDist = Math.min(exit + 5 + along, Math.max(exit + 4, total / 2 - 2));
+  const primary = slot % 2 === 0 ? 1 : -1;
+  const baseNudge = 9 + (slot % 3) * 11;
+  const tries = [{ dist: capped, nudge: baseNudge, sign: primary }];
+  for (const dist of [clearDist, capped]) {
+    for (const extra of [0, 16, 32, 48]) {
+      for (const sign of [primary, -primary]) tries.push({ dist, nudge: baseNudge + extra, sign });
+    }
+  }
+  const at = (dist, nudge, sign) => {
+    const p = pointAlong(points, Math.max(0, dist));
+    const x = p.x + -p.uy * nudge * sign;
+    const y = p.y + p.ux * nudge * sign;
+    return { x, y, w, h, box: { x: x - w / 2, y: y - h / 2, w, h } };
+  };
+  let fallback = null;
+  const seen = new Set();
+  const clear = (spot) => avoid.every((o) => boxesMiss(spot.box, o));
+  for (const t of tries) {
+    const key = `${Math.round(t.dist)}|${t.nudge}|${t.sign}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const spot = at(t.dist, t.nudge, t.sign);
+    if (!fallback) fallback = spot;
+    if (clear(spot)) return { x: spot.x, y: spot.y, w, h };
+  }
+  // Packed blocks: keep the label on the card's own margin, beside the end that
+  // faces the other switch, so it stays nearer this switch and off the next card.
+  const other = points[points.length - 1];
+  const horizontal = Math.abs(other.x - a.x) * GEOM.nodeH >= Math.abs(other.y - a.y) * GEOM.nodeW;
+  const face = horizontal ? Math.sign(other.x - a.x) || 1 : Math.sign(other.y - a.y) || 1;
+  const gap = 4;
+  const edge = horizontal
+    ? a.x + face * (GEOM.nodeW / 2 - w / 2)
+    : a.y + face * (GEOM.nodeH / 2 - h / 2);
+  const inX = a.x > 4 ? -1 : 1;
+  const inY = a.y > 4 ? -1 : 1;
+  const margins = horizontal
+    ? [
+      { x: edge, y: a.y + inY * (GEOM.nodeH / 2 + gap + h / 2) },
+      { x: edge, y: a.y - inY * (GEOM.nodeH / 2 + gap + h / 2) },
+    ]
+    : [
+      { x: a.x + inX * (GEOM.nodeW / 2 + gap + w / 2), y: edge },
+      { x: a.x - inX * (GEOM.nodeW / 2 + gap + w / 2), y: edge },
+    ];
+  for (const base of margins) {
+    for (const mul of [0, 1, -1, 2, -2]) {
+      const x = base.x + (horizontal ? mul * 14 : 0);
+      const y = base.y + (horizontal ? 0 : mul * 12);
+      const nearer = Math.hypot(x - a.x, y - a.y) + 1e-6 < Math.hypot(x - other.x, y - other.y);
+      const box = { x: x - w / 2, y: y - h / 2, w, h };
+      if (nearer && clear({ box })) return { x, y, w, h };
+    }
+  }
+  return { x: fallback.x, y: fallback.y, w, h };
 }
 
 export function renderSvg(model, lay, opts) {
@@ -123,6 +181,16 @@ export function renderSvg(model, lay, opts) {
   const portLabels = [];
   const portSlots = new Map();
   const showPorts = portsVisible(opts);
+  const portAvoid = [];
+  for (const n of model.nodes) {
+    const p = lay.pos.get(n.serial);
+    if (p) portAvoid.push({ x: p.x - W / 2, y: p.y - H / 2, w: W, h: H });
+  }
+  for (const s of lay.sectors ?? []) {
+    const b = labelBox(s);
+    if (b) portAvoid.push(b);
+  }
+  for (const chip of chips) portAvoid.push(chip.box);
   const drawEdge = (x1, y1, x2, y2, from, to, attrs, title) => {
     const d = routeEdge({ x: x1, y: y1 }, { x: x2, y: y2 }, from, to, lay);
     if (d) out.push(`<path d="${d}" ${attrs}><title>${title}</title></path>`);
@@ -149,7 +217,7 @@ export function renderSvg(model, lay, opts) {
         if (!text) return;
         const slot = portSlots.get(serial) ?? 0;
         portSlots.set(serial, slot + 1);
-        portLabels.push({ serial, link, text, ...placePortLabel(points, text, slot) });
+        portLabels.push({ serial, link, text, ...placePortLabel(points, text, slot, portAvoid) });
       };
       add(e.from, e.fromLabel, pts);
       add(e.to, e.toLabel, [...pts].reverse());

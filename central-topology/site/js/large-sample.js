@@ -153,3 +153,114 @@ export function largeSample() {
     coreSerial: serial(coreName),
   };
 }
+
+// Wider campus: 44 switches, 8 buildings, about 650 links, and a crowd of
+// LLDP neighbors. Names are generic. The district core is the highest-degree
+// switch, so the model infers it.
+const CAMPUS = [
+  { site: "Building A", code: "BLDG-A", access: 5, core: "CORE-01" },
+  { site: "Building B", code: "BLDG-B", access: 6 },
+  { site: "Building C", code: "BLDG-C", access: 6 },
+  { site: "Building D", code: "BLDG-D", access: 5 },
+  { site: "Building E", code: "BLDG-E", access: 4 },
+  { site: "Building F", code: "BLDG-F", access: 4 },
+  { site: "Building G", code: "BLDG-G", access: 3 },
+  { site: "Building H", code: "BLDG-H", access: 3 },
+];
+
+export function campusSample() {
+  const switches = [];
+  const externals = [];
+  const links = [];
+  const coreName = CAMPUS[0].core;
+  const names = [];
+
+  CAMPUS.forEach((b, bi) => {
+    const core = b.core ?? `${b.code}-CORE-01`;
+    names.push({ name: core, site: b.site, role: "core" });
+    switches.push(sw(core, b.site, bi === 0 ? "Aruba 8360-32Y4C" : "Aruba 6300M 48G", `10.20.${bi}.1`));
+    for (let a = 1; a <= b.access; a++) {
+      const name = `${b.code}-SW-${String(a).padStart(2, "0")}`;
+      names.push({ name, site: b.site, role: "access", bi, a });
+      switches.push(sw(
+        name,
+        b.site,
+        a % 2 ? "Aruba 6100 48G 4SFP+" : "Aruba 6200F 48G",
+        `10.20.${bi}.${10 + a}`,
+        a === b.access && bi === 3 ? "OFFLINE" : "ONLINE",
+      ));
+    }
+  });
+
+  const byName = new Map(switches.map((s) => [s.name, s]));
+  const link = (a, ap, b, bp, source = "topology") => {
+    links.push({
+      from: byName.get(a)?.serial ?? a,
+      to: byName.get(b)?.serial ?? b,
+      fromPort: ap,
+      toPort: bp,
+      source,
+    });
+  };
+  const ghost = (name, type, local, port) => {
+    const id = serial(name);
+    externals.push({ serial: id, name, mac: mac(name), type, status: "ONLINE" });
+    links.push({
+      from: byName.get(local).serial,
+      to: id,
+      fromPort: port,
+      toPort: "eth0",
+      source: "neighbours",
+    });
+  };
+
+  for (const b of CAMPUS) {
+    const members = names.filter((n) => n.site === b.site).map((n) => n.name);
+    for (let i = 0; i < members.length; i++) {
+      for (let j = i + 1; j < members.length; j++) {
+        const source = j === i + 1 && i % 3 === 0 ? "neighbours" : "topology";
+        link(members[i], `1/1/${j}`, members[j], "1/1/49", source);
+      }
+    }
+  }
+  for (const b of CAMPUS.slice(1)) {
+    link(coreName, `1/1/${b.code.length}`, `${b.code}-CORE-01`, "1/1/49", "neighbours");
+  }
+  const crosses = [
+    ["BLDG-B-SW-01", "BLDG-C-CORE-01"],
+    ["BLDG-C-SW-02", "BLDG-D-CORE-01"],
+    ["BLDG-D-SW-01", "BLDG-E-CORE-01"],
+    ["BLDG-E-SW-01", "BLDG-F-CORE-01"],
+    ["BLDG-F-SW-02", "BLDG-G-CORE-01"],
+    ["BLDG-G-SW-01", "BLDG-H-CORE-01"],
+    ["BLDG-H-SW-01", "CORE-01"],
+    ["BLDG-B-SW-03", "BLDG-A-SW-01"],
+  ];
+  for (const [a, b] of crosses) link(a, "1/1/48", b, "1/1/47");
+
+  ghost("CORE-FW-01", "Firewall", coreName, "1/1/40");
+  ghost("CORE-RTR-01", "Router", coreName, "1/1/41");
+  for (const b of CAMPUS.slice(1)) {
+    ghost(`AP-${b.code}-C1`, "Access Point", `${b.code}-CORE-01`, "1/1/30");
+  }
+  for (const n of names) {
+    if (n.role !== "access") continue;
+    const code = CAMPUS.find((b) => b.site === n.site).code;
+    const count = 12 + (n.a % 6);
+    for (let g = 1; g <= count; g++) {
+      const kind = g % 3 === 0 ? "CAM" : g % 3 === 1 ? "AP" : "PH";
+      const type = kind === "CAM" ? "Camera" : kind === "AP" ? "Access Point" : "Phone";
+      ghost(`${kind}-${code}-${String(n.a).padStart(2, "0")}-${g}`, type, n.name, `1/1/${20 + (g % 20)}`);
+    }
+  }
+
+  return {
+    mock: true,
+    generatedAt: "2026-03-18T15:04:00.000Z",
+    sites: CAMPUS.map((b) => ({ id: b.site, name: b.site })),
+    switches,
+    externals,
+    links,
+    warnings: [],
+  };
+}

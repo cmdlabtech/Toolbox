@@ -30,7 +30,9 @@ export const LAYOUTS = [
 export function layoutById(id, model, opts) {
   const spec = LAYOUTS.find((l) => l.id === id) ?? LAYOUTS[0];
   const column = COLUMN_FNS[spec.id];
-  const lay = column ? column(model, opts) : LAYOUT_FNS[spec.id](model);
+  const lay = column ? column(model, opts)
+    : spec.id === "hub" ? layout(model, opts)
+    : LAYOUT_FNS[spec.id](model);
   return { ...lay, id: spec.id };
 }
 
@@ -238,7 +240,7 @@ export function modelForNeighborToggle(model, showAccessNeighbors) {
 export function chipMetrics(count) {
   const text = apChipLabel(count);
   const w = Math.max(72, Math.ceil(text.length * 7.4) + 18);
-  const h = 24;
+  const h = 16;
   return { text, w, h };
 }
 
@@ -246,7 +248,7 @@ function boxesMiss(a, b, gap) {
   return a.x + a.w + gap <= b.x || b.x + b.w + gap <= a.x || a.y + a.h + gap <= b.y || b.y + b.h + gap <= a.y;
 }
 
-/** One chip per access switch, placed just outside that card. */
+/** One chip per access switch, tucked against that card. */
 export function accessChipBoxes(model, lay) {
   const core = lay.pos.get(model.coreSerial) ?? { x: 0, y: 0 };
   const obstacles = [];
@@ -264,6 +266,17 @@ export function accessChipBoxes(model, lay) {
     const parent = lay.pos.get(serial);
     if (!parent || !ids.length) continue;
     const { text, w, h } = chipMetrics(ids.length);
+    const saved = lay.chipAt?.get(serial);
+    const below = parent.y + GEOM.nodeH / 2 + 4 + h / 2;
+    const above = parent.y - GEOM.nodeH / 2 - 4 - h / 2;
+    const local = [];
+    if (saved) local.push(saved);
+    for (const side of [0, 1, -1]) local.push({ x: parent.x + side * (w + 8), y: below });
+    for (const side of [0, 1, -1]) local.push({ x: parent.x + side * (w + 8), y: above });
+    local.push(
+      { x: parent.x + GEOM.nodeW / 2 + 8 + w / 2, y: parent.y },
+      { x: parent.x - GEOM.nodeW / 2 - 8 - w / 2, y: parent.y },
+    );
     let dx = parent.x - core.x;
     let dy = parent.y - core.y;
     const len = Math.hypot(dx, dy) || 1;
@@ -273,16 +286,23 @@ export function accessChipBoxes(model, lay) {
     const ty = dx;
     const dist = GEOM.nodeW / 2 + w / 2 + 14;
     let placed = null;
-    for (const mul of [1, 1.4, 1.8, 2.3]) {
-      for (const side of [0, 1, -1, 2, -2]) {
-        const x = parent.x + dx * dist * mul + tx * side * (w + 10);
-        const y = parent.y + dy * dist * mul + ty * side * (h + 10);
-        const box = { x: x - w / 2, y: y - h / 2, w, h };
-        if (obstacles.some((o) => !boxesMiss(box, o, 6))) continue;
-        placed = { x, y, box };
-        break;
-      }
+    const tryAt = (x, y, gap) => {
+      const box = { x: x - w / 2, y: y - h / 2, w, h };
+      if (obstacles.some((o) => !boxesMiss(box, o, gap))) return null;
+      return { x, y, box };
+    };
+    for (const spot of local) {
+      placed = tryAt(spot.x, spot.y, 2);
       if (placed) break;
+    }
+    if (!placed) {
+      for (const mul of [1, 1.4, 1.8, 2.3]) {
+        for (const side of [0, 1, -1, 2, -2]) {
+          placed = tryAt(parent.x + dx * dist * mul + tx * side * (w + 10), parent.y + dy * dist * mul + ty * side * (h + 10), 6);
+          if (placed) break;
+        }
+        if (placed) break;
+      }
     }
     if (!placed) {
       const x = parent.x + dx * dist;
@@ -388,11 +408,14 @@ function compactHubLabels(model, pos, sectors, extPos) {
   }
 }
 
-export function layout(model) {
+export function layout(model, opts) {
   const pos = new Map();
   const extPos = new Map();
   const { nodes, coreSerial, byId } = model;
   if (!coreSerial) return { pos, extPos, sectors: [], bounds: { x: -300, y: -300, w: 600, h: 600 } };
+  // Large graphs: pack building blocks across the pane. Access-layer neighbors
+  // become chips, so dropping them (Show access neighbors off) closes the gaps.
+  if (nodes.length >= 40) return layoutPackedHub(model, opts);
   pos.set(coreSerial, { x: 0, y: 0 });
 
   const ghosts = ghostGroups(model);
@@ -440,6 +463,365 @@ export function layout(model) {
   if (nodes.length < 40) compactHubLabels(model, pos, sectors, extPos);
 
   return { pos, extPos, sectors, bounds: hubBounds(pos, extPos, sectors) };
+}
+
+// Large hub. Building blocks sit on a grid around the district core, using the
+// pane's aspect so a wide window spreads sideways and a tall one stacks.
+// Access-only neighbors take a chip row under their switch. Their full pills
+// sit in a band below the blocks: the opening fit drops that band (see
+// shownBounds) so it cannot blow the scale out. Hiding those neighbors removes
+// the chip row and the band, and the blocks close up.
+const PACK_GAP_X = 52;
+const PACK_PITCH_CHIP = 70;
+const PACK_PITCH_TIGHT = GEOM.nodeH + 14;
+const PACK_COL_GAP = 36;
+const PACK_ROW_GAP = 48;
+
+function layoutPackedHub(model, opts = {}) {
+  const pos = new Map();
+  const extPos = new Map();
+  const chipAt = new Map();
+  const { nodes, coreSerial, byId } = model;
+  pos.set(coreSerial, { x: 0, y: 0 });
+
+  const accessOnly = accessOnlyNeighborIds(model);
+  const owned = ghostGroups(model);
+  const accessOf = new Map();
+  const uplinkOf = new Map();
+  for (const [parent, ids] of owned) {
+    const acc = [];
+    const up = [];
+    for (const id of ids) (accessOnly.has(id) ? acc : up).push(id);
+    if (acc.length) accessOf.set(parent, acc);
+    if (up.length) uplinkOf.set(parent, up);
+  }
+
+  const sectorsIn = [];
+  for (const b of model.buildings) {
+    const members = nodes.filter((n) => n.building === b && n.serial !== coreSerial);
+    if (!members.length) continue;
+    const hub = model.hubs[b] && model.hubs[b] !== coreSerial ? byId.get(model.hubs[b]) : null;
+    const spokes = members.filter((n) => n !== hub).sort((a, c) => a.name.localeCompare(c.name));
+    const ordered = hub ? [hub, ...spokes] : spokes.slice().sort((a, c) => a.name.localeCompare(c.name));
+    const chip = ordered.some((n) => accessOf.has(n.serial));
+    sectorsIn.push({ building: b, hub, ordered, chip });
+  }
+
+  const availW = Number(opts.width) > 0 ? Number(opts.width) : 1068;
+  const availH = Number(opts.height) > 0 ? Number(opts.height) : 708;
+  const aspect = availH > 0 ? availW / availH : 1.5;
+  const grid = packedGrid(sectorsIn.length, aspect);
+  const slots = packedSlots(grid.rows, grid.cols).slice(0, sectorsIn.length);
+  const order = sectorsIn.map((s, i) => ({ i, h: packedShape(s, aspect).h }))
+    .sort((a, b) => b.h - a.h || sectorsIn[a.i].building.localeCompare(sectorsIn[b.i].building));
+  const assignment = new Array(sectorsIn.length);
+  order.forEach((item, k) => { assignment[item.i] = slots[k]; });
+
+  const shapes = sectorsIn.map((s) => packedShape(s, aspect));
+  const colW = Array(grid.cols).fill(GEOM.nodeW);
+  const rowH = Array(grid.rows).fill(GEOM.nodeH);
+  const cc = (grid.cols - 1) / 2;
+  const cr = (grid.rows - 1) / 2;
+  sectorsIn.forEach((s, i) => {
+    const slot = assignment[i];
+    if (!slot) return;
+    colW[slot.c] = Math.max(colW[slot.c], shapes[i].w);
+    rowH[slot.r] = Math.max(rowH[slot.r], shapes[i].h);
+  });
+  const colX = [0];
+  for (let c = 0; c < grid.cols; c++) colX.push(colX[c] + colW[c] + PACK_COL_GAP);
+  const rowY = [0];
+  for (let r = 0; r < grid.rows; r++) rowY.push(rowY[r] + rowH[r] + PACK_ROW_GAP);
+  const coreX = colX[cc] + colW[cc] / 2;
+  const coreY = rowY[cr] + rowH[cr] / 2;
+
+  const sectors = [];
+  const stacks = [];
+  sectorsIn.forEach((s, i) => {
+    const slot = assignment[i];
+    const shape = shapes[i];
+    if (!slot) return;
+    const ox = colX[slot.c] + (colW[slot.c] - shape.w) / 2 - coreX;
+    const oy = rowY[slot.r] + (rowH[slot.r] - shape.h) / 2 - coreY;
+    const locals = packedLocals(s.ordered, shape);
+    const used = new Set(locals.map((item) => `${item.row},${item.col}`));
+    const free = [];
+    for (let r = 0; r < shape.rows; r++) {
+      for (let c = 0; c < shape.cols; c++) {
+        if (used.has(`${r},${c}`)) continue;
+        free.push({
+          x: Math.round(ox + c * (GEOM.nodeW + PACK_GAP_X) + GEOM.nodeW / 2),
+          y: Math.round(oy + r * shape.pitchY + GEOM.nodeH / 2),
+        });
+      }
+    }
+    let hubPt = null;
+    locals.forEach((item, k) => {
+      const pt = { x: Math.round(ox + item.x), y: Math.round(oy + item.y) };
+      pos.set(item.node.serial, pt);
+      if (k === 0) hubPt = pt;
+      if (accessOf.has(item.node.serial)) {
+        chipAt.set(item.node.serial, {
+          x: pt.x,
+          y: Math.round(pt.y + GEOM.nodeH / 2 + 4 + chipMetrics(accessOf.get(item.node.serial).length).h / 2),
+        });
+      }
+    });
+    stacks.push({
+      x: ox,
+      y: oy,
+      w: shape.w,
+      h: shape.h,
+      serials: locals.map((item) => item.node.serial),
+      free,
+    });
+    if (!hubPt) return;
+    const cardTop = hubPt.y - GEOM.nodeH / 2;
+    sectors.push({
+      building: s.building,
+      anchor: "middle",
+      labelAt: { x: hubPt.x, y: cardTop - 7 },
+    });
+  });
+
+  const loose = nodes.filter((n) => !pos.has(n.serial));
+  loose.forEach((n, i) => {
+    pos.set(n.serial, { x: Math.round(GEOM.nodeW + 40 + i * (GEOM.nodeW + PACK_GAP_X)), y: 0 });
+  });
+
+  const obstacles = packedObstacles(model, pos, sectors, chipAt, accessOf);
+  placeUplinkPills(uplinkOf, pos, extPos, obstacles, stacks);
+  parkAccessPills(accessOf, extPos, obstacles);
+
+  return { pos, extPos, sectors, chipAt, bounds: hubBounds(pos, extPos, sectors) };
+}
+
+function packedGrid(n, aspect) {
+  let best = null;
+  const limit = Math.max(1, n + 1);
+  for (let rows = 1; rows <= limit; rows += 2) {
+    for (let cols = 1; cols <= limit; cols += 2) {
+      if (cols * rows < n + 1) continue;
+      const waste = cols * rows - (n + 1);
+      const ratio = cols / rows;
+      const score = Math.abs(Math.log(ratio / (aspect || 1))) * 8 + waste;
+      if (!best || score < best.score) best = { rows, cols, score };
+    }
+  }
+  return best ?? { rows: 1, cols: 1 };
+}
+
+function packedSlots(rows, cols) {
+  const cr = (rows - 1) / 2;
+  const cc = (cols - 1) / 2;
+  const slots = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (r === cr && c === cc) continue;
+      const ring = Math.max(Math.abs(r - cr), Math.abs(c - cc));
+      slots.push({ r, c, ring, middle: r === cr ? 1 : 0 });
+    }
+  }
+  slots.sort((a, b) => a.ring - b.ring || a.middle - b.middle || a.c - b.c || a.r - b.r);
+  return slots;
+}
+
+function packedShape(sector, aspect) {
+  const n = sector.ordered.length;
+  let cols = 1;
+  if (aspect >= 0.9) {
+    if (n >= 9) cols = 3;
+    else if (n >= 4) cols = 2;
+  } else if (n >= 6) cols = 2;
+  const rows = Math.max(1, Math.ceil(n / cols));
+  const pitchY = sector.chip ? PACK_PITCH_CHIP : PACK_PITCH_TIGHT;
+  return {
+    cols,
+    rows,
+    pitchY,
+    w: cols * GEOM.nodeW + Math.max(0, cols - 1) * PACK_GAP_X,
+    h: Math.max(0, rows - 1) * pitchY + GEOM.nodeH,
+  };
+}
+
+function packedLocals(ordered, shape) {
+  const hubCol = Math.floor((shape.cols - 1) / 2);
+  const slots = [];
+  for (let r = 0; r < shape.rows; r++) {
+    for (let c = 0; c < shape.cols; c++) slots.push({ r, c });
+  }
+  const hubSlot = { r: 0, c: Math.min(hubCol, shape.cols - 1) };
+  const rest = slots.filter((s) => s.r !== hubSlot.r || s.c !== hubSlot.c);
+  const assign = [hubSlot, ...rest];
+  return ordered.map((node, i) => {
+    const s = assign[i] ?? { r: shape.rows + i, c: 0 };
+    return {
+      node,
+      row: s.r,
+      col: s.c,
+      x: s.c * (GEOM.nodeW + PACK_GAP_X) + GEOM.nodeW / 2,
+      y: s.r * shape.pitchY + GEOM.nodeH / 2,
+    };
+  });
+}
+
+function packedObstacles(model, pos, sectors, chipAt, accessOf) {
+  const cards = [];
+  const boxes = [];
+  for (const n of model.nodes) {
+    const p = pos.get(n.serial);
+    if (!p) continue;
+    const box = { x: p.x - GEOM.nodeW / 2, y: p.y - GEOM.nodeH / 2, w: GEOM.nodeW, h: GEOM.nodeH };
+    cards.push({ ...box, cx: p.x, cy: p.y, flags: n.flags?.length ?? 0 });
+    boxes.push(box);
+  }
+  for (const s of sectors) {
+    const b = labelBox(s);
+    if (b) boxes.push(b);
+  }
+  for (const [serial, ids] of accessOf) {
+    const at = chipAt.get(serial);
+    if (!at) continue;
+    const { w, h } = chipMetrics(ids.length);
+    boxes.push({ x: at.x - w / 2, y: at.y - h / 2, w, h });
+  }
+  return { cards, boxes };
+}
+
+function ghostBox(x, y) {
+  return { x: x - GHOST_W / 2, y: y - GHOST_H / 2, w: GHOST_W, h: GHOST_H };
+}
+
+function pillClear(box, obstacles) {
+  if (obstacles.boxes.some((o) => !boxesMiss(box, o, 4))) return false;
+  for (const card of obstacles.cards) {
+    if (!card.flags) continue;
+    const c = { x: card.cx + GEOM.nodeW / 2 - 2, y: card.cy - GEOM.nodeH / 2 + 2 };
+    const nearestX = Math.max(box.x, Math.min(c.x, box.x + box.w));
+    const nearestY = Math.max(box.y, Math.min(c.y, box.y + box.h));
+    if (Math.hypot(nearestX - c.x, nearestY - c.y) < 9) return false;
+  }
+  return true;
+}
+
+function placeUplinkPills(uplinkOf, pos, extPos, obstacles, stacks) {
+  const bounds = bboxOf(obstacles.boxes);
+  const parents = [...uplinkOf.keys()].sort((a, b) => {
+    const pa = pos.get(a);
+    const pb = pos.get(b);
+    const aCore = pa && pa.x === 0 && pa.y === 0 ? 1 : 0;
+    const bCore = pb && pb.x === 0 && pb.y === 0 ? 1 : 0;
+    return aCore - bCore || String(a).localeCompare(String(b));
+  });
+  for (const parent of parents) {
+    const p = pos.get(parent);
+    if (!p) continue;
+    const ids = uplinkOf.get(parent).slice().sort();
+    const stack = stacks.find((s) => s.serials.includes(parent));
+    ids.forEach((id, i) => {
+      let placed = null;
+      const spots = [];
+      if (stack?.free?.[i]) spots.push(stack.free[i]);
+      for (const spot of pillCandidates(p, stack, i, ids.length)) spots.push(spot);
+      for (const spot of spots) {
+        const box = ghostBox(spot.x, spot.y);
+        if (!pillClear(box, obstacles) || !boxInside(box, bounds, 2)) continue;
+        placed = { x: spot.x, y: spot.y, box };
+        break;
+      }
+      if (!placed) placed = searchPillInside(obstacles, bounds, i);
+      if (!placed) {
+        const x = Math.round(bounds.minX + GHOST_W / 2 + i * (GHOST_W + 8));
+        const y = Math.round(bounds.maxY + 8 + GHOST_H / 2);
+        placed = { x, y, box: ghostBox(x, y) };
+      }
+      extPos.set(id, { x: placed.x, y: placed.y });
+      obstacles.boxes.push(placed.box);
+    });
+  }
+}
+
+function pillCandidates(p, stack, i, n) {
+  const pitch = GHOST_W + 8;
+  const out = [];
+  if (stack) {
+    const midX = stack.x + stack.w / 2;
+    const x = Math.round(midX - ((n - 1) * pitch) / 2 + i * pitch);
+    const below = stack.y + stack.h / 2 <= 0;
+    const yBelow = Math.round(stack.y + stack.h + 24 + GHOST_H / 2);
+    const yAbove = Math.round(stack.y - 24 - GHOST_H / 2);
+    out.push({ x, y: below ? yBelow : yAbove });
+    out.push({ x, y: below ? yAbove : yBelow });
+  }
+  const pitchY = GHOST_H + 6;
+  const side = (i - (n - 1) / 2) * pitch;
+  const above = Math.round(p.y - (GEOM.nodeH / 2 + 8 + GHOST_H / 2) - Math.max(0, i - 1) * pitchY);
+  const belowC = Math.round(p.y + (GEOM.nodeH / 2 + 8 + GHOST_H / 2) + Math.max(0, i - 1) * pitchY);
+  out.push({ x: Math.round(p.x + side), y: above });
+  out.push({ x: Math.round(p.x + side), y: belowC });
+  return out;
+}
+
+function boxInside(box, bounds, slop) {
+  return box.x >= bounds.minX - slop && box.y >= bounds.minY - slop
+    && box.x + box.w <= bounds.maxX + slop && box.y + box.h <= bounds.maxY + slop;
+}
+
+function bboxOf(boxes) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const o of boxes) {
+    minX = Math.min(minX, o.x);
+    minY = Math.min(minY, o.y);
+    maxX = Math.max(maxX, o.x + o.w);
+    maxY = Math.max(maxY, o.y + o.h);
+  }
+  if (!Number.isFinite(minX)) return { minX: -200, minY: -200, maxX: 200, maxY: 200 };
+  return { minX, minY, maxX, maxY };
+}
+
+function searchPillInside(obstacles, bounds, salt) {
+  const step = 18;
+  const y0 = bounds.minY + GHOST_H / 2;
+  const x0 = bounds.minX + GHOST_W / 2 + (salt % 4) * 6;
+  for (let y = y0; y <= bounds.maxY - GHOST_H / 2; y += step) {
+    for (let x = x0; x <= bounds.maxX - GHOST_W / 2; x += step) {
+      const box = ghostBox(Math.round(x), Math.round(y));
+      if (!pillClear(box, obstacles) || !boxInside(box, bounds, 1)) continue;
+      return { x: Math.round(x), y: Math.round(y), box };
+    }
+  }
+  return null;
+}
+
+function parkAccessPills(accessOf, extPos, obstacles) {
+  const ids = [];
+  for (const list of accessOf.values()) ids.push(...list);
+  ids.sort();
+  if (!ids.length) return;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const o of obstacles.boxes) {
+    minX = Math.min(minX, o.x);
+    maxX = Math.max(maxX, o.x + o.w);
+    maxY = Math.max(maxY, o.y + o.h);
+  }
+  if (!Number.isFinite(minX)) { minX = -200; maxX = 200; maxY = 0; }
+  const pitchX = GHOST_W + 8;
+  const pitchY = GHOST_H + 8;
+  const width = Math.max(pitchX, maxX - minX);
+  const cols = Math.max(1, Math.floor((width + 8) / pitchX));
+  const used = Math.min(cols, ids.length);
+  const originX = (minX + maxX) / 2 - ((used - 1) * pitchX) / 2;
+  const originY = maxY + 28 + GHOST_H / 2;
+  ids.forEach((id, i) => {
+    const c = i % cols;
+    const r = Math.floor(i / cols);
+    extPos.set(id, { x: Math.round(originX + c * pitchX), y: Math.round(originY + r * pitchY) });
+  });
 }
 
 function ghostGroups(model) {

@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildModel } from "../site/js/model.js";
-import { largeSample } from "../site/js/large-sample.js";
+import { campusSample, largeSample } from "../site/js/large-sample.js";
 import {
-  CARD_NAME_FONT, GEOM, accessChipBoxes, accessNeighborGroups, apChipLabel, chipsExpanded, coreScroll, fitScale, hubOpeningScale, labelBox, layoutById, nameFloorScale, shownBounds,
+  CARD_NAME_FONT, GEOM, HUB_FRAME, accessChipBoxes, accessNeighborGroups, apChipLabel, chipsExpanded, coreScroll, fitScale, hubOpeningScale, labelBox, layoutById, modelForNeighborToggle, nameFloorScale, shownBounds,
 } from "../site/js/layout.js";
 import { renderSvg } from "../site/js/render.js";
 
@@ -179,4 +179,141 @@ test("access neighbors collapse to one chip and expand on zoom or click", () => 
   assert.equal(chipsExpanded(1.25, 1), true);
   const zoomed = renderSvg(model, lay, { ...opts, collapseAps: !chipsExpanded(1.25, 1) });
   assert.ok(zoomed.includes(ghostName), "zooming in past the opening scale expands neighbors");
+});
+
+test("campus hub fits eight buildings at the 11px floor, and access chips are not free nodes", () => {
+  const sample = campusSample();
+  assert.equal(sample.switches.length, 44);
+  assert.equal(new Set(sample.switches.map((s) => s.site)).size, 8);
+  assert.ok(sample.links.length >= 620 && sample.links.length <= 680);
+  assert.ok(sample.externals.length >= 200);
+  const model = buildModel(sample);
+  assert.equal(model.coreSource, "inferred");
+  assert.equal(model.byId.get(model.coreSerial).name, "CORE-01");
+  assert.equal(model.nodes.length, 44);
+  assert.ok(model.nodes.some((n) => n.name === "BLDG-A-SW-01"));
+
+  const lay = layoutById("hub", model, { width: 1100, height: 760 });
+  const again = layoutById("hub", model, { width: 1100, height: 760 });
+  assert.equal(lay.pos.size, model.nodes.length);
+  for (const n of model.nodes) {
+    const p = lay.pos.get(n.serial);
+    assert.equal(Number.isFinite(p.x) && Number.isFinite(p.y), true, n.name);
+    assert.deepEqual(p, again.pos.get(n.serial), n.name);
+  }
+  const cards = model.nodes.map((n) => {
+    const p = lay.pos.get(n.serial);
+    return { id: n.name, x: p.x - GEOM.nodeW / 2, y: p.y - GEOM.nodeH / 2, w: GEOM.nodeW, h: GEOM.nodeH };
+  });
+  for (let i = 0; i < cards.length; i++) {
+    for (let j = i + 1; j < cards.length; j++) {
+      assert.equal(intersects(cards[i], cards[j]), false, `${cards[i].id} overlaps ${cards[j].id}`);
+    }
+  }
+  for (const sector of lay.sectors) {
+    const label = { id: sector.building, ...labelBox(sector) };
+    assert.ok(label.w > 0 && label.h > 0, sector.building);
+    for (const card of cards) {
+      assert.equal(intersects(label, card), false, `${label.id} overlaps ${card.id}`);
+    }
+  }
+  const uplink = [];
+  for (const e of model.edges) {
+    if (!e.external) continue;
+    const local = model.byId.has(e.from) ? e.from : model.byId.has(e.to) ? e.to : null;
+    if (!local || model.byId.get(local).role === "access") continue;
+    const other = local === e.from ? e.to : e.from;
+    const p = lay.extPos.get(other);
+    assert.ok(p, other);
+    uplink.push({ id: other, x: p.x - 60, y: p.y - 15, w: 120, h: 30 });
+  }
+  for (const pill of uplink) {
+    for (const card of cards) assert.equal(intersects(pill, card), false, `${pill.id} overlaps ${card.id}`);
+  }
+
+  const avail = { w: 1068, h: 708 };
+  const opened = shownBounds(lay, model, { collapseAps: true, ...HUB_FRAME });
+  const frame = { w: opened.w, h: Math.max(1, opened.h - 72) };
+  const fit = fitScale(frame, avail);
+  const scale = hubOpeningScale(frame, avail);
+  assert.ok(fit + 1e-9 >= nameFloorScale(), `opening fit ${fit} is below the 11px floor`);
+  assert.ok(Math.abs(scale - fit) < 1e-9);
+  assert.ok(CARD_NAME_FONT * scale + 1e-9 >= 11);
+  const core = lay.pos.get(model.coreSerial);
+  assert.ok(Math.abs(core.x - (opened.x + opened.w / 2)) < 24, "core is in the middle horizontally");
+  assert.ok(Math.abs(core.y - (opened.y + 72 + frame.h / 2)) < 24, "core is in the middle of the opening frame");
+
+  let accessFar = 0;
+  for (const e of model.edges) {
+    if (!e.external) continue;
+    const local = model.byId.has(e.from) ? e.from : model.byId.has(e.to) ? e.to : null;
+    if (!local || model.byId.get(local).role !== "access") continue;
+    const other = local === e.from ? e.to : e.from;
+    const p = lay.extPos.get(other);
+    assert.equal(Number.isFinite(p.x) && Number.isFinite(p.y), true);
+    const inside = p.x >= opened.x && p.x <= opened.x + opened.w && p.y >= opened.y && p.y <= opened.y + opened.h;
+    if (!inside) accessFar += 1;
+  }
+  assert.ok(accessFar > 100, "access neighbors sit outside the opening fit");
+
+  const hidden = modelForNeighborToggle(model, false);
+  const hid = layoutById("hub", hidden, { width: 1100, height: 760 });
+  let moved = false;
+  for (const n of model.nodes) {
+    const a = lay.pos.get(n.serial);
+    const b = hid.pos.get(n.serial);
+    assert.equal(Number.isFinite(b.x) && Number.isFinite(b.y), true, n.name);
+    if (a.x !== b.x || a.y !== b.y) moved = true;
+  }
+  assert.equal(moved, true, "hiding access neighbors places the blocks again");
+  assert.equal(accessChipBoxes(hidden, hid).length, 0);
+  assert.ok(accessChipBoxes(model, lay).length > 0);
+  assert.ok(hid.bounds.w * hid.bounds.h < lay.bounds.w * lay.bounds.h);
+  const hidFrame = shownBounds(hid, hidden, { collapseAps: true, ...HUB_FRAME });
+  const hidFit = fitScale({ w: hidFrame.w, h: Math.max(1, hidFrame.h - 72) }, avail);
+  assert.ok(hidFit + 1e-9 >= nameFloorScale());
+
+  const svg = renderSvg(model, lay, {
+    tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "Hub and spoke", collapseAps: true,
+  });
+  const zoomed = renderSvg(model, { ...lay, bounds: opened }, {
+    tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "Hub and spoke",
+    collapseAps: true, showPorts: true, portScale: 1,
+  });
+  const ports = [];
+  const portRe = /<g data-port-end="([^"]+)"[^>]*>([\s\S]*?)<\/g>/g;
+  let portMatch;
+  while ((portMatch = portRe.exec(zoomed))) {
+    const rect = portMatch[2].match(/<rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)"/);
+    assert.ok(rect, "port label has a background");
+    assert.match(portMatch[2], /font-size="10"/);
+    ports.push({
+      end: portMatch[1],
+      x: Number(rect[1]), y: Number(rect[2]), w: Number(rect[3]), h: Number(rect[4]),
+    });
+  }
+  assert.ok(ports.length >= 20, "zoomed hub still draws switch port labels");
+  const hiddenPorts = renderSvg(model, lay, {
+    tokens: TOKENS, mgmt: "monitor", title: "t", subtitle: "s", showPorts: false, portScale: 1,
+  });
+  assert.equal(hiddenPorts.includes("data-port-end"), false);
+  for (const lab of ports) {
+    assert.ok(lab.x >= opened.x - 0.5 && lab.y >= opened.y - 0.5, "port label clipped");
+    assert.ok(lab.x + lab.w <= opened.x + opened.w + 0.5 && lab.y + lab.h <= opened.y + opened.h + 0.5, "port label clipped");
+    for (const card of cards) {
+      assert.equal(intersects(lab, card), false, `port label covers ${card.id}`);
+    }
+  }
+  const hidSvg = renderSvg(hidden, hid, {
+    tokens: TOKENS, mgmt: "monitor", title: "t", subtitle: "s", collapseAps: true, showPorts: true, portScale: 1,
+  });
+  assert.match(hidSvg, /data-port-end=/);
+  assert.equal(hidSvg.includes("data-chip"), false);
+  assert.ok(svg.includes("BUILDING A"));
+  assert.ok(svg.includes("BUILDING H"));
+  assert.ok(svg.includes("BLDG-A-SW-01"));
+  assert.match(svg, /stroke-opacity="0\.28"/);
+  assert.ok(svg.includes("CORE-FW-01"));
+  const accessName = model.externals.find((d) => d.name.startsWith("AP-BLDG-A-")).name;
+  assert.equal(svg.includes(accessName), false);
 });
