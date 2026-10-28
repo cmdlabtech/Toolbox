@@ -1,23 +1,25 @@
 import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED } from "./model.js";
 import { largeSample } from "./large-sample.js";
-import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, fitScale, hubOpeningScale, layoutById, openingScale, orthoBend, replaceMeasure, shownBounds, writePosition } from "./layout.js";
+import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, orthoBend, replaceMeasure, shownBounds, writePosition } from "./layout.js";
 import { renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, connectionState, createVault, fetchWithAuth, mintToken, normalise, reuseSavedToken, tokenPlaceholder } from "./creds.js";
+import { UI_KEYS as KEYS, loadPref, readUiPrefs, savePref, writeUiPref } from "./prefs.js";
 
 const $ = (id) => document.getElementById(id);
 // Device data comes from the tenant; escape it before it touches innerHTML.
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const KEYS = { overrides: "ct-overrides", mgmt: "ct-mgmt", theme: "ct-theme", layout: "ct-layout", positions: "ct-positions" };
-const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
-const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+const load = (k, d) => loadPref(localStorage, k, d);
+const save = (k, v) => savePref(localStorage, k, v);
+const prefs = readUiPrefs(localStorage);
 
 const state = {
   data: null,
   overrides: load(KEYS.overrides, { coreSerial: null, switches: {} }),
   positions: load(KEYS.positions, {}),
-  layout: load(KEYS.layout, "hub"),
-  mgmt: load(KEYS.mgmt, "monitor"),
+  layout: prefs.layout,
+  mgmt: prefs.mgmt,
+  showAccessNeighbors: prefs.showAccessNeighbors,
   model: null, lay: null, svg: "",
   view: null,
   openChips: new Set(),
@@ -25,7 +27,7 @@ const state = {
 };
 if (!LAYOUTS.some((l) => l.id === state.layout)) state.layout = "hub";
 if (!state.positions || typeof state.positions !== "object" || Array.isArray(state.positions)) state.positions = {};
-document.documentElement.dataset.theme = load(KEYS.theme, "light");
+document.documentElement.dataset.theme = prefs.theme;
 
 function status(msg, err = false) { const s = $("status"); s.textContent = msg; s.className = err ? "err" : ""; }
 
@@ -119,9 +121,13 @@ connState();
 
 function persist() { save(KEYS.overrides, state.overrides); draw(); }
 
+function diagramModel() {
+  return modelForNeighborToggle(state.model, state.showAccessNeighbors);
+}
+
 function paint() {
   if (!state.model) return;
-  const model = state.model;
+  const model = diagramModel();
   const opts = mgmtOptions(state.data.switches);
   const mgmtLabel = opts.find((o) => o.id === state.mgmt)?.label ?? state.mgmt;
   const layoutLabel = LAYOUTS.find((l) => l.id === state.layout)?.label ?? "Hub and spoke";
@@ -187,7 +193,7 @@ function graphAvail(scroller, host) {
 function mountDiagram(scrollAfter) {
   const host = $("diagram");
   const lay = state.lay;
-  const model = state.model;
+  const model = diagramModel();
   if (!host || !lay?.bounds || !model) return;
   const tokens = readTokens();
   host.innerHTML = `<div class="diagram-card scrolls">${diagramHead(tokens)}<div class="diagram-scroll"></div></div>`;
@@ -251,7 +257,7 @@ function stepZoom(factor) {
   const old = state.view.scale;
   const expanded = chipsExpanded(old, state.view.openedAt);
   const frameOpts = state.lay.id === "hub" ? HUB_FRAME : {};
-  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
+  const bounds = shownBounds(state.lay, diagramModel(), { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
   const fit = fitScale(cropped(bounds), avail);
   const next = Math.min(Math.max(old * factor, Math.min(fit, state.view.openedAt) * 0.5), Math.max(state.view.openedAt * 8, fit));
   state.view.scale = next;
@@ -266,7 +272,7 @@ function fitView() {
   const avail = graphAvail(scroller, $("diagram"));
   const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
   const frameOpts = state.lay.id === "hub" ? HUB_FRAME : {};
-  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
+  const bounds = shownBounds(state.lay, diagramModel(), { collapseAps: !expanded, openChips: state.openChips, ...frameOpts });
   state.view.scale = fitScale(cropped(bounds), avail);
   state.view.user = true;
   mountDiagram({ left: 0, top: 0 });
@@ -382,6 +388,12 @@ $("layoutSel").addEventListener("change", (e) => {
 });
 $("mgmtSel").addEventListener("change", (e) => { state.mgmt = e.target.value; save(KEYS.mgmt, state.mgmt); draw(); });
 $("refreshBtn").addEventListener("click", refresh);
+$("showAccessNeighbors").checked = state.showAccessNeighbors;
+$("showAccessNeighbors").addEventListener("change", (e) => {
+  state.showAccessNeighbors = e.target.checked;
+  writeUiPref(localStorage, "showAccessNeighbors", state.showAccessNeighbors);
+  draw();
+});
 $("themeBtn").addEventListener("click", () => {
   const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = t; save(KEYS.theme, t); draw();
