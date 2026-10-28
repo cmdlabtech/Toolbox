@@ -195,6 +195,46 @@ export function linkLeavesBucket(lay, fromN, toN) {
   return fromN.building !== toN.building;
 }
 
+/**
+ * External devices whose only switch attachments are access-layer switches.
+ * A device that also links to the district core or a building core is kept.
+ */
+export function accessOnlyNeighborIds(model) {
+  const onAccess = new Set();
+  const onUplink = new Set();
+  for (const e of model.edges) {
+    if (!e.external) continue;
+    const local = model.byId.has(e.from) ? e.from : model.byId.has(e.to) ? e.to : null;
+    if (!local) continue;
+    const other = local === e.from ? e.to : e.from;
+    if (model.byId.get(local)?.role === "access") onAccess.add(other);
+    else onUplink.add(other);
+  }
+  const drop = new Set();
+  for (const id of onAccess) if (!onUplink.has(id)) drop.add(id);
+  return drop;
+}
+
+/**
+ * Copy of the model for layout and drawing with access-only LLDP neighbors removed.
+ * Switch nodes and switch-to-switch edges are unchanged. Returns the same model
+ * when there is nothing to drop.
+ */
+export function withoutAccessNeighbors(model) {
+  const drop = accessOnlyNeighborIds(model);
+  if (!drop.size) return model;
+  return {
+    ...model,
+    edges: model.edges.filter((e) => !drop.has(e.from) && !drop.has(e.to)),
+    externals: (model.externals ?? []).filter((d) => !drop.has(d.serial)),
+  };
+}
+
+/** On by default. Off passes a model the layouts place without those neighbors. */
+export function modelForNeighborToggle(model, showAccessNeighbors) {
+  return showAccessNeighbors === false ? withoutAccessNeighbors(model) : model;
+}
+
 export function chipMetrics(count) {
   const text = apChipLabel(count);
   const w = Math.max(72, Math.ceil(text.length * 7.4) + 18);
