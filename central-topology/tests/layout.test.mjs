@@ -5,7 +5,7 @@ import { buildModel, parseOverrides } from "../site/js/model.js";
 import { jsonExport } from "../site/js/export.js";
 import { renderSvg } from "../site/js/render.js";
 import {
-  GEOM, LAYOUTS, applyPositionOverrides, clearPosition, displayScale, labelBox, layout, layoutById, orthoBend, writePosition,
+  GEOM, LAYOUTS, applyPositionOverrides, clearPosition, coreScroll, displayScale, fitScale, labelBox, layout, layoutById, openingScale, orthoBend, readableScale, writePosition,
 } from "../site/js/layout.js";
 
 const data = await topologyFromFixtures();
@@ -211,6 +211,28 @@ test("mock trees have no crossing links and no link through another node", () =>
       }
     }
   }
+});
+
+test("opening scale fits only while labels stay at the readable floor", () => {
+  const avail = { w: 1068, h: 708 };
+  const reference = layoutById("tree-lr", model).bounds;
+  const floor = readableScale(avail, reference);
+  assert.ok(floor > 0);
+  const roomy = { w: 400, h: 280 };
+  const roomyFit = fitScale(roomy, avail);
+  assert.ok(roomyFit >= floor);
+  assert.ok(Math.abs(openingScale(roomy, avail, reference) - roomyFit) < 1e-9);
+  const huge = { w: 9000, h: 7000 };
+  const hugeFit = fitScale(huge, avail);
+  assert.ok(hugeFit < floor);
+  assert.ok(Math.abs(openingScale(huge, avail, reference) - floor) < 1e-9);
+  const core = { x: 40, y: -20 };
+  const frame = { x: -2000, y: -1500, w: 4000, h: 3000 };
+  const scroll = coreScroll(core, frame, floor, avail);
+  const midX = (core.x - frame.x) * floor - scroll.left;
+  const midY = (core.y - frame.y) * floor - scroll.top;
+  assert.ok(Math.abs(midX - avail.w / 2) < 1e-6);
+  assert.ok(Math.abs(midY - avail.h / 2) < 1e-6);
 });
 
 test("display scale uses the floor only when fit-to-canvas would drop below it", () => {

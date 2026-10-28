@@ -1,5 +1,6 @@
 import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED } from "./model.js";
-import { LAYOUTS, applyPositionOverrides, clearPosition, displayScale, layoutById, orthoBend, writePosition } from "./layout.js";
+import { largeSample } from "./large-sample.js";
+import { LAYOUTS, applyPositionOverrides, chipsExpanded, clearPosition, fitScale, layoutById, openingScale, orthoBend, shownBounds, writePosition } from "./layout.js";
 import { renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, apiRequest, createVault, mintToken, normalise, tokenValid } from "./creds.js";
@@ -18,6 +19,8 @@ const state = {
   layout: load(KEYS.layout, "hub"),
   mgmt: load(KEYS.mgmt, "monitor"),
   model: null, lay: null, svg: "",
+  view: null,
+  openChips: new Set(),
 };
 if (!LAYOUTS.some((l) => l.id === state.layout)) state.layout = "hub";
 if (!state.positions || typeof state.positions !== "object" || Array.isArray(state.positions)) state.positions = {};
@@ -49,6 +52,16 @@ function connState() {
 async function refresh() {
   status("Loading topology…");
   try {
+    if (new URLSearchParams(location.search).get("sample") === "large") {
+      const sample = largeSample();
+      state.data = sample;
+      const saved = state.overrides.coreSerial;
+      const known = sample.switches.some((s) => s.serial === saved);
+      if (!known) state.overrides = { ...state.overrides, coreSerial: sample.coreSerial };
+      $("mockBadge").hidden = false;
+      draw();
+      return;
+    }
     const creds = await activeCreds();
     const { url, init } = apiRequest(apiBase, "/api/topology?include=vlans,interfaces", creds);
     const resp = await fetch(url, init);
@@ -153,28 +166,51 @@ function legendHtml(T) {
   ].join("")}</div>`;
 }
 
-function mountDiagram() {
+function diagramHead(tokens) {
+  return `<div class="diagram-head"><div><div class="diagram-title">Switch topology</div><div class="diagram-sub">${esc(state.subtitle ?? "")}</div></div><div class="diagram-tools"><button type="button" id="zoomOut" aria-label="Zoom out">−</button><button type="button" id="zoomFit">Fit</button><button type="button" id="zoomIn" aria-label="Zoom in">+</button></div>${legendHtml(tokens)}</div>`;
+}
+
+function cropped(bounds) {
+  return { ...bounds, h: Math.max(1, bounds.h - HEADER_BAND) };
+}
+
+function graphAvail(scroller, host) {
+  const pane = paneSize(host);
+  return {
+    w: scroller.clientWidth >= 160 ? scroller.clientWidth : pane.w,
+    h: scroller.clientHeight >= 160 ? scroller.clientHeight : Math.max(200, pane.h - 84),
+  };
+}
+
+function mountDiagram(scrollAfter) {
   const host = $("diagram");
   const lay = state.lay;
   const model = state.model;
-  if (!host || !lay?.bounds || !model || !state.svg) return;
-  const avail = paneSize(host);
-  const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
-  const scale = displayScale(lay.bounds, avail, reference);
-  const fullW = lay.bounds.w * scale;
-  const fullH = lay.bounds.h * scale;
-  const overflows = fullW > avail.w + 1 || fullH > avail.h + 1;
+  if (!host || !lay?.bounds || !model) return;
   const tokens = readTokens();
-  const head = overflows
-    ? `<div class="diagram-head"><div><div class="diagram-title">Switch topology</div><div class="diagram-sub">${esc(state.subtitle ?? "")}</div></div>${legendHtml(tokens)}</div>`
-    : "";
-  host.innerHTML = `<div class="diagram-card${overflows ? " scrolls" : ""}">${head}<div class="diagram-scroll">${state.svg}</div></div>`;
-  const svg = host.querySelector("svg");
+  host.innerHTML = `<div class="diagram-card scrolls">${diagramHead(tokens)}<div class="diagram-scroll"></div></div>`;
+  const scroller = host.querySelector(".diagram-scroll");
+  const avail = graphAvail(scroller, host);
+  const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
+  if (!state.view) {
+    const opened = shownBounds(lay, model, { collapseAps: true, openChips: state.openChips });
+    const scale = openingScale(cropped(opened), avail, cropped(reference));
+    state.view = { scale, openedAt: scale, user: false };
+    if (scrollAfter === undefined) scrollAfter = "core";
+  }
+  const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
+  const bounds = shownBounds(lay, model, { collapseAps: !expanded, openChips: state.openChips });
+  scroller.innerHTML = renderSvg(model, { ...lay, bounds }, {
+    tokens, mgmt: state.mgmt, title: "Switch topology", subtitle: state.subtitle,
+    collapseAps: !expanded, openChips: state.openChips,
+  });
+  const svg = scroller.querySelector("svg");
   if (!svg) return;
-  const { x, y, w, h } = lay.bounds;
-  let drawW = fullW;
-  let drawH = fullH;
-  if (overflows && h > HEADER_BAND) {
+  const { x, y, w, h } = bounds;
+  const scale = state.view.scale;
+  let drawW = w * scale;
+  let drawH = h * scale;
+  if (h > HEADER_BAND) {
     svg.setAttribute("viewBox", `${x} ${y + HEADER_BAND} ${w} ${h - HEADER_BAND}`);
     drawH = (h - HEADER_BAND) * scale;
   }
@@ -182,7 +218,43 @@ function mountDiagram() {
   svg.style.height = `${Math.max(1, Math.round(drawH))}px`;
   svg.style.maxWidth = "none";
   svg.style.maxHeight = "none";
-  centerOpeningScroll();
+  if (drawW <= avail.w + 1 && drawH <= avail.h + 1) {
+    scroller.style.display = "grid";
+    scroller.style.placeItems = "center";
+  }
+  if (scrollAfter === "core") centerOpeningScroll();
+  else if (scrollAfter && typeof scrollAfter === "object") {
+    scroller.scrollLeft = Math.max(0, scrollAfter.left);
+    scroller.scrollTop = Math.max(0, scrollAfter.top);
+  }
+}
+
+function stepZoom(factor) {
+  if (!state.view || !state.lay || !state.model) return;
+  const scroller = document.querySelector("#diagram .diagram-scroll");
+  const avail = graphAvail(scroller, $("diagram"));
+  const cx = (scroller?.scrollLeft ?? 0) + avail.w / 2;
+  const cy = (scroller?.scrollTop ?? 0) + avail.h / 2;
+  const old = state.view.scale;
+  const expanded = chipsExpanded(old, state.view.openedAt);
+  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips });
+  const fit = fitScale(cropped(bounds), avail);
+  const next = Math.min(Math.max(old * factor, Math.min(fit, state.view.openedAt) * 0.5), Math.max(state.view.openedAt * 8, fit));
+  state.view.scale = next;
+  state.view.user = true;
+  const ratio = next / old;
+  mountDiagram({ left: cx * ratio - avail.w / 2, top: cy * ratio - avail.h / 2 });
+}
+
+function fitView() {
+  if (!state.view || !state.lay || !state.model) return;
+  const scroller = document.querySelector("#diagram .diagram-scroll");
+  const avail = graphAvail(scroller, $("diagram"));
+  const expanded = chipsExpanded(state.view.scale, state.view.openedAt);
+  const bounds = shownBounds(state.lay, state.model, { collapseAps: !expanded, openChips: state.openChips });
+  state.view.scale = fitScale(cropped(bounds), avail);
+  state.view.user = true;
+  mountDiagram({ left: 0, top: 0 });
 }
 
 // Size the SVG in px. The width and height attributes on the export string
@@ -204,10 +276,28 @@ function centerOpeningScroll() {
   scroller.scrollLeft += (nb.left + nb.width / 2) - (sb.left + sb.width / 2);
   scroller.scrollTop += (nb.top + nb.height / 2) - (sb.top + sb.height / 2);
 }
-window.addEventListener("resize", () => fitDiagram());
+window.addEventListener("resize", () => {
+  if (state.view && !state.view.user) state.view = null;
+  fitDiagram();
+});
+$("diagram").addEventListener("click", (ev) => {
+  if (ev.target.closest?.("#zoomIn")) { stepZoom(1.25); return; }
+  if (ev.target.closest?.("#zoomOut")) { stepZoom(1 / 1.25); return; }
+  if (ev.target.closest?.("#zoomFit")) { fitView(); return; }
+  const chip = ev.target.closest?.("[data-chip]");
+  if (!chip || !state.openChips) return;
+  const scroller = document.querySelector("#diagram .diagram-scroll");
+  const keep = scroller ? { left: scroller.scrollLeft, top: scroller.scrollTop } : undefined;
+  const id = chip.getAttribute("data-chip");
+  if (state.openChips.has(id)) state.openChips.delete(id);
+  else state.openChips.add(id);
+  mountDiagram(keep);
+});
 
 function draw() {
   if (!state.data) return;
+  state.view = null;
+  state.openChips = new Set();
   const model = (state.model = buildModel(state.data, state.overrides));
   const opts = mgmtOptions(state.data.switches);
   if (!opts.some((o) => o.id === state.mgmt)) state.mgmt = opts[0]?.id ?? "monitor";
