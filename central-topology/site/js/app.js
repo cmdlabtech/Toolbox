@@ -79,7 +79,7 @@ async function refresh() {
       if (!known) state.overrides = { ...state.overrides, coreSerial: sample.coreSerial };
       $("mockBadge").hidden = false;
       draw();
-      return;
+      return true;
     }
     const result = await fetchWithAuth(vault.get(), { apiBase });
     if (result.creds) vault.save(result.creds);
@@ -87,14 +87,16 @@ async function refresh() {
     $("mockBadge").hidden = !result.body.mock;
     draw();
     connState();
+    return true;
   } catch (e) {
     if (e?.creds) vault.save(e.creds);
     connState();
-    const panelOpen = !$("credsPanel").hidden;
+    const panelOpen = $("credsPanel").open;
     const typing = panelOpen && [$("cToken"), $("cSecret"), $("cId"), $("cWorkspace")].some((el) => el.value.trim());
     if (e?.reopen && !(panelOpen && typing)) togglePanel(true, e.message);
     else if (panelOpen) cMsg(e.message, true);
     status(`Could not load topology: ${e.message}`, true);
+    return false;
   }
 }
 
@@ -116,12 +118,35 @@ function fillPanel() {
   $("cRemember").checked = vault.remembered();
   showMethod();
 }
-function togglePanel(open = $("credsPanel").hidden, message = "") {
-  $("credsPanel").hidden = !open; $("credsBtn").setAttribute("aria-expanded", String(open));
-  if (open) { fillPanel(); cMsg(message, Boolean(message)); }
+// Modal dialog: showModal() makes the page behind it inert (focus stays
+// inside) and Esc closes it. It opens under the header so the connection
+// line and token countdown stay in view.
+const panel = $("credsPanel");
+function togglePanel(open = !panel.open, message = "") {
+  if (open) {
+    fillPanel(); cMsg(message, Boolean(message));
+    panel.style.setProperty("--creds-top", `${Math.round(document.querySelector("header").getBoundingClientRect().bottom)}px`);
+    if (!panel.open) panel.showModal();
+  } else if (panel.open) panel.close();
+  $("credsBtn").setAttribute("aria-expanded", String(panel.open));
 }
+panel.addEventListener("close", () => { $("credsBtn").setAttribute("aria-expanded", "false"); $("credsBtn").focus(); });
+// A click on the backdrop lands on the dialog element itself, outside its box.
+panel.addEventListener("click", (e) => {
+  const r = panel.getBoundingClientRect();
+  if (e.target === panel && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) togglePanel(false);
+});
+// showModal() leaves the browser's own UI in the Tab order; wrap Tab inside the dialog.
+panel.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab") return;
+  const f = [...panel.querySelectorAll("button, input, select")].filter((el) => !el.disabled && el.getClientRects().length);
+  const first = f[0], last = f.at(-1);
+  if (e.shiftKey && (document.activeElement === first || !panel.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
 $("credsBtn").addEventListener("click", () => togglePanel());
 $("cClose").addEventListener("click", () => togglePanel(false));
+$("cX").addEventListener("click", () => togglePanel(false));
 for (const r of document.querySelectorAll("input[name=cMethod]")) r.addEventListener("change", showMethod);
 $("cRemember").addEventListener("change", () => { const c = vault.get(); if (c) { vault.save(c, $("cRemember").checked); connState(); } });
 $("cConnect").addEventListener("click", async () => {
@@ -137,7 +162,7 @@ $("cConnect").addEventListener("click", async () => {
     vault.save(ready, $("cRemember").checked);
     $("cSecret").value = ""; $("cToken").value = "";
     connState(); cMsg("Connected. Loading live data…");
-    await refresh();
+    if (await refresh()) togglePanel(false);
   } catch (e) { cMsg(e.message, true); }
 });
 $("cForget").addEventListener("click", () => {
@@ -392,8 +417,6 @@ if (typeof ResizeObserver === "function") {
   const watch = new ResizeObserver(() => noteContainer());
   watch.observe($("diagram"));
 }
-$("credsBtn").addEventListener("click", () => noteContainer());
-$("cClose").addEventListener("click", () => noteContainer());
 // Structured hover: a switch or link lights its own links and dims the rest.
 // Port and LAG names are in the tooltips.
 {
@@ -694,4 +717,6 @@ $("stClear").addEventListener("click", async () => {
 }
 loadStencils().then((list) => { if (list.length) { setStencils(list); draw(); } stencilState(); }).catch(() => stencilState());
 
+// First visit without credentials: open sign-in straight away (mock data loads behind it).
+if (!vault.get() && new URLSearchParams(location.search).get("sample") !== "large") togglePanel(true);
 refresh();

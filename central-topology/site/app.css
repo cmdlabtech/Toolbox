@@ -65,8 +65,14 @@ aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; co
 .warnings { font-size: 12px; color: var(--warn); }
 .conn { font-size: 12px; color: var(--muted); }
 .conn.live { color: var(--node-access); font-weight: 600; }
-.creds { padding: 14px 20px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
-.creds h2 { font-size: 14px; margin: 0 0 4px; }
+/* Sign-in dialog: opens just under the header (--creds-top is set on open),
+   so the connection line and countdown stay readable above the scrim. */
+.creds { padding: 14px 20px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--fg); box-shadow: var(--shadow-float); inline-size: min(880px, calc(100vw - 24px)); max-inline-size: none; max-block-size: calc(100dvh - var(--creds-top, 64px) - 12px); margin: var(--creds-top, 64px) auto 0; overflow: auto; }
+.creds::backdrop { background: var(--scrim); }
+.creds-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.creds h2 { font-size: 14px; margin: 0; }
+.creds button.icon { inline-size: 32px; block-size: 32px; padding: 0; font-size: 18px; line-height: 1; }
+.creds :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .creds .note { margin: 0 0 12px; font-size: 12px; color: var(--muted); max-width: 820px; }
 .creds .fields { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; }
 .creds label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
@@ -92,6 +98,8 @@ aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; co
   #diagram { padding: 8px; }
   aside { border-left: 0; border-top: 1px solid var(--border); }
   .creds { padding: 12px; }
+  .creds .method { flex-wrap: wrap; }
+  .creds .actions { flex-wrap: wrap; }
   .creds label { flex: 1 1 100%; }
   .creds input[type=text], .creds input[type=password] { min-width: 0; width: 100%; }
 }

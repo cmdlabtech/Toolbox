@@ -19,7 +19,7 @@
     <span id="mockBadge" class="badge" hidden>Mock data</span>
     <span class="spacer"></span>
     <span id="connState" class="conn" aria-live="polite">Not connected</span>
-    <button id="credsBtn" type="button" aria-expanded="false" aria-controls="credsPanel">Credentials</button>
+    <button id="credsBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="credsPanel">Credentials</button>
     <label class="check"><input id="showLldpNeighbors" type="checkbox"> Show LLDP neighbors</label>
     <label class="check"><input id="portsToggle" type="checkbox" checked> Show ports</label>
     <button id="themeBtn" type="button">Theme</button>
@@ -47,8 +47,11 @@
       <span id="stState" class="st-state" role="status"></span>
     </div>
   </div>
-  <section id="credsPanel" class="creds" hidden aria-labelledby="credsTitle">
-    <h2 id="credsTitle">Central credentials</h2>
+  <dialog id="credsPanel" class="creds" aria-labelledby="credsTitle">
+    <div class="creds-head">
+      <h2 id="credsTitle">Central credentials</h2>
+      <button id="cX" class="icon" type="button" aria-label="Close">×</button>
+    </div>
     <p class="note">Credentials stay in this browser. They are sent only in request headers to HPE GreenLake and new Central (through a stateless pass-through that stores and logs nothing). Without credentials the page shows mock data.</p>
     <div class="fields">
       <label>Cluster <select id="cBase"></select></label>
@@ -71,7 +74,7 @@
       <button id="cClose" type="button">Close</button>
       <span id="cMsg" role="status"></span>
     </div>
-  </section>
+  </dialog>
   <div id="status" role="status">Loading…</div>
   <main>
     <div id="diagram"></div>
