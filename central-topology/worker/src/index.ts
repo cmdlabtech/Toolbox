@@ -90,11 +90,14 @@ async function topology(c: Central, mock: boolean, include: Set<string>, secrets
 async function tokenRoute(request: Request): Promise<Response> {
   const type = request.headers.get("Content-Type") ?? "";
   if (!type.includes("application/json")) throw new CentralError("Send the client ID and secret as a JSON body.", 415);
-  const body = (await request.json().catch(() => null)) as { clientId?: unknown; clientSecret?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { clientId?: unknown; clientSecret?: unknown; workspaceId?: unknown } | null;
   const id = typeof body?.clientId === "string" ? body.clientId.trim() : "";
   const secret = typeof body?.clientSecret === "string" ? body.clientSecret : "";
   if (!id || !secret) throw new CentralError("clientId and clientSecret are required.", 400);
-  return json(await exchangeToken(id, secret), 200, "live");
+  const ws = body?.workspaceId;
+  if (ws != null && typeof ws !== "string") throw new CentralError("workspaceId must be a string.", 400);
+  // exchangeToken checks the workspace pattern before any outbound call.
+  return json(await exchangeToken(id, secret, ws ?? null), 200, "live");
 }
 
 async function api(request: Request, env: Env, url: URL): Promise<Response> {

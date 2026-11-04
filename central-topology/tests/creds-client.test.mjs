@@ -71,7 +71,7 @@ test("token mint: direct to GreenLake first, Worker pass-through only on network
   assert.deepEqual(seen, [SSO_URL, "https://api.example/api/token"]);
   assert.equal(fb.token, TOKEN);
 
-  await assert.rejects(mintToken(creds, { fetchImpl: async () => Response.json({ error: "unauthorized_request" }, { status: 401 }) }), /unauthorized_request/);
+  await assert.rejects(mintToken(creds, { fetchImpl: async () => Response.json({ error: "unauthorized_request" }, { status: 401 }) }), (e) => e.message === CLIENT_REJECTED);
 });
 
 test("token mint: documented request shape and clear credential-type errors", async () => {
@@ -89,8 +89,8 @@ test("token mint: documented request shape and clear credential-type errors", as
   for (const status of [400, 401]) {
     await assert.rejects(
       mintToken(creds, { fetchImpl: async () => Response.json({ error: "unauthorized_request" }, { status }) }),
-      (e) => e.message.startsWith(CLIENT_REJECTED) && /personal API client/.test(e.message) && /Bearer token/.test(e.message));
+      (e) => e.message === CLIENT_REJECTED && /Workspace ID/.test(e.message) && !e.message.includes("sec-FAKE"));
   }
-  await assert.rejects(mintToken(creds, { fetchImpl: async () => new Response("down", { status: 503 }) }), /Token request failed \(HTTP 503\)/);
-  assert.throws(() => normalise({ method: "client", baseUrl: BASE, clientId: "a" }), /personal API client/);
+  await assert.rejects(mintToken(creds, { fetchImpl: async () => new Response("down", { status: 503 }) }), /could not issue a token right now \(HTTP 503\)/);
+  assert.throws(() => normalise({ method: "client", baseUrl: BASE, clientId: "a" }), /Enter the client secret/);
 });

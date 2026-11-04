@@ -3,7 +3,7 @@ import { largeSample } from "./large-sample.js";
 import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, structuredOpeningScale, structuredOpeningScroll, structuredScaleFloor, writePosition } from "./layout.js";
 import { contentBounds, renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
-import { CLUSTERS, connectionState, createVault, fetchWithAuth, mintToken, normalise, reuseSavedToken, tokenPlaceholder } from "./creds.js";
+import { CLUSTERS, connectionState, createVault, fetchWithAuth, formatExpiry, mintToken, normalise, renewDue, reuseSavedToken, tokenPlaceholder, tokenValid } from "./creds.js";
 import { UI_KEYS as KEYS, loadPref, readUiPrefs, savePref, writeUiPref } from "./prefs.js";
 import { createRegistry, EMPTY_REGISTRY } from "./stencils.js";
 import { importStencils } from "./stencil/vssx.js";
@@ -48,6 +48,26 @@ function connState() {
   el.className = view.live ? "conn live" : "conn";
 }
 
+// Silent renewal: while the tab is visible, re-mint a client-credential token
+// once 80% of its lifetime has passed, and keep the countdown current.
+let renewing = null;
+function renewTick() {
+  if (document.visibilityState !== "visible") return;
+  const c = vault.get();
+  if (!renewing && renewDue(c)) {
+    renewing = mintToken(c, { apiBase })
+      .then((next) => { if (vault.get()?.clientId === c.clientId) vault.save(next); })
+      .catch((e) => {
+        const left = tokenValid(c) ? ` The current token works until ${formatExpiry(c.expiresAt)}.` : "";
+        status(`Could not renew the token: ${e.message}${left}`, true);
+      })
+      .finally(() => { renewing = null; connState(); });
+  }
+  connState();
+}
+setInterval(renewTick, 15_000);
+document.addEventListener("visibilitychange", renewTick);
+
 async function refresh() {
   status("Loading topology…");
   try {
@@ -71,7 +91,7 @@ async function refresh() {
     if (e?.creds) vault.save(e.creds);
     connState();
     const panelOpen = !$("credsPanel").hidden;
-    const typing = panelOpen && [$("cToken"), $("cSecret"), $("cId")].some((el) => el.value.trim());
+    const typing = panelOpen && [$("cToken"), $("cSecret"), $("cId"), $("cWorkspace")].some((el) => el.value.trim());
     if (e?.reopen && !(panelOpen && typing)) togglePanel(true, e.message);
     else if (panelOpen) cMsg(e.message, true);
     status(`Could not load topology: ${e.message}`, true);
@@ -89,6 +109,7 @@ function fillPanel() {
   $("cBase").innerHTML = CLUSTERS.map((k) => `<option value="${k.url}"${c?.baseUrl === k.url ? " selected" : ""}>${k.label}</option>`).join("");
   document.querySelector(`input[name=cMethod][value=${c?.method ?? "client"}]`).checked = true;
   $("cId").value = c?.clientId ?? "";
+  $("cWorkspace").value = c?.workspaceId ?? "";
   $("cSecret").value = ""; $("cToken").value = "";
   $("cSecret").placeholder = c?.clientSecret ? "(saved in this browser)" : "";
   $("cToken").placeholder = tokenPlaceholder(c);
@@ -107,7 +128,7 @@ $("cConnect").addEventListener("click", async () => {
   const prev = vault.get();
   try {
     const creds = normalise({
-      method: method(), baseUrl: $("cBase").value, clientId: $("cId").value,
+      method: method(), baseUrl: $("cBase").value, clientId: $("cId").value, workspaceId: $("cWorkspace").value,
       clientSecret: $("cSecret").value || (prev?.clientId === $("cId").value.trim() ? prev?.clientSecret : ""),
       token: method() === "token" ? reuseSavedToken($("cToken").value, prev) : "",
     });

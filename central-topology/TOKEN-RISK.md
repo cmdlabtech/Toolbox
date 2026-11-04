@@ -7,15 +7,19 @@ The page (Cloudflare Pages) and the Worker can therefore be public without expos
 ## How credentials flow
 
 1. **Entry.** The Credentials panel takes a new Central cluster plus either:
-   - the client ID and secret of a new Central personal API client (OAuth2 client credentials), or
+   - the client ID and secret of an HPE GreenLake personal API client (OAuth2 client credentials), plus an optional Workspace ID for GreenLake platform (GLP) clients, or
    - a bearer token.
 2. **Storage, browser only.**
    - `sessionStorage` (key `ct-auth`) by default. It clears when the tab closes.
    - **Remember on this device** moves the entry to `localStorage` and removes it from `sessionStorage`.
    - **Forget** removes it from both, plus the in-memory copy, and the page returns to mock data.
-3. **Token.** The browser POSTs the client ID and secret straight to `https://sso.common.cloud.hpe.com/as/token.oauth2`, which allows CORS (see `docs/API-NOTES.md`). It keeps the returned token and its expiry. If Central rejects that token, the browser mints one new token and retries the data request once.
-   - If that direct call fails at the network or CORS level, the browser falls back to `POST /api/token` on the Worker.
-   - The fallback takes a JSON body only, relays it once, and returns the token to the browser with `Cache-Control: no-store`.
+3. **Token.** The browser POSTs the client ID and secret straight to HPE (see `docs/API-NOTES.md`):
+   - no Workspace ID: `https://sso.common.cloud.hpe.com/as/token.oauth2`
+   - with a Workspace ID: `https://global.api.greenlake.hpe.com/authorization/v2/oauth2/<workspace-id>/token` first, then the SSO endpoint. The one that works is remembered.
+
+   It keeps the token, the time it was issued and its expiry. While the tab is visible it mints a new token at 80% of the lifetime, and the status line counts down to that point. A hidden tab does not renew; the next data request renews first instead. If Central rejects a token, the browser mints one new token and retries the data request once.
+   - If the direct call fails at the network or CORS level, the browser falls back to `POST /api/token` on the Worker.
+   - The fallback takes a JSON body only, relays it once, and returns the token to the browser with `Cache-Control: no-store`. It builds only the two token URLs above, and a Workspace ID that fails `^[A-Za-z0-9-]{8,64}$` gets 400 before any outbound call.
 4. **Data.** The new Central API does not allow CORS, so the browser calls the Worker with:
    - `Authorization: Bearer <token>`
    - `X-Central-Base: https://<cluster>.api.central.arubanetworks.com`
@@ -36,6 +40,8 @@ The page (Cloudflare Pages) and the Worker can therefore be public without expos
 - **No open proxy:** `X-Central-Base` must be `https://<cluster>.api.central.arubanetworks.com` (or `.com.cn`). Anything else gets 400 before any outbound call.
 - **No credentials:** mock data with `MOCK=1` (the default), or a clear 401 with `MOCK=0`.
 - **CORS:** the credential headers are allowed only for origins in `ALLOWED_ORIGINS`.
+- **Token URL allowlist:** `/api/token` calls only the SSO URL or the GLP URL for a well-formed Workspace ID. A bad Workspace ID gets 400 with no outbound call, and nothing is logged.
+- **CSP:** `site/_headers` sets `script-src 'self'`, `object-src 'none'` and `frame-ancestors 'none'`, and `connect-src` lists every host the page calls (the HPE token hosts plus each `config.js` Worker URL). The page has no inline scripts.
 
 `tests/creds-client.test.mjs` and `tests/creds-token-expiry.test.mjs` check the browser side:
 - sessionStorage is the default
@@ -49,18 +55,30 @@ The page (Cloudflare Pages) and the Worker can therefore be public without expos
 - the bearer placeholder is shown only while the saved token is still valid
 - a bearer 401 clears the token and asks for a new one; a client 401 mints once and retries once
 
+`tests/creds-glp-renew.test.mjs` checks:
+- the Workspace ID is optional, trimmed, and checked before anything is sent
+- with a Workspace ID, GLP is tried first, then Central, and the working endpoint is remembered
+- the GLP Worker fallback sends the Workspace ID in the JSON body only
+- rejection messages say what to fix (secret, Workspace ID, or a reset secret) and never contain the secret
+- renewal is due at 80% of the lifetime; the status line counts down; bearer mode shows the expiry and a hint
+- a still-valid token is renewed before a request once due, and is kept if HPE is unavailable
+
 ## Residual risks
 
 | Risk | Notes and mitigations |
 |---|---|
 | **Credentials at rest in the browser** | A remembered client secret or token sits in `localStorage` on that device. Leave Remember unticked on shared machines. Forget clears it. Prefer a read-only API client so a leaked secret cannot change configuration |
-| **Cross-site scripting** | Script injected into the page could read the stored credentials. The page has no third-party scripts, and device data is escaped before display. A strict Content-Security-Policy on Pages (`script-src 'self'`) is recommended before going live |
+| **Cross-site scripting** | Script injected into the page could read the stored credentials. The page has no third-party scripts, and device data is escaped before display. `site/_headers` sets a CSP with `script-src 'self'` and a `connect-src` allowlist, so injected markup cannot run inline script or send data to other hosts. `style-src` keeps `'unsafe-inline'` for generated SVG style attributes |
 | **Credentials in transit through the Worker** | The token (and, in the fallback only, the client secret) passes through Cloudflare's edge for one request. It is not stored, logged or cached by this code. Cloudflare platform logs record URLs, not headers, and credentials are never placed in URLs |
-| **Token lifetime** | Tokens from a new Central personal API client last about 2 hours (`expires_in` 7199). Tokens from a GreenLake platform (GLP) API client last 15 minutes. HPE issues no refresh token. Client-credential sign-in mints one new token and retries once when a token expires or is rejected. A pasted bearer token that is a JWT stores its `exp` claim (the payload is decoded locally, with no signature check and no network call). Bearer sign-in does not reuse an expired or rejected token, including one remembered in localStorage; the panel asks for a new paste |
+| **Token lifetime** | Tokens from a new Central personal API client last about 2 hours (`expires_in` 7199). Tokens from a GreenLake platform (GLP) API client last 15 minutes (`expires_in` 899). HPE issues no refresh token, but the client secret stays valid until it is reset or deleted, so client-credential sign-in renews silently at 80% of the lifetime while the tab is visible, renews before a request once due, and mints once more when a token is rejected. Resetting the secret in GreenLake invalidates its tokens; the page then says the secret was probably reset. A pasted bearer token that is a JWT stores its `exp` claim (the payload is decoded locally, with no signature check and no network call). Bearer sign-in does not reuse an expired or rejected token, including one remembered in localStorage; the panel asks for a new paste |
 | **Public Worker as a relay** | The Worker forwards only to new Central cluster hosts and only read-only GETs, so it cannot be used as a general proxy. Rate limiting (a Workers rate-limit binding or WAF rule on `/api/*`) is still advisable to protect the Central API quota |
 | **Over-privileged clients** | Users should create a new Central personal API client with the narrowest read-only role for Central monitoring |
 
 ## Still open
+
+- A real GLP token mint (HTTP 200) has not been run; the success path is tested with mocks only.
+- The Workspace ID pattern `^[A-Za-z0-9-]{8,64}$` is inferred, not documented. If real IDs fall outside it, widen it in `site/js/creds.js` and `worker/src/central.ts` together.
+- `site/_headers` was confirmed under `wrangler dev --assets`; that Cloudflare Pages serves it in production is expected but unverified until deploy.
 
 - Whether a public Toolbox listing is acceptable for this page, or whether it should sit behind Cloudflare Access anyway as defense in depth.
 - Whether to ship with `MOCK=0` in production (401 without credentials) or keep the mock demo for visitors.

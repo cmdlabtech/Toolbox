@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  SSO_URL, connectionState, fetchWithAuth, formatExpiry, normalise, readJwtExp, reuseSavedToken, tokenPlaceholder, tokenValid,
+  BEARER_HINT, CLIENT_REJECTED, SSO_URL, connectionState, fetchWithAuth, formatExpiry, normalise, readJwtExp, reuseSavedToken, tokenPlaceholder, tokenValid,
 } from "../site/js/creds.js";
 
 const BASE = "https://de1.api.central.arubanetworks.com";
@@ -62,7 +62,7 @@ test("Connect does not reuse an expired, cleared, or legacy saved token", () => 
   const expired = bearer(past);
   assert.throws(
     () => reuseSavedToken("", expired, NOW),
-    (e) => e.message === `Paste a new bearer token (the saved one expired at ${formatExpiry(past)}).` && !e.message.includes(expired.token),
+    (e) => e.message === `Paste a new bearer token (the saved one expired at ${formatExpiry(past)}). ${BEARER_HINT}` && !e.message.includes(expired.token),
   );
   assert.throws(() => reuseSavedToken("   ", { ...expired, expiresAt: null }, NOW), /saved one expired at /);
   assert.equal(tokenValid({ ...expired, expiresAt: null }, NOW), false, "a remembered JWT with no stored expiry is still expired");
@@ -112,7 +112,7 @@ test("bearer placeholder only while a saved token is still valid", () => {
 
   const view = connectionState(good, true, NOW);
   assert.equal(view.live, true);
-  assert.equal(view.text, `Live: de1 (remembered), expires ${formatExpiry(future)}`);
+  assert.equal(view.text, `Live: de1 (remembered), token expires in 2 h 0 min (${formatExpiry(future)})`);
   assert.equal(connectionState(bearer(NOW - 1000), false, NOW).text, `de1, token expired ${formatExpiry(NOW - 1000)}`);
 });
 
@@ -215,5 +215,5 @@ test("401 on client sign-in mints once and retries once", async () => {
   assert.equal(topo, 1);
   assert.equal(sso, 1);
   assert.equal(mintFail.creds.token, null);
-  assert.match(mintFail.message, /personal API client/);
+  assert.equal(mintFail.message, CLIENT_REJECTED);
 });

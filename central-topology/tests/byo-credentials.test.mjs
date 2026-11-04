@@ -189,6 +189,54 @@ test("token exchange pass-through: JSON body only, returns token to caller, keep
   } finally { h.restore(); }
 });
 
+test("GLP token pass-through builds only the allowlisted GreenLake URL and refuses bad workspace IDs before any call", async () => {
+  const WS = "0123456789abcdef0123456789abcdef";
+  const GLP = `https://global.api.greenlake.hpe.com/authorization/v2/oauth2/${WS}/token`;
+  const h = harness(async (url, _h, body) => {
+    if (url.href === `https://global.api.greenlake.hpe.com/authorization/v2/oauth2/${"f".repeat(32)}/token`) return Response.json({ error: "invalid_request" }, { status: 404 });
+    assert.equal(url.href, GLP);
+    return new URLSearchParams(body).get("client_secret") === SECRET
+      ? Response.json({ access_token: TOKEN, expires_in: 899, token_type: "Bearer" })
+      : Response.json({ error: "unauthorized_request" }, { status: 401 });
+  });
+  const post = (o) => worker.fetch(req("/api/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: "id-FAKE", clientSecret: SECRET, ...o }) }), ENV);
+  try {
+    const ok = await post({ workspaceId: WS });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), { access_token: TOKEN, expires_in: 899 });
+    assert.equal(h.calls.length, 1);
+
+    for (const bad of ["../../../evil.example/x", "short", "a".repeat(65), "ws?x=1", "", 42, { href: "x" }]) {
+      const r = await post({ workspaceId: bad });
+      assert.equal(r.status, 400, String(bad));
+      assert.ok(!(await r.text()).includes(SECRET));
+    }
+    assert.equal(h.calls.length, 1, "no outbound call for a bad workspace ID");
+
+    const unknown = await post({ workspaceId: "f".repeat(32) });
+    assert.equal(unknown.status, 404);
+    assert.match((await unknown.json()).error, /does not recognise that Workspace ID/);
+    const wrong = await post({ workspaceId: WS, clientSecret: "nope-FAKE" });
+    assert.equal(wrong.status, 401);
+    assert.ok(!(await wrong.text()).includes("nope-FAKE"));
+    assert.ok(h.calls.every((c) => ["https://global.api.greenlake.hpe.com"].includes(c.url.origin)));
+    assert.deepEqual(h.logs, []);
+  } finally { h.restore(); }
+});
+
+test("site CSP: scripts from this origin only, and every host the page calls is in connect-src", () => {
+  const headers = read("../site/_headers");
+  const csp = headers.match(/Content-Security-Policy: (.+)/)[1];
+  const dir = Object.fromEntries(csp.split(";").map((d) => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
+  assert.deepEqual(dir["script-src"], ["'self'"]);
+  assert.deepEqual(dir["object-src"], ["'none'"]);
+  assert.deepEqual(dir["frame-ancestors"], ["'none'"]);
+  const connect = new Set(dir["connect-src"]);
+  for (const host of ["https://sso.common.cloud.hpe.com", "https://global.api.greenlake.hpe.com"]) assert.ok(connect.has(host), host);
+  for (const m of read("../site/config.js").matchAll(/https:\/\/[a-z0-9.-]+/g)) assert.ok(connect.has(m[0]), `config.js apiBase ${m[0]} missing from connect-src`);
+  assert.ok(!/<script>|\son[a-z]+=/i.test(read("../site/index.html")), "no inline script or handlers (CSP would block them)");
+});
+
 test("CORS preflight allows the credential headers for the configured origin only", async () => {
   const pre = (origin) => worker.fetch(req("/api/topology", { method: "OPTIONS", headers: { Origin: origin, "Access-Control-Request-Headers": "authorization,x-central-base" } }), ENV);
   const ok = await pre(ORIGIN);
