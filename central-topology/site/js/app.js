@@ -1,6 +1,6 @@
 import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED, switchLinks } from "./model.js";
 import { largeSample } from "./large-sample.js";
-import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, writePosition } from "./layout.js";
+import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, structuredOpeningScale, structuredOpeningScroll, structuredScaleFloor, writePosition } from "./layout.js";
 import { contentBounds, renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, connectionState, createVault, fetchWithAuth, mintToken, normalise, reuseSavedToken, tokenPlaceholder } from "./creds.js";
@@ -138,7 +138,8 @@ function paint() {
   const mgmtLabel = opts.find((o) => o.id === state.mgmt)?.label ?? state.mgmt;
   const layoutLabel = LAYOUTS.find((l) => l.id === state.layout)?.label ?? "Hub and spoke";
   const box = readContainer();
-  const placed = applyPositionOverrides(layoutById(state.layout, model, { width: box.w, height: box.h }), state.positions[state.layout]);
+  const layOpts = state.layout === "structured" ? { width: box.w, height: box.h, mgmt: state.mgmt, measure: textMeasurer() } : { width: box.w, height: box.h };
+  const placed = applyPositionOverrides(layoutById(state.layout, model, layOpts), state.positions[state.layout]);
   const subtitle = `${model.nodes.length} switches · ${model.buildings.length} buildings · ${layoutLabel} · Mgmt: ${mgmtLabel} · ${state.data.mock ? "MOCK DATA · " : ""}${new Date(state.data.generatedAt).toLocaleString()}`;
   const renderOpts = {
     tokens: readTokens(), mgmt: state.mgmt, title: "Switch topology", subtitle,
@@ -149,6 +150,25 @@ function paint() {
   state.subtitle = subtitle;
   mountDiagram();
 }
+
+// Structured text is measured in the real font, so columns fit their names.
+// Canvas measureText resolves the same font stack as the SVG text.
+function textMeasurer() {
+  const T = readTokens();
+  const ctx = document.createElement("canvas").getContext("2d");
+  const cache = new Map();
+  return (text, st = {}) => {
+    const s = String(text ?? "");
+    const k = `${st.size}|${st.weight}|${st.mono ? 1 : 0}|${st.ls ?? 0}|${s}`;
+    if (!cache.has(k)) {
+      ctx.font = `${st.weight ?? 400} ${st.size ?? 12}px ${st.mono ? T["--font-mono"] : T["--font-sans"]}`;
+      cache.set(k, ctx.measureText(s).width + (st.ls ?? 0) * [...s].length);
+    }
+    return cache.get(k);
+  };
+}
+// Web fonts can land after the first paint; measure again once they have.
+document.fonts?.ready?.then(() => { if (state.layout === "structured" && state.model) paint(); });
 
 // Title band drawn above the graph in the SVG. A scrolling layout lifts this
 // band out of the scroller so it stays on screen.
@@ -227,13 +247,14 @@ function mountDiagram(scrollAfter) {
     });
     const frame = cropped(opened);
     let scale;
-    if (opensAtNameFloor(lay.id)) scale = hubOpeningScale(frame, avail);
+    if (lay.kind === "structured") scale = structuredOpeningScale(frame, avail);
+    else if (opensAtNameFloor(lay.id)) scale = hubOpeningScale(frame, avail);
     else {
       const reference = lay.id === "tree-lr" ? lay.bounds : layoutById("tree-lr", model).bounds;
       scale = openingScale(frame, avail, cropped(reference));
     }
     state.view = { scale, openedAt: scale, user: false };
-    if (scrollAfter === undefined) {
+    if (scrollAfter === undefined && lay.kind !== "structured") {
       const fit = fitScale(frame, avail);
       // Fitted drawings stay put. A floor zoom centers the district core.
       scrollAfter = scale > fit + 1e-6 ? "core" : { left: 0, top: 0 };
@@ -254,6 +275,8 @@ function mountDiagram(scrollAfter) {
   if (!svg) return;
   const { x, y, w, h } = bounds;
   const scale = state.view.scale;
+  // Until the user zooms or scrolls, every Structured repaint reopens on the core.
+  if (scrollAfter === undefined && lay.kind === "structured" && !state.view.user) scrollAfter = structuredOpeningScroll(lay, bounds, scale, avail);
   let drawW = w * scale;
   let drawH = h * scale;
   if (h > HEADER_BAND) {
@@ -289,7 +312,8 @@ function stepZoom(factor) {
     mgmt: state.mgmt, portScale: state.view.scale, ...frameOpts,
   });
   const fit = fitScale(cropped(bounds), avail);
-  const next = Math.min(Math.max(old * factor, Math.min(fit, state.view.openedAt) * 0.5), Math.max(state.view.openedAt * 8, fit));
+  const lowest = state.lay.kind === "structured" ? structuredScaleFloor() : Math.min(fit, state.view.openedAt) * 0.5;
+  const next = Math.min(Math.max(old * factor, lowest), Math.max(state.view.openedAt * 8, fit));
   state.view.scale = next;
   state.view.user = true;
   const ratio = next / old;
@@ -306,7 +330,7 @@ function fitView() {
     collapseAps: !expanded, openChips: state.openChips, showPorts: state.showPorts !== false,
     mgmt: state.mgmt, portScale: state.view.scale, ...frameOpts,
   });
-  state.view.scale = fitScale(cropped(bounds), avail);
+  state.view.scale = state.lay.kind === "structured" ? structuredOpeningScale(cropped(bounds), avail) : fitScale(cropped(bounds), avail);
   state.view.user = true;
   mountDiagram({ left: 0, top: 0 });
 }
@@ -349,6 +373,34 @@ if (typeof ResizeObserver === "function") {
 }
 $("credsBtn").addEventListener("click", () => noteContainer());
 $("cClose").addEventListener("click", () => noteContainer());
+// Structured hover: a switch or link lights its own links and dims the rest.
+// Port and LAG names are in the tooltips.
+{
+  const host = $("diagram");
+  const clear = () => {
+    const svg = host.querySelector("svg.hl");
+    if (!svg) return;
+    svg.classList.remove("hl");
+    for (const el of svg.querySelectorAll("[data-edge].on")) el.classList.remove("on");
+  };
+  host.addEventListener("mouseover", (ev) => {
+    if (state.lay?.kind !== "structured") return;
+    const svg = host.querySelector("svg");
+    const hit = ev.target.closest?.("[data-hit]");
+    const u = ev.target.closest?.("g[data-serial], g[data-ext]");
+    if (!svg || (!hit && !u)) { clear(); return; }
+    clear();
+    const id = u ? u.dataset.serial ?? u.dataset.ext : null;
+    const ends = hit?.dataset.hit;
+    let any = false;
+    for (const el of svg.querySelectorAll("[data-edge]")) {
+      const e = el.dataset.ends ?? "";
+      if (ends ? e === ends : e.split("|").includes(id)) { el.classList.add("on"); any = true; }
+    }
+    if (any) svg.classList.add("hl");
+  });
+  host.addEventListener("mouseleave", clear);
+}
 $("diagram").addEventListener("click", (ev) => {
   if (ev.target.closest?.("#zoomIn")) { stepZoom(1.25); return; }
   if (ev.target.closest?.("#zoomOut")) { stepZoom(1 / 1.25); return; }

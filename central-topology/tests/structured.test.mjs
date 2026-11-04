@@ -6,7 +6,7 @@ import { topologyFromFixtures } from "./helpers.mjs";
 import { buildModel } from "../site/js/model.js";
 import { largeSample } from "../site/js/large-sample.js";
 import { LAYOUTS, layoutById, modelForNeighborToggle } from "../site/js/layout.js";
-import { checkLayout, stubLines } from "../site/js/structured.js";
+import { checkLayout, checkText, stubLines } from "../site/js/structured.js";
 import { renderSvg, TOKEN_NAMES } from "../site/js/render.js";
 import { createRegistry, modelKey } from "../site/js/stencils.js";
 
@@ -28,6 +28,7 @@ test("mock tenant: sections around the core, crossing-free, LLDP neighbors on an
     const model = modelForNeighborToggle(full, shown);
     const lay = layout(model);
     assert.deepEqual(clean(checkLayout(lay)), ok, `LLDP ${shown}`);
+    assert.deepEqual(checkText(lay), [], `LLDP ${shown} text`);
     const core = lay.sections.find((s) => s.own);
     assert.equal(core.name, "District Office");
     for (const s of lay.sections.filter((s) => !s.own)) {
@@ -42,13 +43,14 @@ test("mock tenant: sections around the core, crossing-free, LLDP neighbors on an
   }
 });
 
-test("large sample stays crossing-free and switches to the compact tier", () => {
+test("large sample stays crossing-free with every text rule met", () => {
   const sample = largeSample();
   const full = buildModel(sample, { coreSerial: sample.coreSerial });
   for (const shown of [true, false]) {
     const lay = layout(modelForNeighborToggle(full, shown));
-    assert.equal(lay.tier.fw, 150, "compact above 40 switches");
+    assert.equal(lay.geom.fw, 200, "one faceplate size; text never shrinks to fit");
     assert.deepEqual(clean(checkLayout(lay)), ok, `LLDP ${shown}`);
+    assert.deepEqual(checkText(lay), [], `LLDP ${shown}`);
   }
 });
 
@@ -77,6 +79,7 @@ test("synthetic districts of 1 to 14 buildings stay crossing-free", () => {
     const sizes = Array.from({ length: k }, () => 1 + Math.floor(rnd() * 8));
     const lay = layout(buildModel(...Object.values(district(sizes))));
     assert.deepEqual(clean(checkLayout(lay)), ok, `k=${k} sizes=${sizes}`);
+    assert.deepEqual(checkText(lay), [], `k=${k} text`);
     assert.equal(lay.sections.length, k + 1);
   }
 });
@@ -87,7 +90,12 @@ test("auto core on the wrong building: real links become stubs, still crossing-f
   const lay = layout(model);
   assert.notEqual(lay.name(model.coreSerial), "DO-CORE-01");
   assert.deepEqual(clean(checkLayout(lay)), ok);
-  assert.ok(lay.stubs.some((s) => s.labels.length > 1), "several peers share one stub");
+  assert.deepEqual(checkText(lay), []);
+  // DO-CORE-01 heads its own section now; its links to the other heads are
+  // listed in a "Links out" row inside that section, not drawn loose.
+  const lo = lay.sections.find((s) => s.name === "District Office").linksOut;
+  assert.ok(lo.length >= 2, "several links out share one row");
+  assert.ok(lay.labels.some((x) => x.kind === "linksout-head" && x.section === "District Office"));
 });
 
 test("wing links land on the core at least 12px apart, in lane order", () => {
@@ -100,7 +108,7 @@ test("wing links land on the core at least 12px apart, in lane order", () => {
     for (const side of ["L", "R"]) {
       const ys = lay.landings[side] ?? [];
       ys.slice(1).forEach((y, i) => assert.ok(y - ys[i] >= 12 - 1e-9, `stack=${coreStack} k=${k} ${side} gap ${y - ys[i]}`));
-      for (const y of ys) assert.ok(y > coreSec.y + 28 && y < coreSec.y + coreSec.h, "landing stays inside the core site, below its header");
+      for (const y of ys) assert.ok(y > coreSec.y + lay.geom.titleBand && y < coreSec.y + coreSec.h, "landing stays inside the core site, below its header");
       const bb = lay.links.filter((l) => l.kind === "backbone" && l.b === lay.coreSerial && l.pts.at(-1)[0] === (side === "L" ? core.l : core.r));
       assert.deepEqual(bb.map((l) => l.pts.at(-1)[1]), ys);
       if (ys.length && (ys[0] < core.ft || ys.at(-1) > core.fb)) { railed++; assert.ok(lay.rails.some((r) => r.side === side && r.y0 <= ys[0] && r.y1 >= ys.at(-1)), "rail covers off-faceplate landings"); }
@@ -146,7 +154,7 @@ test("render: stack ordered by member id, black stack connector, one <defs> imag
   assert.deepEqual(model.byId.get(model.coreSerial).stack.map((m) => [m.name, m.memberId]), [["DO-CORE-02", 1], ["DO-CORE-01", 2]]);
   const lay = layout(model);
   const plain = renderSvg(model, lay, { tokens: { ...TOKENS, "--link-stack": "#000000" }, title: "t", subtitle: "s" });
-  assert.match(plain, /stroke="#000000" stroke-width="3"/, "stack connector drawn in the stack token");
+  assert.match(plain, /class="stack-link"[^>]*fill="#000000"/, "stack connector drawn in the stack token");
   assert.ok(!plain.includes("<image"), "no art without stencils");
   const reg = createRegistry([{ match: "", sku: "JL676A", href: "data:image/svg+xml;base64,AAAA" }]);
   const svg = renderSvg(model, lay, { tokens: TOKENS, title: "t", subtitle: "s", stencils: reg });

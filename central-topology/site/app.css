@@ -94,3 +94,8 @@ aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; co
   .creds label { flex: 1 1 100%; }
   .creds input[type=text], .creds input[type=password] { min-width: 0; width: 100%; }
 }
+/* Structured hover: the hovered switch's or link's paths stay, the rest dim. */
+#diagram svg.hl [data-edge] { transition: opacity 0.12s; }
+#diagram svg.hl [data-edge]:not(.on) { opacity: 0.15; }
+#diagram svg.hl [data-edge].on { stroke-width: 3.5; }
+#diagram svg .edge-hit { pointer-events: stroke; }
