@@ -7,8 +7,8 @@ import { jsonExport, svgBlob } from "../site/js/export.js";
 import { renderSvg } from "../site/js/render.js";
 import { GEOM, LAYOUTS, layoutById, modelForNeighborToggle } from "../site/js/layout.js";
 
-// Port pills sit on card layouts. Structured keeps ports in link tooltips and
-// stub chips so labels never land on a riser; it is checked on its own below.
+// Port pills sit on card layouts. Structured keeps ports in link tooltips so
+// labels never land on a riser; it is checked on its own below.
 const CARD_LAYOUTS = LAYOUTS.filter((l) => l.id !== "structured");
 import { compactPortNames, formatPortEnd, portsVisible, readShowPorts, writeShowPorts } from "../site/js/ports.js";
 import { UI_KEYS, readUiPrefs, writeUiPref } from "../site/js/prefs.js";
