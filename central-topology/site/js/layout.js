@@ -2,7 +2,7 @@
 // positions out. Hub and spoke is the default. Position overrides are applied
 // afterwards, per layout, and never written back into the model.
 import { isLldpOnlySwitch } from "./model.js";
-import { layoutStructured } from "./structured.js";
+import { MIN_FONT_PX, TYPE, layoutStructured } from "./structured.js";
 
 export const GEOM = { r1: 290, r2: 600, rExt: 740, nodeW: 156, nodeH: 46, pad: 40 };
 
@@ -15,7 +15,7 @@ const LAYOUT_FNS = {
   "tree-lr": (model) => layoutTree(model, "lr"),
   radial: (model) => layoutRadial(model),
   force: (model) => layoutForce(model),
-  structured: (model) => layoutStructured(model),
+  structured: (model, opts) => layoutStructured(model, opts),
 };
 
 const COLUMN_FNS = {
@@ -39,7 +39,7 @@ export function layoutById(id, model, opts) {
   const column = COLUMN_FNS[spec.id];
   const lay = column ? column(model, opts)
     : spec.id === "hub" ? layout(model, opts)
-    : LAYOUT_FNS[spec.id](model);
+    : LAYOUT_FNS[spec.id](model, opts);
   return { ...lay, id: spec.id };
 }
 
@@ -160,6 +160,21 @@ export function hubOpeningScale(bounds, avail) {
   if (!Number.isFinite(fit) || fit <= 0) return 1;
   if (!Number.isFinite(floor) || floor <= 0 || fit >= floor) return fit;
   return floor;
+}
+
+/**
+ * Structured zoom floor: the scale at which its smallest text (10px model
+ * names and badges) is MIN_FONT_PX on screen. Fit never goes below it; the
+ * pane scrolls instead.
+ */
+export function structuredScaleFloor() {
+  return MIN_FONT_PX / Math.min(...Object.values(TYPE).map((t) => t.size));
+}
+
+/** Structured opening and Fit scale: fit, but never under the 10px floor. */
+export function structuredOpeningScale(bounds, avail) {
+  const fit = fitScale(bounds, avail);
+  return Math.max(fit, structuredScaleFloor());
 }
 
 /** Scroll offsets that put the district core in the middle of the pane. */

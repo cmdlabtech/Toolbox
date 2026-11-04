@@ -94,7 +94,8 @@ test("mock nodes, external devices, and labels do not overlap", () => {
 
 test("every layout renders, including the management-IP fallback ring", () => {
   for (const spec of LAYOUTS) {
-    const lay = layoutById(spec.id, model);
+    // Structured places the IP line itself, so it takes the selection too.
+    const lay = layoutById(spec.id, model, spec.id === "structured" ? { mgmt: "vlan:99" } : undefined);
     const svg = renderSvg(model, lay, { tokens: TOKENS, mgmt: "vlan:99", title: "Switch topology", subtitle: spec.label });
     assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
     for (const n of model.nodes) assert.ok(svg.includes(n.name), `${spec.id} ${n.name}`);
