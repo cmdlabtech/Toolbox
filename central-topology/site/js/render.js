@@ -3,12 +3,14 @@
 // same outside the page. Pure function except for tokens passed in.
 import { CARD_NAME_FONT, GEOM, accessChipBoxes, labelBox, linkLeavesBucket, orthoBend, shownBounds } from "./layout.js";
 import { resolveMgmt } from "./model.js";
+import { renderStructuredSvg } from "./structured-render.js";
 import { PORT_FONT, portsVisible } from "./ports.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 export const TOKEN_NAMES = ["--diagram-bg", "--diagram-fg", "--diagram-muted", "--node-core", "--node-bcore", "--node-access",
-  "--node-ext", "--node-fill", "--edge", "--edge-inferred", "--warn", "--font-sans", "--font-mono"];
+  "--node-ext", "--node-fill", "--edge", "--edge-inferred", "--warn", "--font-sans", "--font-mono",
+  "--section-fill", "--section-border", "--link-backbone", "--link-access", "--link-wan", "--link-stack", "--link-down"];
 
 export function readTokens(el = document.documentElement) {
   const cs = getComputedStyle(el);
@@ -208,10 +210,13 @@ export function prepareDiagram(model, lay, opts = {}) {
 
 /** View box for the diagram that is on screen or in an export. */
 export function contentBounds(model, lay, opts = {}) {
+  // The structured layout routes its own links and sizes its own canvas.
+  if (lay.kind === "structured") return lay.bounds;
   return prepareDiagram(model, lay, opts).bounds;
 }
 
 export function renderSvg(model, lay, opts) {
+  if (lay.kind === "structured") return renderStructuredSvg(model, lay, opts);
   const T = opts.tokens;
   const prepared = prepareDiagram(model, lay, opts);
   const { x, y, w, h } = prepared.bounds;

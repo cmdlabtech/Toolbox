@@ -125,9 +125,30 @@
    "deviceType": "SWITCH",
    "deviceGroupName": "Group 3",
    "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SGD1C13D9C",
+   "id": "SGD1C13D9C",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SGC00CCC23",
+   "id": "SGC00CCC23",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
+  },
+  {
+   "serialNumber": "SGCCD1825B",
+   "id": "SGCCD1825B",
+   "deviceType": "SWITCH",
+   "deviceGroupName": "Group 2",
+   "type": "network-monitoring/device-monitoring"
   }
  ],
- "count": 18,
- "total": 18,
+ "count": 21,
+ "total": 21,
  "next": null
 }

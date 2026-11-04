@@ -22,7 +22,10 @@ export interface TopoDevice {
   deviceFunction: string | null;
   ipv4: string | null;         // topology devices[].ipv4
   vlanIds: number[];           // topology devices[].vlans (IDs only, no addresses)
+  deployment: string | null;   // "Standalone", or a stack deployment (exact stack value unverified)
+  conductorSerial: string | null; // stack conductor's serial when the switch is a stack member
 }
+export interface SwitchDetail { siteId: string | null; siteName: string | null; jNumber: string | null; stackMemberId: number | null }
 export interface LinkPort { name: string; lag: string | null }
 export interface TopoLink {
   from: string; to: string;
@@ -31,6 +34,7 @@ export interface TopoLink {
   toPorts: LinkPort[];
   speedGbps: number | null;
   source: "topology" | "neighbours";
+  isSibling: boolean;          // stack (VSF) link between members of one stack
 }
 export interface NormVlan { id: string; name: string | null; ipv4: string | null }
 export interface NormInterface { name: string; type: string | null; ipv4: string | null; kind: "oobm" | "loopback" | "other" }
@@ -89,12 +93,12 @@ export function portList(v: unknown): LinkPort[] {
   return out;
 }
 
-function linkEnds(from: string, to: string, fromPorts: LinkPort[], toPorts: LinkPort[], speedGbps: number | null, source: TopoLink["source"]): TopoLink {
+function linkEnds(from: string, to: string, fromPorts: LinkPort[], toPorts: LinkPort[], speedGbps: number | null, source: TopoLink["source"], isSibling = false): TopoLink {
   return {
     from, to, fromPorts, toPorts,
     fromPort: fromPorts[0]?.name ?? null,
     toPort: toPorts[0]?.name ?? null,
-    speedGbps, source,
+    speedGbps, source, isSibling,
   };
 }
 
@@ -168,6 +172,8 @@ export function central(get: GetJson) {
         deviceFunction: str(d.deviceFunction),
         ipv4: str(d.ipv4),
         vlanIds: Array.isArray(d.vlans) ? d.vlans.map(Number).filter(Number.isFinite) : [],
+        deployment: str(d.deployment),
+        conductorSerial: str(d.conductorSerial),
       }));
       const links = asList(body?.links)
         .filter((l: any) => str(l.from) && str(l.to))
@@ -176,15 +182,17 @@ export function central(get: GetJson) {
           portList(l.fromPortList), portList(l.toPortList),
           typeof l.speed === "number" ? l.speed : null,
           "topology",
+          l.isSibling === true,
         ));
       return { devices, links };
     },
 
-    // Switch detail: used only to settle the home site of a switch that shows
-    // up in more than one site's topology.
-    async switchSite(serial: string): Promise<{ siteId: string | null; siteName: string | null }> {
+    // Switch detail: the part number (jNumber) and stack member id for every
+    // switch, and the home site of a switch that shows up in several sites.
+    async switchDetail(serial: string): Promise<SwitchDetail> {
       const d = await get(`/network-monitoring/v1/switches/${encodeURIComponent(serial)}`);
-      return { siteId: str(d?.siteId), siteName: str(d?.siteName) };
+      const id = Number(d?.stackMemberId);
+      return { siteId: str(d?.siteId), siteName: str(d?.siteName), jNumber: str(d?.jNumber), stackMemberId: d?.stackMemberId != null && Number.isFinite(id) ? id : null };
     },
 
     // LLDP fill-in when topology leaves a switch cut off from the rest.

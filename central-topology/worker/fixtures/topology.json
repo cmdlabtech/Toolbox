@@ -470,12 +470,12 @@
     "health": "Good",
     "model": "Aruba 6200F 48G",
     "deviceFunction": "Access Switch",
-    "deployment": "Standalone",
+    "deployment": "Stack",
     "status": "ONLINE",
     "type": "Switch",
     "ipv4": "10.10.2.12",
     "healthReason": null,
-    "conductorSerial": null,
+    "conductorSerial": "SGAE5515DB",
     "internet": true,
     "lastSeen": 1793120400,
     "vlans": [
@@ -518,6 +518,48 @@
     "ipv4": "10.10.250.7",
     "healthReason": null,
     "conductorSerial": null,
+    "internet": true,
+    "lastSeen": 1793120400,
+    "vlans": [
+     1,
+     10,
+     99
+    ]
+   },
+   {
+    "serial": "SGC00CCC23",
+    "mac": "38:21:c7:2a:da:d6",
+    "name": "OMS-ACC-02-2",
+    "health": "Good",
+    "model": "Aruba 6200F 48G",
+    "deviceFunction": "Access Switch",
+    "deployment": "Stack",
+    "status": "ONLINE",
+    "type": "Switch",
+    "ipv4": "10.10.2.114",
+    "healthReason": null,
+    "conductorSerial": "SGAE5515DB",
+    "internet": true,
+    "lastSeen": 1793120400,
+    "vlans": [
+     1,
+     10,
+     99
+    ]
+   },
+   {
+    "serial": "SGCCD1825B",
+    "mac": "38:21:c7:f0:1c:fc",
+    "name": "OMS-ACC-02-3",
+    "health": "Good",
+    "model": "Aruba 6200F 48G",
+    "deviceFunction": "Access Switch",
+    "deployment": "Stack",
+    "status": "ONLINE",
+    "type": "Switch",
+    "ipv4": "10.10.2.115",
+    "healthReason": null,
+    "conductorSerial": "SGAE5515DB",
     "internet": true,
     "lastSeen": 1793120400,
     "vlans": [
@@ -785,6 +827,78 @@
      }
     ],
     "isSibling": false
+   },
+   {
+    "from": "SGAE5515DB",
+    "to": "SGC00CCC23",
+    "edgeType": "STACK",
+    "health": "Good",
+    "healthReason": null,
+    "speed": 10,
+    "stpState": "Forwarding",
+    "fromPortList": [
+     {
+      "index": 1,
+      "name": "1/1/52",
+      "lag": null,
+      "health": "Good",
+      "healthReason": null,
+      "vlanId": 99,
+      "vlanMode": "trunk",
+      "allowedVlans": "1,10,99",
+      "nativeVlan": "1"
+     }
+    ],
+    "toPortList": [
+     {
+      "index": 1,
+      "name": "2/1/51",
+      "lag": null,
+      "health": "Good",
+      "healthReason": null,
+      "vlanId": 99,
+      "vlanMode": "trunk",
+      "allowedVlans": "1,10,99",
+      "nativeVlan": "1"
+     }
+    ],
+    "isSibling": true
+   },
+   {
+    "from": "SGC00CCC23",
+    "to": "SGCCD1825B",
+    "edgeType": "STACK",
+    "health": "Good",
+    "healthReason": null,
+    "speed": 10,
+    "stpState": "Forwarding",
+    "fromPortList": [
+     {
+      "index": 1,
+      "name": "2/1/52",
+      "lag": null,
+      "health": "Good",
+      "healthReason": null,
+      "vlanId": 99,
+      "vlanMode": "trunk",
+      "allowedVlans": "1,10,99",
+      "nativeVlan": "1"
+     }
+    ],
+    "toPortList": [
+     {
+      "index": 1,
+      "name": "3/1/51",
+      "lag": null,
+      "health": "Good",
+      "healthReason": null,
+      "vlanId": 99,
+      "vlanMode": "trunk",
+      "allowedVlans": "1,10,99",
+      "nativeVlan": "1"
+     }
+    ],
+    "isSibling": true
    }
   ],
   "isolatedDevicesCount": 0,
@@ -946,12 +1060,12 @@
     "health": "Good",
     "model": "Aruba 6300M 48G",
     "deviceFunction": "Aggregation Switch",
-    "deployment": "Standalone",
+    "deployment": "Stack",
     "status": "ONLINE",
     "type": "Switch",
     "ipv4": "10.10.1.1",
     "healthReason": null,
-    "conductorSerial": null,
+    "conductorSerial": "SG6EBB7402",
     "internet": true,
     "lastSeen": 1793120400,
     "vlans": [
@@ -1036,6 +1150,27 @@
     "ipv4": "10.10.1.14",
     "healthReason": null,
     "conductorSerial": null,
+    "internet": true,
+    "lastSeen": 1793120400,
+    "vlans": [
+     1,
+     10,
+     99
+    ]
+   },
+   {
+    "serial": "SGD1C13D9C",
+    "mac": "38:21:c7:90:18:a1",
+    "name": "WHS-CORE-02",
+    "health": "Good",
+    "model": "Aruba 6300M 48G",
+    "deviceFunction": "Aggregation Switch",
+    "deployment": "Stack",
+    "status": "ONLINE",
+    "type": "Switch",
+    "ipv4": "10.10.1.103",
+    "healthReason": null,
+    "conductorSerial": "SG6EBB7402",
     "internet": true,
     "lastSeen": 1793120400,
     "vlans": [
@@ -1259,6 +1394,78 @@
      }
     ],
     "isSibling": false
+   },
+   {
+    "from": "SG188EFC07",
+    "to": "SGD1C13D9C",
+    "edgeType": "ETHERNET",
+    "health": "Good",
+    "healthReason": null,
+    "speed": 10,
+    "stpState": "Forwarding",
+    "fromPortList": [
+     {
+      "index": 1,
+      "name": "1/1/5",
+      "lag": null,
+      "health": "Good",
+      "healthReason": null,
+      "vlanId": 99,
+      "vlanMode": "trunk",
+      "allowedVlans": "1,10,99",
+      "nativeVlan": "1"
+     }
+    ],
+    "toPortList": [
+     {
+      "index": 1,
+      "name": "2/1/49",
+      "lag": null,
+      "health": "Good",
+      "healthReason": null,
+      "vlanId": 99,
+      "vlanMode": "trunk",
+      "allowedVlans": "1,10,99",
+      "nativeVlan": "1"
+     }
+    ],
+    "isSibling": false
+   },
+   {
+    "from": "SG6EBB7402",
+    "to": "SGD1C13D9C",
+    "edgeType": "STACK",
+    "health": "Good",
+    "healthReason": null,
+    "speed": 10,
+    "stpState": "Forwarding",
+    "fromPortList": [
+     {
+      "index": 1,
+      "name": "1/1/52",
+      "lag": null,
+      "health": "Good",
+      "healthReason": null,
+      "vlanId": 99,
+      "vlanMode": "trunk",
+      "allowedVlans": "1,10,99",
+      "nativeVlan": "1"
+     }
+    ],
+    "toPortList": [
+     {
+      "index": 1,
+      "name": "2/1/51",
+      "lag": null,
+      "health": "Good",
+      "healthReason": null,
+      "vlanId": 99,
+      "vlanMode": "trunk",
+      "allowedVlans": "1,10,99",
+      "nativeVlan": "1"
+     }
+    ],
+    "isSibling": true
    },
    {
     "from": "SG5D186396",

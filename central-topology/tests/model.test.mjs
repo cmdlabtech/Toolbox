@@ -70,3 +70,40 @@ test("override import validates shape", () => {
   assert.deepEqual(o, { coreSerial: "X", switches: { A: { role: "access", building: "B" } } });
   assert.throws(() => parseOverrides("[]"));
 });
+
+test("stack members collapse into one logical switch on the conductor", () => {
+  assert.equal(data.switches.length, 22);
+  const m = buildModel(data);
+  assert.equal(m.nodes.length, 19);
+  const whs = byName(m, "WHS-CORE-01");
+  assert.deepEqual(whs.stack.map((x) => x.name), ["WHS-CORE-01", "WHS-CORE-02"]);
+  assert.deepEqual(byName(m, "OMS-ACC-02").stack.map((x) => x.name), ["OMS-ACC-02", "OMS-ACC-02-2", "OMS-ACC-02-3"]);
+  assert.equal(byName(m, "WHS-CORE-02"), undefined);
+  assert.equal(m.edges.some((e) => e.isSibling), false, "sibling links fold into the stack");
+  const up = m.edges.filter((e) => [e.from, e.to].includes(whs.serial) && [e.from, e.to].includes(m.coreSerial));
+  assert.equal(up.length, 1, "both uplink legs merge into one logical edge");
+  assert.equal(up[0].legs, 2);
+  assert.equal(up[0].toLabel, "1/1/49, 2/1/49");
+  assert.equal(whs.role, "building-core");
+});
+
+test("stack members order by member id and keep their part numbers", () => {
+  const m = buildModel(data);
+  for (const n of m.nodes.filter((x) => x.stack)) {
+    const ids = n.stack.map((x) => x.memberId);
+    assert.deepEqual(ids, [...ids].sort((a, b) => a - b), `${n.name} member order`);
+    for (const x of n.stack) assert.ok(x.jNumber, `${x.name} jNumber`);
+  }
+  // Without member ids: conductor first, then by name.
+  const sw = data.switches.map((s) => ({ ...s, stackMemberId: null }));
+  sw.find((s) => s.name === "OMS-ACC-02-3").stackMemberId = 1;
+  const m2 = buildModel({ ...data, switches: sw });
+  assert.deepEqual(byName(m2, "OMS-ACC-02").stack.map((x) => x.name), ["OMS-ACC-02-3", "OMS-ACC-02", "OMS-ACC-02-2"]);
+});
+
+test("data with no stacks passes through the stack fold unchanged", () => {
+  const flat = { ...data, switches: data.switches.filter((s) => !s.conductorSerial || s.conductorSerial === s.serial).map((s) => ({ ...s, conductorSerial: null })), links: data.links.filter((l) => !l.isSibling) };
+  const m = buildModel(flat);
+  assert.equal(m.nodes.length, flat.switches.length);
+  assert.equal(m.nodes.some((n) => n.stack), false);
+});

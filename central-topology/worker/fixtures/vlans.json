@@ -644,5 +644,107 @@
   "count": 3,
   "total": 3,
   "offset": null
+ },
+ "SGD1C13D9C": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SGC00CCC23": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
+ },
+ "SGCCD1825B": {
+  "items": [
+   {
+    "id": "1",
+    "type": "STATIC",
+    "name": "DEFAULT_VLAN",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "10",
+    "type": "STATIC",
+    "name": "STAFF",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   },
+   {
+    "id": "99",
+    "type": "STATIC",
+    "name": "MGMT",
+    "status": "Up",
+    "ipv4": null,
+    "voice": "false",
+    "interfaces": []
+   }
+  ],
+  "count": 3,
+  "total": 3,
+  "offset": null
  }
 }

@@ -79,6 +79,9 @@ aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; co
 #cMsg { font-size: 12px; color: var(--muted); }
 #cMsg.err { color: var(--node-core); }
 
+.st-state { align-self: center; font-size: 12px; color: var(--muted); }
+#diagram.dropping svg { outline: 2px dashed var(--accent); outline-offset: 4px; }
+
 /* Narrow screens: one column (diagram above the switch list), wrapped header. */
 @media (max-width: 760px) {
   header { flex-wrap: wrap; padding: 10px 12px; gap: 8px; }

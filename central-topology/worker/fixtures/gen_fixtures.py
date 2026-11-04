@@ -12,7 +12,7 @@
 All names, serials, MACs and IPs are made up. Private (RFC 1918) addresses only.
 Run: python3 worker/fixtures/gen_fixtures.py   (rewrites the JSON files next to it)
 """
-import json, os, hashlib
+import json, os, hashlib, re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -25,10 +25,15 @@ def mac(name):
 
 # name, site, model, mgmt-vlan-ip, oobm-ip, loopback-ip, monitor-ip
 SW = []
-def add(name, site, model, mon, vlan99=True, oobm=None, loop=None, status="Online"):
+def add(name, site, model, mon, vlan99=True, oobm=None, loop=None, status="Online", stack=None):
     SW.append(dict(name=name, site=site, model=model, mon=mon,
                    vlan99=(mon.replace("10.10.", "10.99.") if vlan99 is True else vlan99),
-                   oobm=oobm, loop=loop, status=status))
+                   oobm=oobm, loop=loop, status=status, stack=stack))
+
+# Part numbers as switch detail reports them (jNumber). Real SKUs, so the
+# stencil matcher has something true to match against.
+SKU = {"Aruba 8360-32Y4C": "JL700C", "Aruba 6300M 48G": "JL661A", "Aruba 6100 48G 4SFP+": "JL676A",
+       "Aruba 6100 24G 4SFP+": "JL678A", "Aruba 6200F 48G": "JL726A"}
 
 add("DO-CORE-01", "District Office", "Aruba 8360-32Y4C", "10.10.0.1",
     oobm="192.168.100.1", loop="10.255.0.1")
@@ -50,6 +55,21 @@ for i, (code, site, n) in enumerate(buildings, start=1):
             status=("Offline" if (code, a) == ("WHS", 4) else "Online"))
 # The ambiguous one: assigned to Oak MS, but LLDP-linked to both the Oak MS and Maple ES cores.
 add("SPARE-SW-07", "Oak MS", "Aruba 6100 24G 4SFP+", "10.10.250.7", vlan99=None)
+
+# Stacks (VSF). Each member is its own device in topology with the
+# conductor's serial in conductorSerial, and members are joined by isSibling
+# links. Field names follow the getLinkTopology spec; the "Stack" deployment
+# value and whether real topology lists every member are unverified.
+#   Westfield HS core: 2 x 6300M, both members uplinked to the district core.
+#   Oak MS access 02:  3 x 6200F in a chain.
+STACKS = {"WHS-CORE-01": ["WHS-CORE-01", "WHS-CORE-02"],
+          "OMS-ACC-02": ["OMS-ACC-02", "OMS-ACC-02-2", "OMS-ACC-02-3"]}
+for cond, members in STACKS.items():
+    c = next(x for x in SW if x["name"] == cond)
+    c["stack"] = (cond, 1)
+    for m, name in enumerate(members[1:], start=2):
+        base = c["mon"].rsplit(".", 1)
+        add(name, c["site"], c["model"], f"{base[0]}.{int(base[1]) + 100 + m}", vlan99=None, stack=(cond, m))
 
 by = {s["name"]: s for s in SW}
 for s in SW:
@@ -73,6 +93,15 @@ link("PES-ACC-01", "1/1/50", "PES-ACC-02", "1/1/49")
 # Ambiguous spare: LLDP to Oak MS core and Maple ES core
 link("OMS-CORE-01", "1/1/20", "SPARE-SW-07", "1/1/25")
 link("MES-CORE-01", "1/1/20", "SPARE-SW-07", "1/1/26")
+# Second leg of the Westfield HS uplink lands on stack member 2.
+link("DO-CORE-01", "1/1/5", "WHS-CORE-02", "2/1/49")
+# Stack (VSF) links between members: isSibling in topology.
+SIBLING = set()
+for cond, members in STACKS.items():
+    for a, b in zip(members, members[1:]):
+        ma, mb = by[a]["stack"][1], by[b]["stack"][1]
+        link(a, f"{ma}/1/52", b, f"{mb}/1/51")
+        SIBLING.add((a, b))
 
 EXTERNAL = [  # local switch, local port, neighbour dict
     ("DO-CORE-01", "1/1/30", dict(name="DO-FW-01", type="Firewall", mac="00:1b:17:aa:01:01", toPort="ethernet1/1")),
@@ -83,16 +112,23 @@ EXTERNAL = [  # local switch, local port, neighbour dict
 def site_id(site):
     return str(2000000 + int(hashlib.sha1(site.encode()).hexdigest()[:5], 16))
 
+def conductor(s):
+    return by[s["stack"][0]] if s["stack"] else None
+
+def stack_id(s):
+    return "stack-" + hashlib.sha1(s["stack"][0].encode()).hexdigest()[:6] if s["stack"] else None
+
 def switch_device(s, function):
+    c = conductor(s)
     return {"serial": s["serial"], "mac": mac(s["name"]), "name": s["name"], "health": "Good",
-            "model": s["model"], "deviceFunction": function, "deployment": "Standalone",
+            "model": s["model"], "deviceFunction": function, "deployment": "Stack" if c else "Standalone",
             "status": "ONLINE" if s["status"] == "Online" else "OFFLINE", "type": "Switch",
-            "ipv4": s["mon"], "healthReason": None, "conductorSerial": None, "internet": True,
+            "ipv4": s["mon"], "healthReason": None, "conductorSerial": c["serial"] if c else None, "internet": True,
             "lastSeen": 1793120400, "vlans": [1, 10, 99]}
 
 def function_of(s):
     if s["name"] == "DO-CORE-01": return "Core Switch"
-    if s["name"].endswith("-CORE-01"): return "Aggregation Switch"
+    if re.search(r"-CORE-0\d$", s["name"]): return "Aggregation Switch"
     return "Access Switch"
 
 def as_ports(p):
@@ -104,10 +140,11 @@ def port_entries(names, lag=None):
             for i, name in enumerate(as_ports(names), start=1)]
 
 def edge(a, ap, b, bp, lag=None):
+    sib = (a, b) in SIBLING
     return {"from": by[a]["serial"] if a in by else a, "to": by[b]["serial"] if b in by else b,
-            "edgeType": "ETHERNET", "health": "Good", "healthReason": None, "speed": 10,
+            "edgeType": "STACK" if sib else "ETHERNET", "health": "Good", "healthReason": None, "speed": 10,
             "stpState": "Forwarding", "fromPortList": port_entries(ap, lag), "toPortList": port_entries(bp, lag),
-            "isSibling": False}
+            "isSibling": sib}
 
 sites = sorted({s["site"] for s in SW})
 sites_health = {"items": [{"id": site_id(n), "type": "network-monitoring/site-health", "siteName": n,
@@ -153,7 +190,12 @@ for s in SW:
     detail[s["serial"]] = {"id": s["serial"], "type": "network-monitoring/switch", "serialNumber": s["serial"],
                            "deviceName": s["name"], "model": s["model"], "switchType": "cx",
                            "siteName": s["site"], "siteId": site_id(s["site"]), "ipv4": s["mon"], "ipv6": None,
-                           "publicIp": None, "status": s["status"], "switchRole": None, "deployment": "Standalone"}
+                           "publicIp": None, "status": s["status"], "jNumber": SKU[s["model"]],
+                           "stackId": stack_id(s),
+                           "switchRole": (None if not s["stack"] else
+                                          "Conductor" if s["stack"][1] == 1 else "Standby" if s["stack"][1] == 2 else "Member"),
+                           "stackMemberId": s["stack"][1] if s["stack"] else None,
+                           "deployment": "Stack" if s["stack"] else "Standalone"}
 
 neighbours = {}
 for s in SW:
@@ -230,4 +272,5 @@ for fname, obj in [("sites-health.json", sites_health), ("topology.json", topolo
                    ("interfaces.json", interfaces), ("device-inventory.json", inventory)]:
     with open(os.path.join(HERE, fname), "w") as f:
         json.dump(obj, f, indent=1)
-print(f"{len(SW)} switches in {len(sites)} sites, {len(LINKS)} switch links, {len(EXTERNAL)} external neighbours, {len(items)} inventory rows")
+print(f"{len(SW)} switches ({sum(len(m) for m in STACKS.values())} in {len(STACKS)} stacks) in {len(sites)} sites, "
+      f"{len(LINKS)} switch links ({len(SIBLING)} stack), {len(EXTERNAL)} external neighbours, {len(items)} inventory rows")

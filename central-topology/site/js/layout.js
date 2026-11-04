@@ -2,6 +2,7 @@
 // positions out. Hub and spoke is the default. Position overrides are applied
 // afterwards, per layout, and never written back into the model.
 import { isLldpOnlySwitch } from "./model.js";
+import { layoutStructured } from "./structured.js";
 
 export const GEOM = { r1: 290, r2: 600, rExt: 740, nodeW: 156, nodeH: 46, pad: 40 };
 
@@ -14,6 +15,7 @@ const LAYOUT_FNS = {
   "tree-lr": (model) => layoutTree(model, "lr"),
   radial: (model) => layoutRadial(model),
   force: (model) => layoutForce(model),
+  structured: (model) => layoutStructured(model),
 };
 
 const COLUMN_FNS = {
@@ -29,6 +31,7 @@ export const LAYOUTS = [
   { id: "sites", label: "Grouped by site" },
   { id: "groups", label: "Grouped by group" },
   { id: "force", label: "Force-directed" },
+  { id: "structured", label: "Structured (sections)" },
 ];
 
 export function layoutById(id, model, opts) {

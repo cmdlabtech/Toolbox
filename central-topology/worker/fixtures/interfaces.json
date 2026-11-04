@@ -86,6 +86,18 @@
     "ipv4": null
    },
    {
+    "id": "1/1/5",
+    "name": "1/1/5",
+    "type": "ETHERNET",
+    "status": "Up",
+    "operStatus": "Up",
+    "adminStatus": "Up",
+    "uplink": false,
+    "neighbour": "WHS-CORE-02",
+    "neighbourSerial": "SGD1C13D9C",
+    "ipv4": null
+   },
+   {
     "id": "mgmt",
     "name": "mgmt",
     "type": "MANAGEMENT",
@@ -106,8 +118,8 @@
     "ipv4": "10.255.0.1"
    }
   ],
-  "count": 9,
-  "total": 9,
+  "count": 10,
+  "total": 10,
   "offset": null
  },
  "SG28851A9C": {
@@ -223,6 +235,18 @@
     "ipv4": null
    },
    {
+    "id": "1/1/52",
+    "name": "1/1/52",
+    "type": "ETHERNET",
+    "status": "Up",
+    "operStatus": "Up",
+    "adminStatus": "Up",
+    "uplink": false,
+    "neighbour": "WHS-CORE-02",
+    "neighbourSerial": "SGD1C13D9C",
+    "ipv4": null
+   },
+   {
     "id": "mgmt",
     "name": "mgmt",
     "type": "MANAGEMENT",
@@ -243,8 +267,8 @@
     "ipv4": "10.255.0.11"
    }
   ],
-  "count": 7,
-  "total": 7,
+  "count": 8,
+  "total": 8,
   "offset": null
  },
  "SG4D0640FC": {
@@ -442,10 +466,22 @@
     "neighbour": "OMS-CORE-01",
     "neighbourSerial": "SG36670055",
     "ipv4": null
+   },
+   {
+    "id": "1/1/52",
+    "name": "1/1/52",
+    "type": "ETHERNET",
+    "status": "Up",
+    "operStatus": "Up",
+    "adminStatus": "Up",
+    "uplink": false,
+    "neighbour": "OMS-ACC-02-2",
+    "neighbourSerial": "SGC00CCC23",
+    "ipv4": null
    }
   ],
-  "count": 1,
-  "total": 1,
+  "count": 2,
+  "total": 2,
   "offset": null
  },
  "SG29060159": {
@@ -700,6 +736,87 @@
   ],
   "count": 2,
   "total": 2,
+  "offset": null
+ },
+ "SGD1C13D9C": {
+  "items": [
+   {
+    "id": "2/1/49",
+    "name": "2/1/49",
+    "type": "ETHERNET",
+    "status": "Up",
+    "operStatus": "Up",
+    "adminStatus": "Up",
+    "uplink": true,
+    "neighbour": "DO-CORE-01",
+    "neighbourSerial": "SG188EFC07",
+    "ipv4": null
+   },
+   {
+    "id": "2/1/51",
+    "name": "2/1/51",
+    "type": "ETHERNET",
+    "status": "Up",
+    "operStatus": "Up",
+    "adminStatus": "Up",
+    "uplink": false,
+    "neighbour": "WHS-CORE-01",
+    "neighbourSerial": "SG6EBB7402",
+    "ipv4": null
+   }
+  ],
+  "count": 2,
+  "total": 2,
+  "offset": null
+ },
+ "SGC00CCC23": {
+  "items": [
+   {
+    "id": "2/1/51",
+    "name": "2/1/51",
+    "type": "ETHERNET",
+    "status": "Up",
+    "operStatus": "Up",
+    "adminStatus": "Up",
+    "uplink": false,
+    "neighbour": "OMS-ACC-02",
+    "neighbourSerial": "SGAE5515DB",
+    "ipv4": null
+   },
+   {
+    "id": "2/1/52",
+    "name": "2/1/52",
+    "type": "ETHERNET",
+    "status": "Up",
+    "operStatus": "Up",
+    "adminStatus": "Up",
+    "uplink": false,
+    "neighbour": "OMS-ACC-02-3",
+    "neighbourSerial": "SGCCD1825B",
+    "ipv4": null
+   }
+  ],
+  "count": 2,
+  "total": 2,
+  "offset": null
+ },
+ "SGCCD1825B": {
+  "items": [
+   {
+    "id": "3/1/51",
+    "name": "3/1/51",
+    "type": "ETHERNET",
+    "status": "Up",
+    "operStatus": "Up",
+    "adminStatus": "Up",
+    "uplink": false,
+    "neighbour": "OMS-ACC-02-2",
+    "neighbourSerial": "SGC00CCC23",
+    "ipv4": null
+   }
+  ],
+  "count": 1,
+  "total": 1,
   "offset": null
  }
 }

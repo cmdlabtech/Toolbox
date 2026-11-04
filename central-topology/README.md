@@ -4,13 +4,15 @@ A switch topology diagram for a new Central (HPE GreenLake) tenant. A layout pic
 
 - `site/`: a static page with no build step, hosted on Cloudflare Pages.
 - `worker/`: a stateless, read-only pass-through on Cloudflare Workers. It holds no credentials. It is new Central only, and the topology API is the inventory source.
-- `tests/`: `node --test`. Covers the Worker merge against the fixtures, role inference, management-IP choice, override parsing, layout placement, and the credential model: nothing persisted or logged server-side, and requests without credentials get mock data or a 401.
+- `tests/`: `node --test`. Covers the Worker merge against the fixtures, role inference, management-IP choice, override parsing, layout placement, and the credential model: nothing persisted or logged server-side, and requests without credentials get mock data or a 401. `structured.test.mjs` checks the Structured layout has no link crossings on the mock tenant, the large sample, and 1 to 14 synthetic buildings. `stencil.test.mjs` parses a real stencil only when `CT_STENCIL_FILE` points at one on your machine; otherwise that test is skipped.
 - `docs/API-NOTES.md`: every Central call with its doc link, which items are unverified, the auth flow, the CORS check, and the management-IP path end to end.
 - `TOKEN-RISK.md`: the credential model (bring your own, held in the browser) and its residual risks.
 
 **Hosted preview (mock data):** [central-topology-preview.pages.dev](https://central-topology-preview.pages.dev/)
 
 ![Central Topology with mock data](shots/central-topology-mock.png)
+
+![Structured (sections) layout with mock data, plain faceplates](shots/central-topology-structured.png)
 
 Status: preview. The hosted preview shows a synthetic district by default. Live data requires the viewer's own read-only new Central API credentials, entered in the browser. No credentials are stored in this repository or in the hosted Worker.
 
@@ -44,7 +46,8 @@ With no credentials entered and `MOCK=1` (the default in `wrangler.toml`), the W
 ## How it works
 
 1. The Worker's `/api/topology` lists sites (`sites-health`) and fetches `topology/{site-id}` for each one. It merges devices and links across sites.
-   - If a switch shows up in more than one site, the Worker asks switch detail for its home site.
+   - The Worker asks switch detail for every switch's part number (`jNumber`), used to match stencils. If a switch shows up in more than one site, the same call gives its home site.
+   - Stack members (topology `conductorSerial`, sibling links) fold into one switch on the conductor. Its uplinks from different members merge into one link that lists every port.
    - If a switch is still disconnected, it fills the gap from LLDP (`neighbours/{serial}`).
    - It adds VLAN SVI and OOBM/loopback IPs as management candidates.
    - Device group names come from one read-only `GET /network-monitoring/v1/device-inventory` (`items[].deviceGroupName`, matched on `items[].serialNumber`). A blank or missing name stays unset. The same bearer token is used. Nothing from that response is stored or logged.
@@ -55,7 +58,7 @@ With no credentials entered and `MOCK=1` (the default in `wrangler.toml`), the W
    - Everything else is access.
    - Ambiguous switches are flagged: no site, linked into another building, multi-homed, or no path to the core.
 3. Overrides are stored in `localStorage` under `ct-overrides`. You can set the district core, or a switch's building or role, then export or import them as JSON. Those apply in every layout.
-4. `layout.js` places nodes. The Layout picker selects one of the seven layouts below; the choice is kept in `localStorage` under `ct-layout`. `render.js` produces one self-contained SVG with colors taken from the `theme.css` tokens.
+4. `layout.js` places nodes. The Layout picker selects one of the eight layouts below; the choice is kept in `localStorage` under `ct-layout`. `render.js` produces one self-contained SVG with colors taken from the `theme.css` tokens.
 5. Downloads follow the layout on screen:
    - SVG is that string.
    - PNG is the SVG drawn onto a 2× canvas.
@@ -75,9 +78,14 @@ Hub and spoke keeps the district core in the middle. A small network pulls each 
 - **Radial rings.** Tiers are concentric rings: district core, then building cores, then access switches. Each building's switches share an arc.
 - **Grouped by site.** Each site is a labelled box with that site's switches stacked inside. Links that stay in the site run through the gutter beside the box. Links that leave the site run through the lane above the boxes. The boxes wrap across the width of the diagram.
 - **Grouped by group.** The same boxes and full-width grid, with one box per Central device group. A switch with no group sits in Ungrouped. The district core keeps its core mark. Links that leave the group are drawn lighter, the same way links that leave a site are. The view opens at the 11px name floor. Show LLDP neighbors uses the same toggle as the other layouts: off removes every LLDP neighbor and unmanaged LLDP card, and the boxes are placed again.
+- **Structured (sections).** Each building is a section. The district core's section is in the middle, the other buildings sit in a left and a right wing, and every link runs orthogonally with no crossings. Building cores head their section and access switches hang off a riser gutter. A firewall or router neighbor draws in a WAN band above the core when Show LLDP neighbors is on. A link that does not fit the tree leaves as a labeled off-page stub. Stack members draw as faceplates one above another, joined by a black stack connector and numbered by member. A stack of more than four (more than two above 40 switches) draws as one faceplate with a ×N badge. Above 40 switches the faceplates get narrower. Port names are in each link's tooltip and in the stub labels, not in margin pills, and this layout does not take drag pins.
 - **Force-directed.** Links act as springs and nodes repel. The simulation starts from a fixed seed and stops when it settles, so the same data always produces the same picture. It does not keep moving. The settled graph is centered in the frame, with at least a 16px gap between node boxes.
 
 The header control **Show ports** is on by default. It is stored in `localStorage` under `ct-ports`, with the same JSON load and save as the layout, theme, and management-IP choices. Each switch-to-switch link is labeled at both ends with that switch's interface. A LAG is the LAG name and its member ports, for example `lag1 (1/1/49-50)`. Links to access points and other neighbor devices are not labeled. Labels drop out when zoom would draw them smaller than about 10px. SVG and PNG downloads include them, and each switch card lists the same ports.
+
+## Visio stencils
+
+Import stencils draws the Structured layout's faceplates with Visio switch art. Pick or drop one or more `.vssx` files (or a `.zip` of them), for example the HPE Aruba switch stencils from VisioCafe. The browser reads them: front-view masters whose name has a part number become stencils, matched on the switch model, then its part number from Central, then the longest matching model prefix, then the model family (for example 6300M). A switch with no match keeps the plain faceplate. Parsed art is kept in this browser's IndexedDB only. Nothing is uploaded, the Worker never sees the files, and Clear stencils deletes them. No stencil art ships with this tool; VisioCafe's license does not allow redistributing it.
 
 ## Worker endpoints
 

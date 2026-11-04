@@ -12,7 +12,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL700C",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG28851A9C": {
@@ -28,7 +31,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL678A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG2EFE1AD2": {
@@ -44,7 +50,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL678A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG6EBB7402": {
@@ -60,8 +69,11 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
-  "switchRole": null,
-  "deployment": "Standalone"
+  "jNumber": "JL661A",
+  "stackId": "stack-6ebb74",
+  "switchRole": "Conductor",
+  "stackMemberId": 1,
+  "deployment": "Stack"
  },
  "SG4D0640FC": {
   "id": "SG4D0640FC",
@@ -76,7 +88,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL676A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG5D186396": {
@@ -92,7 +107,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL726A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SGB0423702": {
@@ -108,7 +126,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL676A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG1682C978": {
@@ -124,7 +145,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Offline",
+  "jNumber": "JL726A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG36670055": {
@@ -140,7 +164,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL661A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SGC40767FF": {
@@ -156,7 +183,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL676A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SGAE5515DB": {
@@ -172,8 +202,11 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
-  "switchRole": null,
-  "deployment": "Standalone"
+  "jNumber": "JL726A",
+  "stackId": "stack-ae5515",
+  "switchRole": "Conductor",
+  "stackMemberId": 1,
+  "deployment": "Stack"
  },
  "SG29060159": {
   "id": "SG29060159",
@@ -188,7 +221,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL676A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG63D57F1D": {
@@ -204,7 +240,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL661A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG0975B360": {
@@ -220,7 +259,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL676A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG74C757A1": {
@@ -236,7 +278,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL726A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SGC5489CBB": {
@@ -252,7 +297,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL661A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG7F217032": {
@@ -268,7 +316,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL676A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG4DC4F1DA": {
@@ -284,7 +335,10 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL726A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
  },
  "SG83363C34": {
@@ -300,7 +354,67 @@
   "ipv6": null,
   "publicIp": null,
   "status": "Online",
+  "jNumber": "JL678A",
+  "stackId": null,
   "switchRole": null,
+  "stackMemberId": null,
   "deployment": "Standalone"
+ },
+ "SGD1C13D9C": {
+  "id": "SGD1C13D9C",
+  "type": "network-monitoring/switch",
+  "serialNumber": "SGD1C13D9C",
+  "deviceName": "WHS-CORE-02",
+  "model": "Aruba 6300M 48G",
+  "switchType": "cx",
+  "siteName": "Westfield HS",
+  "siteId": "2864147",
+  "ipv4": "10.10.1.103",
+  "ipv6": null,
+  "publicIp": null,
+  "status": "Online",
+  "jNumber": "JL661A",
+  "stackId": "stack-6ebb74",
+  "switchRole": "Standby",
+  "stackMemberId": 2,
+  "deployment": "Stack"
+ },
+ "SGC00CCC23": {
+  "id": "SGC00CCC23",
+  "type": "network-monitoring/switch",
+  "serialNumber": "SGC00CCC23",
+  "deviceName": "OMS-ACC-02-2",
+  "model": "Aruba 6200F 48G",
+  "switchType": "cx",
+  "siteName": "Oak MS",
+  "siteId": "2910578",
+  "ipv4": "10.10.2.114",
+  "ipv6": null,
+  "publicIp": null,
+  "status": "Online",
+  "jNumber": "JL726A",
+  "stackId": "stack-ae5515",
+  "switchRole": "Standby",
+  "stackMemberId": 2,
+  "deployment": "Stack"
+ },
+ "SGCCD1825B": {
+  "id": "SGCCD1825B",
+  "type": "network-monitoring/switch",
+  "serialNumber": "SGCCD1825B",
+  "deviceName": "OMS-ACC-02-3",
+  "model": "Aruba 6200F 48G",
+  "switchType": "cx",
+  "siteName": "Oak MS",
+  "siteId": "2910578",
+  "ipv4": "10.10.2.115",
+  "ipv6": null,
+  "publicIp": null,
+  "status": "Online",
+  "jNumber": "JL726A",
+  "stackId": "stack-ae5515",
+  "switchRole": "Member",
+  "stackMemberId": 3,
+  "deployment": "Stack"
  }
 }
