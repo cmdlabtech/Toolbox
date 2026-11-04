@@ -4,8 +4,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildModel, mgmtOptions } from "../site/js/model.js";
-import { layoutById, structuredOpeningScale, structuredScaleFloor } from "../site/js/layout.js";
-import { GEOM, MIN_FONT_PX, approxMeasure, checkLayout, checkText, displayName } from "../site/js/structured.js";
+import { layoutById, structuredOpeningScale, structuredOpeningScroll, structuredScaleFloor } from "../site/js/layout.js";
+import { GEOM, MIN_FONT_PX, WAN_CLEAR, approxMeasure, checkLayout, checkText, displayName } from "../site/js/structured.js";
 import { renderSvg, TOKEN_NAMES } from "../site/js/render.js";
 import { district44 } from "./fixtures/district44.mjs";
 
@@ -148,4 +148,41 @@ test("render: labels come out as drawn, IP in mono, ports in the tooltip", () =>
   assert.match(svg, new RegExp(`class="lbl-ip"[^>]*font-family="MONO"[^>]*>${ip.text.replace(/[.]/g, "\\.")}<`));
   assert.match(svg, /<path data-edge=""[^>]*><title>[^<]*lag\d+/, "LAG names in link tooltips");
   assert.ok(!/<text[^>]*>[^<]*lag\d+/.test(svg), "no LAG names as text");
+});
+
+test("first scroll centres the district-core section with the top in view", () => {
+  const l = lay();
+  const core = l.sections.find((s) => s.own);
+  for (const w of [700, 1100]) {
+    const avail = { w, h: 600 };
+    const { left, top } = structuredOpeningScroll(l, l.bounds, 1, avail);
+    assert.equal(top, 0);
+    const centre = core.x + core.w / 2 - l.bounds.x;
+    assert.ok(Math.abs(left + w / 2 - centre) <= 1, `core centre ${centre} sits mid-pane at ${w}`);
+    assert.ok(left > 0, "the left wing is not what opens");
+  }
+  // A pane wider than the drawing does not scroll.
+  assert.deepEqual(structuredOpeningScroll(l, l.bounds, 1, { w: l.bounds.w + 100, h: 600 }), { left: 0, top: 0 });
+});
+
+test(`WAN line stays ${WAN_CLEAR}px clear of the core title text`, () => {
+  for (const measure of [undefined, (t, st) => approxMeasure(t, st) * 1.15]) {
+    const l = lay("vlan:1", measure);
+    assert.ok(l.wan, "fixture has a WAN line");
+    const core = l.sections.find((s) => s.own);
+    for (const lb of l.labels.filter((x) => x.section === core.name && (x.kind === "title" || x.kind === "count"))) {
+      assert.ok(l.wan.x - lb.box.x1 >= WAN_CLEAR, `${lb.kind} "${lb.text}" ends ${l.wan.x - lb.box.x1}px from the WAN line`);
+    }
+    assert.deepEqual(checkText(l).filter((m) => m.startsWith("WAN")), []);
+  }
+});
+
+test("mgmt line is VLAN arrow IP in 11px mono", () => {
+  const l = lay();
+  const ip = l.labels.find((x) => x.kind === "ip" && x.text.startsWith("VL1 "));
+  assert.match(ip.text, /^VL1 → \d+\.\d+\.\d+\.\d+$/);
+  assert.equal(ip.size, 11);
+  assert.equal(ip.mono, true);
+  const model10 = l.labels.find((x) => x.kind === "model");
+  assert.equal(model10.mono, true, "same family as the model text");
 });

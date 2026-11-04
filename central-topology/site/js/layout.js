@@ -1868,3 +1868,15 @@ function mulberry32(seed) {
 }
 
 const polar = (r, a) => ({ x: Math.round(r * Math.cos(a)), y: Math.round(r * Math.sin(a)) });
+
+/**
+ * First scroll for the Structured layout. The district-core section sits
+ * centred across the pane and the top of the diagram is in view.
+ */
+export function structuredOpeningScroll(lay, bounds, scale, avail) {
+  const core = lay?.sections?.find((s) => s.own);
+  if (!core || !bounds) return { left: 0, top: 0 };
+  const want = (core.x + core.w / 2 - bounds.x) * scale - avail.w / 2;
+  const most = Math.max(0, bounds.w * scale - avail.w);
+  return { left: Math.round(Math.min(Math.max(0, want), most)), top: 0 };
+}

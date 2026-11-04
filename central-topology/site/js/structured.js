@@ -38,6 +38,7 @@ export const MIN_FONT_PX = 10;
 /** Shared stubs and the Links out row show up to STUB_LINES labels, then "+n more". */
 export const STUB_LINES = 3;
 
+export const WAN_CLEAR = 8;
 const WAN_RE = /firewall|router|sd-?wan/i;
 const SLOT_RE = /gateway|controller/i;
 const AP_RE = /access point/i;
@@ -91,8 +92,8 @@ export function displayName(n) {
 export function mgmtText(m, optionId) {
   if (!m?.ip) return "—";
   if (m.fallback || m.source === "monitor") return m.ip;
-  if (optionId?.startsWith("vlan:")) return `VL${optionId.slice(5)} – ${m.ip}`;
-  return `${optionId === "oobm" ? "OOBM" : "Lo"} – ${m.ip}`;
+  if (optionId?.startsWith("vlan:")) return `VL${optionId.slice(5)} → ${m.ip}`;
+  return `${optionId === "oobm" ? "OOBM" : "Lo"} → ${m.ip}`;
 }
 
 export function stubLines(labels) {
@@ -298,7 +299,8 @@ export function layoutStructured(model, opts = {}) {
     const { x, local } = wanDevs[0];
     const wanX = Math.min(Math.max(cu.l + textNeed(cu) + 10, cu.l + g.fw / 2), cu.r - 30);
     cu.textMax = wanX - 8 - cu.l;
-    coreSec.titleMax = wanX - 10 - coreSec.inner.x0;
+    // Title text stays WAN_CLEAR clear of the WAN line, plus room for glyph overhang.
+    coreSec.titleMax = wanX - WAN_CLEAR - 2 - coreSec.inner.x0;
     const off = Math.min(Math.max(textNeed(wanUnit) + 8, g.fw / 2), g.fw - 12);
     const fx = Math.min(Math.max(wanX - off, coreSec.inner.x0), coreSec.inner.x1 - g.fw);
     place(wanUnit, fx, -cellH(wanUnit) - 46);
@@ -509,6 +511,17 @@ export function checkText(lay, scale = 1) {
     if (s && !inside(b, s.x + lay.geom.pad, s.x + s.w - lay.geom.pad, s.y, s.y + s.h)) bad.push(`${lb.kind} "${lb.text}" leaves ${s.name}`);
     const band = !!s && b.y0 < s.y + lay.geom.titleBand;
     if (band !== (lb.kind === "title" || lb.kind === "count")) bad.push(`${lb.kind} "${lb.text}" ${band ? "in" : "outside"} the title band`);
+  }
+  // The WAN line keeps WAN_CLEAR px from title text it passes.
+  for (const l of lay.links) if (l.kind === "wan") for (let i = 1; i < l.pts.length; i++) {
+    const [[ax, ay], [bx, by]] = [l.pts[i - 1], l.pts[i]];
+    for (const lb of lay.labels) {
+      if (lb.kind !== "title" && lb.kind !== "count") continue;
+      const b = lb.box;
+      const dx = Math.max(b.x0 - Math.max(ax, bx), Math.min(ax, bx) - b.x1, 0);
+      const dy = Math.max(b.y0 - Math.max(ay, by), Math.min(ay, by) - b.y1, 0);
+      if (Math.hypot(dx, dy) < WAN_CLEAR - eps) bad.push(`WAN line within ${WAN_CLEAR}px of ${lb.kind} "${lb.text}"`);
+    }
   }
   for (const u of lay.units.values()) {
     for (const f of u.faces ?? []) {

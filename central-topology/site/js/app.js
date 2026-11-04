@@ -1,6 +1,6 @@
 import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED, switchLinks } from "./model.js";
 import { largeSample } from "./large-sample.js";
-import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, structuredOpeningScale, structuredScaleFloor, writePosition } from "./layout.js";
+import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, structuredOpeningScale, structuredOpeningScroll, structuredScaleFloor, writePosition } from "./layout.js";
 import { contentBounds, renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, connectionState, createVault, fetchWithAuth, mintToken, normalise, reuseSavedToken, tokenPlaceholder } from "./creds.js";
@@ -254,7 +254,7 @@ function mountDiagram(scrollAfter) {
       scale = openingScale(frame, avail, cropped(reference));
     }
     state.view = { scale, openedAt: scale, user: false };
-    if (scrollAfter === undefined) {
+    if (scrollAfter === undefined && lay.kind !== "structured") {
       const fit = fitScale(frame, avail);
       // Fitted drawings stay put. A floor zoom centers the district core.
       scrollAfter = scale > fit + 1e-6 ? "core" : { left: 0, top: 0 };
@@ -275,6 +275,8 @@ function mountDiagram(scrollAfter) {
   if (!svg) return;
   const { x, y, w, h } = bounds;
   const scale = state.view.scale;
+  // Until the user zooms or scrolls, every Structured repaint reopens on the core.
+  if (scrollAfter === undefined && lay.kind === "structured" && !state.view.user) scrollAfter = structuredOpeningScroll(lay, bounds, scale, avail);
   let drawW = w * scale;
   let drawH = h * scale;
   if (h > HEADER_BAND) {
