@@ -25,7 +25,8 @@ export interface TopoDevice {
   deployment: string | null;   // "Standalone", or a stack deployment (exact stack value unverified)
   conductorSerial: string | null; // stack conductor's serial when the switch is a stack member
 }
-export interface SwitchDetail { siteId: string | null; siteName: string | null; jNumber: string | null; stackMemberId: number | null }
+export interface SwitchDetail { siteId: string | null; siteName: string | null; jNumber: string | null; stackMemberId: number | null; deviceName: string | null; serialNumber: string | null }
+export interface InventoryRow { serial: string; group: string | null; name: string | null; stackId: string | null }
 export interface LinkPort { name: string; lag: string | null }
 export interface TopoLink {
   from: string; to: string;
@@ -145,18 +146,19 @@ export function central(get: GetJson) {
         .map((s) => ({ id: String(s.id), name: str(s.siteName) ?? String(s.id) }));
     },
 
-    // Central device group name. Not used as the switch inventory.
+    // Central device group name, and the device name as a fallback when the
+    // topology name is only a serial. Not used as the switch inventory.
     // GET /network-monitoring/v1/device-inventory → items[].deviceGroupName,
-    // matched on items[].serialNumber (else items[].id).
-    async deviceGroups(): Promise<{ serial: string; group: string | null }[]> {
+    // deviceName, stackId, matched on items[].serialNumber (else items[].id).
+    async deviceGroups(): Promise<InventoryRow[]> {
       const items = await pagedCursor(get, "/network-monitoring/v1/device-inventory", {
         filter: "deviceType eq 'SWITCH'",
       });
-      const out: { serial: string; group: string | null }[] = [];
+      const out: InventoryRow[] = [];
       for (const d of items) {
         const serial = str(d?.serialNumber) ?? str(d?.id);
         if (!serial) continue;
-        out.push({ serial, group: str(d?.deviceGroupName) });
+        out.push({ serial, group: str(d?.deviceGroupName), name: str(d?.deviceName), stackId: str(d?.stackId) });
       }
       return out;
     },
@@ -192,7 +194,11 @@ export function central(get: GetJson) {
     async switchDetail(serial: string): Promise<SwitchDetail> {
       const d = await get(`/network-monitoring/v1/switches/${encodeURIComponent(serial)}`);
       const id = Number(d?.stackMemberId);
-      return { siteId: str(d?.siteId), siteName: str(d?.siteName), jNumber: str(d?.jNumber), stackMemberId: d?.stackMemberId != null && Number.isFinite(id) ? id : null };
+      return {
+        siteId: str(d?.siteId), siteName: str(d?.siteName), jNumber: str(d?.jNumber),
+        stackMemberId: d?.stackMemberId != null && Number.isFinite(id) ? id : null,
+        deviceName: str(d?.deviceName), serialNumber: str(d?.serialNumber),
+      };
     },
 
     // LLDP fill-in when topology leaves a switch cut off from the rest.

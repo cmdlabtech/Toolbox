@@ -104,7 +104,9 @@ export function bfs(adj, root) {
 
 /**
  * Build the hub-and-spoke model.
- * data: /api/topology response. overrides: { coreSerial, switches: { serial: { building, role } } }
+ * data: /api/topology response. overrides: { coreSerial, switches: { serial: { building, role, name } } }
+ * A name override is a browser-side rename: it replaces `name` everywhere and
+ * keeps Central's name as `centralName`. Nothing is written to Central.
  */
 export function buildModel(data, overrides = {}) {
   const unique = [];
@@ -128,8 +130,12 @@ export function buildModel(data, overrides = {}) {
   const nodes = switches.map((s) => {
     const o = ov[s.serial] ?? {};
     const building = o.building || s.site || UNASSIGNED;
+    const rename = cleanName(o.name);
     return {
       ...s,
+      name: rename ?? s.name,
+      centralName: s.name,
+      nameSource: rename ? "override" : "central",
       building,
       buildingSource: o.building ? "override" : s.site ? "site" : "none",
       group: typeof s.group === "string" && s.group.trim() ? s.group.trim() : null,
@@ -248,6 +254,26 @@ export function resolveMgmt(sw, optionId) {
   return { ip: null, fallback: true, source: null };
 }
 
+/** A user-typed switch name: control characters removed, spaces collapsed, at most 64 characters. Blank is null. */
+export function cleanName(v) {
+  if (typeof v !== "string") return null;
+  const t = v.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 64).trim();
+  return t || null;
+}
+
+/**
+ * Overrides with one switch renamed. A blank name, or the Central name itself,
+ * clears the rename. Returns a new object; other overrides are kept.
+ */
+export function withSwitchName(overrides, serial, value, centralName) {
+  const switches = { ...(overrides?.switches ?? {}) };
+  const cur = { ...(switches[serial] ?? {}) };
+  const name = cleanName(value);
+  if (name && name !== centralName) cur.name = name; else delete cur.name;
+  if (Object.keys(cur).length) switches[serial] = cur; else delete switches[serial];
+  return { ...overrides, switches };
+}
+
 /** Validate an imported overrides file; throws on bad shape. */
 export function parseOverrides(text) {
   const o = JSON.parse(text);
@@ -258,6 +284,8 @@ export function parseOverrides(text) {
     const e = {};
     if (typeof v.building === "string" && v.building.trim()) e.building = v.building.trim();
     if (ROLES.includes(v.role)) e.role = v.role;
+    const name = cleanName(v.name);
+    if (name) e.name = name;
     if (Object.keys(e).length) out.switches[serial] = e;
   }
   const positions = parsePositionStore(o.positions);
