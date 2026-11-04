@@ -190,6 +190,8 @@ function paint() {
   const renderOpts = {
     tokens: readTokens(), mgmt: state.mgmt, title: "Switch topology", subtitle,
     showPorts: state.showPorts !== false, stencils: state.registry,
+    // Export only: the on-screen view keeps its warning badges.
+    badges: false,
   };
   const lay = (state.lay = { ...placed, bounds: contentBounds(model, placed, renderOpts) });
   state.svg = renderSvg(model, lay, renderOpts);

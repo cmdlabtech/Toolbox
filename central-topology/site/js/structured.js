@@ -6,8 +6,9 @@
 //   Wings: every other building is a section box on the left or right.
 //   Routes: risers inside a section, nested-L spine routes from the core to
 //   each building core, one WAN lane. Each kind is crossing-free by
-//   construction. Links outside that tree become in-section stubs, or a
-//   "Links out" row at the bottom of the section.
+//   construction. Links outside that tree are peer routes: a bus per hub
+//   switch that runs in the section margins, gutter, and bottom channel, and
+//   leaves the section through outer channels when its peer is elsewhere.
 // Text is measured (opts.measure, the real font in the browser) and every
 // label is emitted in out.labels with its box, so columns size to their
 // content and tests can check that no text leaves its cell or section.
@@ -15,7 +16,7 @@ import { resolveMgmt } from "./model.js";
 
 export const GEOM = {
   fw: 200, fh: 18, sgap: 6, collapseOver: 4,
-  nameH: 16, lineH: 14, faceGap: 4, stubLen: 16, stubLineH: 14, stubGap: 2,
+  nameH: 16, lineH: 14, faceGap: 4, laneEdge: 4, tapSpread: 5, channelGap: 8, outerGap: 12,
   titleBand: 32, headGap: 12, rowGap: 12, bottomPad: 16, pad: 16,
   colMin: 160, colMax: 280, cellPad: 8, gutter: 24, lane: 6, laneInset: 6, textInset: 7,
   badgeR: 7, badgeInset: 4, badgeReserve: 22, square: 14,
@@ -31,12 +32,9 @@ export const TYPE = {
   ip: { size: 11, weight: 400, mono: true },
   model: { size: 10, weight: 500, mono: true },
   badge: { size: 10, weight: 700 },
-  stub: { size: 11, weight: 400 },
 };
 /** No structured text is drawn below this many screen px. */
 export const MIN_FONT_PX = 10;
-/** Shared stubs and the Links out row show up to STUB_LINES labels, then "+n more". */
-export const STUB_LINES = 3;
 
 export const WAN_CLEAR = 8;
 const WAN_RE = /firewall|router|sd-?wan/i;
@@ -96,10 +94,6 @@ export function mgmtText(m, optionId) {
   return `${optionId === "oobm" ? "OOBM" : "Lo"} → ${m.ip}`;
 }
 
-export function stubLines(labels) {
-  return labels.length <= STUB_LINES ? labels : [...labels.slice(0, STUB_LINES), `+${labels.length - STUB_LINES} more`];
-}
-
 // Text box from a baseline: ascent and descent as fractions of the size.
 function textBox(x, base, w, size, anchor) {
   const x0 = anchor === "end" ? x - w : anchor === "middle" ? x - w / 2 : x;
@@ -114,7 +108,7 @@ export function layoutStructured(model, opts = {}) {
   const nsw = nodes.reduce((a, n) => a + (n.stack?.length ?? 1), 0);
   // pos/extPos hold each drawn unit's centre so callers that look a switch up
   // by position still find it. Drag pins do not apply (app.js skips them).
-  const out = { kind: "structured", pos: new Map(), extPos: new Map(), sectors: [], geom: g, units: new Map(), sections: [], links: [], labels: [], stubs: [], wan: null, mgmt,
+  const out = { kind: "structured", pos: new Map(), extPos: new Map(), sectors: [], geom: g, units: new Map(), sections: [], links: [], labels: [], wan: null, mgmt,
     bounds: { x: -300, y: -300, w: 600, h: 600 }, name: (id) => displayName(byId.get(id)) || id };
   if (!coreSerial) return out;
   const core = byId.get(coreSerial);
@@ -133,14 +127,13 @@ export function layoutStructured(model, opts = {}) {
     const m = n ? resolveMgmt(n, mgmt) : null;
     u = { id, node: n ?? null, ext: x ?? null, name: n ? displayName(n) : x?.name ?? id, model: n?.model ?? x?.model ?? x?.type ?? null,
       role: n?.role ?? "ext", n: collapsed ? 1 : members, collapsed, mgmt: m, ipText: n ? mgmtText(m, mgmt) : null,
-      warn: !!(n && (m.fallback || n.flags.length)), stubPeers: [], stubPorts: [] };
+      warn: !!(n && (m.fallback || n.flags.length)) };
     out.units.set(id, u);
     return u;
   };
   const stackH = (k) => k * g.fh + (k - 1) * g.sgap;
   const textH = (u) => g.nameH + (u.via ? g.lineH : 0) + (u.node ? g.lineH : 0);
-  const stubBlock = (u) => (u.stubPeers.length ? g.stubGap + g.stubLineH * stubLines(u.stubPeers).length : 0);
-  const cellH = (u) => textH(u) + g.faceGap + stackH(u.n) + stubBlock(u);
+  const cellH = (u) => textH(u) + g.faceGap + stackH(u.n);
   const place = (u, x, y) => { u.x = x; u.y = y; u.l = x; u.r = x + g.fw; u.ft = y + textH(u) + g.faceGap; u.fb = u.ft + stackH(u.n); u.mid = u.ft + g.fh / 2; u.bottom = y + cellH(u); };
   // Attach y on a stack member named by a CX port (m/s/p), else member 1.
   const memberMid = (u, port) => {
@@ -175,7 +168,7 @@ export function layoutStructured(model, opts = {}) {
     const headId = own ? coreSerial : model.hubs[b] && byId.get(model.hubs[b])?.building === b ? model.hubs[b] : [...members].sort((a, c) => out.name(a.serial).localeCompare(out.name(c.serial)))[0].serial;
     const access = members.filter((n) => n.serial !== headId).sort(byHop).map((n) => n.serial);
     secs.push({ name: b, own, head: headId, access: [...access, ...(slots.get(b) ?? [])], aps: aps.get(b) ?? 0,
-      unassigned: b === "Unassigned", nsw: members.reduce((a, n) => a + (n.stack?.length ?? 1), 0), linksOut: [] });
+      unassigned: b === "Unassigned", nsw: members.reduce((a, n) => a + (n.stack?.length ?? 1), 0) });
   }
   const secOf = new Map();
   for (const s of secs) { unit(s.head); secOf.set(s.head, s); for (const id of s.access) { unit(id); secOf.set(id, s); } }
@@ -196,25 +189,21 @@ export function layoutStructured(model, opts = {}) {
       else if (u.ext && localOf.get(id) && localOf.get(id) !== s.head) { u.via = out.name(localOf.get(id)); drawn.add(key(id, localOf.get(id))); }
     }
   }
-  // Every other link between drawn units: a stub on access units, a Links out
-  // line for section heads (their sides carry risers and the spine).
-  const stubEdges = [];
-  for (const e of model.edges) {
-    const k = key(e.from, e.to);
-    if (drawn.has(k) || !out.units.has(e.from) || !out.units.has(e.to)) continue;
-    drawn.add(k);
-    stubEdges.push(e);
-    for (const [me, peer, port] of [[e.from, e.to, e.fromPort], [e.to, e.from, e.toPort]]) {
-      const u = unit(me), s = secOf.get(me), pn = out.name(peer);
-      if (s && s.head !== me) {
-        if (!u.stubPeers.includes(pn)) u.stubPeers.push(pn);
-        u.stubPorts.push({ port, peer, edge: e });
-      } else {
-        const host = s ?? secs.find((x) => x.own);
-        host.linksOut.push(`${u.name} → ${pn}`);
-      }
-    }
+  // Every other link between drawn units is a peer route. Routes group into
+  // buses, one per hub: the end with more peer links (then the name). A bus
+  // draws as one line that branches, so its routes may share lanes.
+  const peerEdges = model.edges.filter((e) => !drawn.has(key(e.from, e.to)) && out.units.has(e.from) && out.units.has(e.to) && e.from !== e.to);
+  const deg = new Map();
+  for (const e of peerEdges) for (const id of [e.from, e.to]) deg.set(id, (deg.get(id) ?? 0) + 1);
+  const buses = new Map();
+  for (const e of peerEdges) {
+    drawn.add(key(e.from, e.to));
+    const [hub, other] = [e.from, e.to].sort((a, b) => deg.get(b) - deg.get(a) || out.name(a).localeCompare(out.name(b)) || (a < b ? -1 : 1));
+    if (!buses.has(hub)) buses.set(hub, { id: buses.size, hub, routes: [] });
+    buses.get(hub).routes.push({ e, other, hubPort: hub === e.from ? e.fromPort : e.toPort, otherPort: hub === e.from ? e.toPort : e.fromPort });
   }
+  const busList = [...buses.values()];
+  for (const b of busList) b.secs = new Set([secOf.get(b.hub), ...b.routes.map((r) => secOf.get(r.other))]);
 
   // Column of each access unit, per section side.
   const columns = (sec, side) => {
@@ -223,20 +212,46 @@ export function layoutStructured(model, opts = {}) {
   };
   // Width a unit needs inside a column (text starts textInset in from the faceplate).
   const textNeed = (u) => g.textInset + Math.max(measure(u.name, TYPE.name), u.via ? measure(`via ${u.via}`, TYPE.sub) : 0, u.ipText ? measure(u.ipText, TYPE.ip) : 0);
-  const stubNeed = (u) => Math.max(0, ...stubLines(u.stubPeers.map((p) => `→ ${p}`)).map((t) => measure(t, TYPE.stub)));
 
   // Section layout at (x0, y0). side: "L" (inner edge right), "R", or "C".
   // pad: extra space above and below the head unit (core landings, LAYOUT-SPEC §5).
   function layoutSection(sec, side, x0, y0, pad = 0) {
     const bc = unit(sec.head);
     const [L, R] = columns(sec, side);
-    const offL = L.some((u) => u.stubPeers.length) ? g.stubLen : 0;
-    const offR = R.some((u) => u.stubPeers.length) ? g.stubLen : 0;
+    // Peer lanes: each bus that touches this section gets a lane on every
+    // side it uses (left margin, right margin, gutter for the head), and a
+    // bottom channel when it joins sides or leaves a wing section.
+    const sideIn = new Map([[bc.id, "h"], ...L.map((u) => [u.id, "l"]), ...R.map((u) => [u.id, "r"])]);
+    const lanes = { l: [], r: [], h: [], b: [] }, busAt = new Map();
+    for (const b of busList) {
+      if (!b.secs.has(sec)) continue;
+      const sides = new Set([b.hub, ...b.routes.map((r) => r.other)].filter((id) => secOf.get(id) === sec).map((id) => sideIn.get(id)));
+      for (const sd of sides) lanes[sd].push(b);
+      if (sides.size > 1 || (b.secs.size > 1 && side !== "C")) lanes.b.push(b);
+      busAt.set(b, {});
+    }
+    // Lane order. Buses that leave run outermost; the rest nest by the row
+    // they start on, outer lanes on deeper bottom channels. A wing section's
+    // leaving buses turn toward its outer edge on their channel, so on that
+    // side the outer lane takes the shallower channel, and on the other side
+    // the deeper one.
+    const row = (id) => (id === bc.id ? -1 : Math.max(L.findIndex((u) => u.id === id), R.findIndex((u) => u.id === id)));
+    const top = (b) => Math.min(...[b.hub, ...b.routes.map((r) => r.other)].filter((id) => secOf.get(id) === sec).map(row));
+    const byTop = (x, y) => top(x) - top(y) || x.id - y.id;
+    const leaves = (b) => b.secs.size > 1;
+    for (const sd of ["l", "r", "h"]) {
+      const out = lanes[sd].filter(leaves).sort(byTop), stay = lanes[sd].filter((b) => !leaves(b)).sort(byTop);
+      const toward = side === "L" ? "l" : side === "R" ? "r" : sd;
+      lanes[sd] = [...(sd === toward ? out : out.reverse()), ...stay];
+    }
+    lanes.b = [...lanes.b.filter((b) => !leaves(b)).sort(byTop).reverse(), ...lanes.b.filter(leaves).sort(byTop)];
+    const margin = (n) => (n ? 2 * g.laneEdge + n * g.lane : 0);
+    const offL = margin(lanes.l.length), offR = margin(lanes.r.length);
     const need = Math.max(g.fw, textNeed(bc),
-      ...L.map((u) => Math.max(offL + Math.max(g.fw, textNeed(u)), stubNeed(u))),
-      ...R.map((u) => Math.max(g.fw + offR, textNeed(u), stubNeed(u))));
+      ...L.map((u) => offL + Math.max(g.fw, textNeed(u))),
+      ...R.map((u) => Math.max(g.fw, textNeed(u)) + offR));
     const colW = Math.min(Math.max(need + g.cellPad, g.colMin), g.colMax);
-    const Wg = Math.max(g.gutter, g.lane * (L.length + R.length + 1));
+    const Wg = Math.max(g.gutter, g.lane * (L.length + R.length + 1 + lanes.h.length));
     const p = g.pad, fw = g.fw;
     let inner, gc;
     if (L.length && R.length) { gc = colW + Wg / 2; inner = 2 * colW + Wg; }
@@ -251,7 +266,8 @@ export function layoutStructured(model, opts = {}) {
     for (let r = 0; r < Math.max(L.length, R.length); r++) {
       const row = [];
       if (r < L.length) { const u = L[r]; place(u, gl - colW + offL, y); u.cell = { x0: gl - colW, x1: gl }; u.outer = "l"; row.push(u); }
-      if (r < R.length) { const u = R[r]; place(u, gr, y); u.cell = { x0: gr, x1: gr + colW }; u.outer = "r"; row.push(u); }
+      // Right-column text stops before the right margin's peer lanes.
+      if (r < R.length) { const u = R[r]; place(u, gr, y); u.cell = { x0: gr, x1: gr + colW }; u.outer = "r"; u.textMax = offR ? colW - offR : undefined; row.push(u); }
       y = Math.max(...row.map((u) => u.bottom)) + g.rowGap;
     }
     let bottom = y - g.rowGap;
@@ -259,9 +275,14 @@ export function layoutStructured(model, opts = {}) {
     const risers = [];
     L.forEach((a, r) => { const lx = gl + g.laneInset + r * g.lane; risers.push({ a, pts: [[lx, bc.fb], [lx, a.mid], [a.r, a.mid]] }); });
     R.forEach((a, r) => { const lx = gr - g.laneInset - r * g.lane; risers.push({ a, pts: [[lx, bc.fb], [lx, a.mid], [a.l, a.mid]] }); });
-    const lo = sec.linksOut.length ? { y: bottom + g.rowGap, lines: ["Links out", ...stubLines(sec.linksOut)] } : null;
-    if (lo) bottom = lo.y + g.lineH * lo.lines.length;
-    Object.assign(sec, { x: x0, y: y0, w: W, h: bottom + g.bottomPad - y0, side, risers, colW, gutter: Wg, inner: { x0: ix0, x1: ix1 }, lo });
+    // Lane positions. Head lanes take the gutter slots after the left risers,
+    // so no riser tap crosses them.
+    lanes.l.forEach((b, i) => { busAt.get(b).l = gl - colW + g.laneEdge + i * g.lane; });
+    lanes.r.forEach((b, i) => { busAt.get(b).r = gr + colW - g.laneEdge - i * g.lane; });
+    lanes.h.forEach((b, i) => { busAt.get(b).h = gl + g.laneInset + (L.length + i) * g.lane; });
+    lanes.b.forEach((b, i) => { busAt.get(b).b = bottom + g.channelGap + i * g.lane; });
+    if (lanes.b.length) bottom += g.channelGap + (lanes.b.length - 1) * g.lane;
+    Object.assign(sec, { x: x0, y: y0, w: W, h: bottom + g.bottomPad - y0, side, risers, colW, gutter: Wg, inner: { x0: ix0, x1: ix1 }, busAt, sideIn });
     bc.outer = side === "L" ? "l" : "r";
   }
 
@@ -369,20 +390,71 @@ export function layoutStructured(model, opts = {}) {
     }
   }
 
-  // Stub lines: one per attach point, from the faceplate's outer end to the
-  // section's inner padding edge.
-  for (const u of out.units.values()) {
-    if (!u.stubPorts.length) continue;
-    const seen = new Map();
-    for (const { port, peer, edge } of u.stubPorts) {
-      const ym = memberMid(u, port);
-      if (seen.has(ym)) { seen.get(ym).peers.push(peer); continue; }
-      const [x0, x1] = u.outer === "l" ? [u.l, u.cell.x0] : [u.r, u.cell.x1];
-      const st = { unit: u, y: ym, x: x1, side: u.outer, peers: [peer], labels: u.stubPeers.map((p) => `→ ${p}`) };
-      seen.set(ym, st);
-      out.stubs.push(st);
-      out.links.push({ kind: "stub", a: u.id, b: peer, edge, pts: [[x0, ym], [x1, ym]] });
+  // Peer routes. Each end taps its faceplate's outer end (a head drops from
+  // its faceplate bottom into the gutter), runs its bus lane to the bottom
+  // channel, and joins the other end in the same section, or leaves: a wing
+  // section through its outer channel, the core site straight down, and the
+  // two meet on the canvas bottom channel.
+  const placedSecs = secs.filter((s) => s.busAt);
+  const wingL = placedSecs.filter((s) => s.side === "L"), wingR = placedSecs.filter((s) => s.side === "R");
+  const leaving = busList.filter((b) => b.secs.size > 1);
+  // Canvas channels nest the same way: a bus between two sections of one wing
+  // runs innermost, then one that drops straight out of the core site, then
+  // the bus that leaves its section lowest.
+  const exitY = (b) => Math.max(...[...b.secs].map((s) => (s.side === "C" ? -Infinity : s.busAt.get(b).b)));
+  const coreOut = (b) => [...b.secs].some((s) => s.side === "C");
+  const oneSide = (b) => [...b.secs].every((s) => s.side === [...b.secs][0].side);
+  const chan = new Map([...leaving].sort((x, y) => oneSide(y) - oneSide(x) || coreOut(y) - coreOut(x) || exitY(y) - exitY(x) || x.id - y.id).map((b, i) => [b, i]));
+  const xgL = Math.min(...wingL.map((s) => s.x)) - g.outerGap, xgR = Math.max(...wingR.map((s) => s.x + s.w)) + g.outerGap;
+  const ygBase = Math.max(...placedSecs.map((s) => s.y + s.h)) + g.outerGap;
+  const gx = (s, b) => (s.side === "L" ? xgL - chan.get(b) * g.lane : xgR + chan.get(b) * g.lane);
+  const yg = (b) => ygBase + chan.get(b) * g.lane;
+  // Taps: one y per bus on each unit end, spread when buses share a member.
+  const taps = new Map();
+  const tapY = (u, b, port) => {
+    const base = memberMid(u, port), k = `${u.id}|${base}`;
+    if (!taps.has(k)) taps.set(k, []);
+    const list = taps.get(k);
+    if (!list.includes(b)) list.push(b);
+    return { base, k };
+  };
+  for (const b of busList) { const r0 = b.routes[0]; tapY(unit(b.hub), b, r0.hubPort); for (const r of b.routes) { tapY(unit(b.hub), b, r.hubPort); tapY(unit(r.other), b, r.otherPort); } }
+  const tapAt = (u, b, port) => {
+    const { base, k } = tapY(u, b, port), list = taps.get(k), i = list.indexOf(b);
+    const off = Math.max(-(g.fh / 2 - 2), Math.min(g.fh / 2 - 2, (i - (list.length - 1) / 2) * g.tapSpread));
+    return base + off;
+  };
+  // An end's way from its faceplate to its lane: points, then the lane x.
+  const leg = (id, b, port) => {
+    const u = unit(id), s = secOf.get(id), sd = s.sideIn.get(id), at = s.busAt.get(b);
+    if (sd === "h") return { s, x: at.h, pts: [[at.h, u.fb]] };
+    const y = tapAt(u, b, port), x = at[sd];
+    return { s, x, pts: [[sd === "l" ? u.l : u.r, y], [x, y]] };
+  };
+  // From the lane out of the section, to the point where it meets the canvas channels.
+  const exit = (lg, b) => {
+    const { s, x } = lg, at = s.busAt.get(b);
+    if (s.side === "C") return [[x, yg(b)]];
+    return [[x, at.b], [gx(s, b), at.b]];
+  };
+  const tidy = (pts) => {
+    const q = [];
+    for (const pt of pts) if (!q.length || q.at(-1)[0] !== pt[0] || q.at(-1)[1] !== pt[1]) q.push(pt);
+    return q.filter((pt, i) => i === 0 || i === q.length - 1 || !((q[i - 1][0] === pt[0] && pt[0] === q[i + 1][0]) || (q[i - 1][1] === pt[1] && pt[1] === q[i + 1][1])));
+  };
+  for (const b of busList) for (const r of b.routes) {
+    const A = leg(b.hub, b, r.hubPort), B = leg(r.other, b, r.otherPort);
+    let mid;
+    if (A.s === B.s) {
+      const at = A.s.busAt.get(b);
+      mid = A.x === B.x ? [] : [[A.x, at.b], [B.x, at.b]];
+    } else {
+      const ea = exit(A, b), eb = exit(B, b);
+      const pa = ea.at(-1), pb = eb.at(-1);
+      const join = pa[0] === pb[0] ? [] : [[pa[0], yg(b)], [pb[0], yg(b)]];
+      mid = [...ea, ...join, ...[...eb].reverse()];
     }
+    out.links.push({ kind: "peer", a: b.hub, b: r.other, edge: r.e, bus: b.id, cross: A.s !== B.s, pts: tidy([...A.pts, ...mid, ...[...B.pts].reverse()]) });
   }
   out.sections = secs;
 
@@ -404,10 +476,6 @@ export function layoutStructured(model, opts = {}) {
     const base = s.y + 21;
     const t = label("title", tw <= max ? title : ellipsize(title, TYPE.title, max, measure), s.name, s.inner.x0, base, TYPE.title, { color: "fg", section: s.name });
     if (t && tw + 8 + cw <= max) label("count", count, count, s.inner.x0 + tw + 8, base, TYPE.count, { section: s.name });
-    if (s.lo) {
-      const lw = s.inner.x1 - s.inner.x0;
-      s.lo.lines.forEach((line, i) => label(i ? "linksout" : "linksout-head", ellipsize(line, TYPE.stub, lw, measure), i ? line : s.linksOut.join("\n"), s.inner.x0, s.lo.y + 10.5 + i * g.lineH, TYPE.stub, { section: s.name }));
-    }
   }
   for (const u of out.units.values()) {
     if (u.x == null) continue;
@@ -434,15 +502,10 @@ export function layoutStructured(model, opts = {}) {
       f.text = text;
       if (f.square) label("badge", f.square.text, f.square.text, f.square.x + g.square / 2, fy + g.fh / 2 + 3.5, TYPE.badge, { anchor: "middle", color: "bg", unit: u.id, section: sec });
       if (f.pill) label("badge", f.pill.text, f.pill.text, f.pill.x + f.pill.w / 2, fy + g.fh / 2 + 3.5, TYPE.badge, { anchor: "middle", color: "bg", unit: u.id, section: sec });
-      if (f.badge) label("badge", "!", "!", f.badge.cx, f.badge.cy + 3.5, TYPE.badge, { anchor: "middle", color: "bg", unit: u.id, section: sec });
+      if (f.badge) f.badge.label = label("badge", "!", "!", f.badge.cx, f.badge.cy + 3.5, TYPE.badge, { anchor: "middle", color: "bg", unit: u.id, section: sec });
       if (text) label("model", text, f.model, (left + right) / 2, fy + g.fh / 2 + 3.5, TYPE.model, { anchor: "middle", unit: u.id, section: sec });
       return f;
     });
-    if (u.stubPeers.length) {
-      const lines = stubLines(u.stubPeers.map((p) => `→ ${p}`));
-      const right = u.outer === "r", ax = right ? u.cell.x1 : u.cell.x0, cw = u.cell.x1 - u.cell.x0;
-      lines.forEach((t, i) => label("stub", ellipsize(t, TYPE.stub, cw, measure), u.stubPeers.map((p) => `→ ${p}`).join("\n"), ax, u.fb + g.stubGap + 10.5 + i * g.stubLineH, TYPE.stub, { anchor: right ? "end" : "start", unit: u.id, section: sec }));
-    }
   }
 
   // Bounds: every box, path, and label, padding, and the title block.
@@ -458,7 +521,7 @@ export function layoutStructured(model, opts = {}) {
     if (u.x == null) continue;
     (u.node ? out.pos : out.extPos).set(u.id, { x: u.x + g.fw / 2, y: (u.y + u.fb) / 2 });
   }
-  out.stubEdges = stubEdges;
+  out.peerEdges = peerEdges;
   out.switchCount = nsw;
   out.minFont = Math.min(...L.map((lb) => lb.size));
   return out;
@@ -471,12 +534,14 @@ export function checkLayout(lay) {
   lay.links.forEach((l, li) => l.pts.slice(1).forEach((q, i) => segs.push([li, l.pts[i], q])));
   const diagonal = lay.links.filter((l) => l.pts.slice(1).some((q, i) => q[0] !== l.pts[i][0] && q[1] !== l.pts[i][1])).length;
   const box = (p, q) => [Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[0], q[0]), Math.max(p[1], q[1])];
-  const crossings = [];
+  const crossings = [], peerCrossings = [];
   for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) {
     if (segs[i][0] === segs[j][0]) continue;
+    const bi = lay.links[segs[i][0]].bus, bj = lay.links[segs[j][0]].bus;
+    if (bi != null && bi === bj) continue; // one bus, drawn as one branching line
     const A = box(segs[i][1], segs[i][2]), B = box(segs[j][1], segs[j][2]);
     if (A[0] > B[2] + 0.01 || B[0] > A[2] + 0.01 || A[1] > B[3] + 0.01 || B[1] > A[3] + 0.01) continue;
-    crossings.push(`${lay.name(lay.links[segs[i][0]].a)}–${lay.name(lay.links[segs[i][0]].b)} x ${lay.name(lay.links[segs[j][0]].a)}–${lay.name(lay.links[segs[j][0]].b)}`);
+    (bi != null && bj != null ? peerCrossings : crossings).push(`${lay.name(lay.links[segs[i][0]].a)}–${lay.name(lay.links[segs[i][0]].b)} x ${lay.name(lay.links[segs[j][0]].a)}–${lay.name(lay.links[segs[j][0]].b)}`);
   }
   const through = [];
   const hit = (p, q, [x0, x1, y0, y1]) => { const [sx0, sy0, sx1, sy1] = box(p, q); return sx1 > x0 && sx0 < x1 && sy1 > y0 && sy0 < y1; };
@@ -492,7 +557,7 @@ export function checkLayout(lay) {
   for (const s of lay.sections) {
     for (const [li, p, q] of segs) if (lay.links[li].kind !== "wan" && hit(p, q, [s.x, s.x + s.w, s.y, s.y + g.titleBand])) through.push(`${s.name} title band`);
   }
-  return { links: lay.links.length, crossings: crossings.length, diagonal, throughNodes: through.length, detail: [...crossings, ...through] };
+  return { links: lay.links.length, crossings: crossings.length, diagonal, throughNodes: through.length, detail: [...crossings, ...through], peerCrossings: peerCrossings.length, peerDetail: peerCrossings };
 }
 
 /**

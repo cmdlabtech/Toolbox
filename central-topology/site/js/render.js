@@ -309,7 +309,7 @@ export function renderSvg(model, lay, opts) {
     const ipText = m.ip ? m.ip + (m.fallback ? " (fallback)" : "") : "no IP";
     out.push(`<text x="${p.x + 3}" y="${p.y + 13}" text-anchor="middle" font-size="11" font-family="${esc(T["--font-mono"])}" fill="${m.fallback ? T["--warn"] : T["--diagram-muted"]}">${esc(ipText)}</text>`);
     if (m.fallback) out.push(`<rect x="${p.x - W / 2 - 4}" y="${p.y - H / 2 - 4}" width="${W + 8}" height="${H + 8}" rx="11" fill="none" stroke="${T["--warn"]}" stroke-width="1.5" stroke-dasharray="5 4"/>`);
-    if (n.flags.length) {
+    if (n.flags.length && opts.badges !== false) {
       out.push(`<circle cx="${p.x + W / 2 - 2}" cy="${p.y - H / 2 + 2}" r="9" fill="${T["--warn"]}"/><text x="${p.x + W / 2 - 2}" y="${p.y - H / 2 + 6}" text-anchor="middle" font-size="12" font-weight="700" fill="${T["--diagram-bg"]}">!</text>`);
     }
     out.push(`</g>`);

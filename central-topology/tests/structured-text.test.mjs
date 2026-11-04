@@ -102,19 +102,24 @@ test("model text is 10px mono and never shrinks; badges sit inside the faceplate
   assert.ok(badges > 0);
 });
 
-test("stubs and links out stay inside their sections, three lines then +n more", () => {
+test("no switch lists inline; ports in tooltips, only via X stays", () => {
   const l = lay();
-  for (const st of l.labels.filter((x) => x.kind === "stub" || x.kind === "linksout")) assert.equal(st.size, 11);
-  const more = l.labels.filter((x) => /^\+\d+ more$/.test(x.text));
-  assert.ok(more.length > 0);
-  for (const m of more) assert.ok(m.section, "no loose +n more");
-  for (const u of l.units.values()) {
-    const lines = l.labels.filter((x) => x.unit === u.id && x.kind === "stub");
-    assert.ok(lines.length <= 4, `${u.name} has ${lines.length} stub lines`);
-  }
-  // Ports and LAGs live in tooltips; only "via X" stays inline.
+  assert.ok(!l.labels.some((x) => /^→ |^\+\d+ more$/.test(x.text)), "no → switch lists or +n more");
   assert.ok(!l.labels.some((x) => /lag\d|\d+\/\d+\/\d+/.test(x.text)), "no port names inline");
   assert.equal(label(l, "LHS-C214-STACK", "via").text.startsWith("via LHS-CORE-VSX-"), true);
+});
+
+test("export leaves out the warning badges; the screen keeps them", () => {
+  const l = lay();
+  const screen = renderSvg(model, l, { tokens: TOKENS, mgmt: "vlan:1", title: "t", subtitle: "s" });
+  const file = renderSvg(model, l, { tokens: TOKENS, mgmt: "vlan:1", title: "t", subtitle: "s", badges: false });
+  assert.ok(screen.includes("warn-badge") && />!<\/text>/.test(screen), "screen shows the badges");
+  assert.ok(!file.includes("warn-badge") && !/>!<\/text>/.test(file), "export has no badges");
+  // Card layouts follow the same switch.
+  const flagged = { ...model, nodes: model.nodes.map((n, i) => (i ? n : { ...n, flags: ["test flag"] })) };
+  const hub = layoutById("hub", flagged);
+  assert.ok(/>!<\/text>/.test(renderSvg(flagged, hub, { tokens: TOKENS, mgmt: "vlan:1", title: "t", subtitle: "s" })));
+  assert.ok(!/>!<\/text>/.test(renderSvg(flagged, hub, { tokens: TOKENS, mgmt: "vlan:1", title: "t", subtitle: "s", badges: false })));
 });
 
 test("management IP follows the selected VLAN, changes on reselect, and stays in its column", () => {

@@ -6,7 +6,8 @@ import { topologyFromFixtures } from "./helpers.mjs";
 import { buildModel } from "../site/js/model.js";
 import { largeSample } from "../site/js/large-sample.js";
 import { LAYOUTS, layoutById, modelForNeighborToggle } from "../site/js/layout.js";
-import { checkLayout, checkText, stubLines } from "../site/js/structured.js";
+import { checkLayout, checkText } from "../site/js/structured.js";
+import { district44 } from "./fixtures/district44.mjs";
 import { renderSvg, TOKEN_NAMES } from "../site/js/render.js";
 import { createRegistry, modelKey } from "../site/js/stencils.js";
 
@@ -15,6 +16,38 @@ const ok = { crossings: 0, diagonal: 0, throughNodes: 0, detail: [] };
 const layout = (model) => layoutById("structured", model);
 const TOKENS = Object.fromEntries(TOKEN_NAMES.map((t) => [t, "#123456"]));
 const data = await topologyFromFixtures();
+
+// No line is cut off: both ends of every link sit on their own faceplate (or
+// a core landing rail), no segment enters a section that is neither end's,
+// a link inside one section stays inside it, and every link the tree cannot
+// draw is drawn as a peer line.
+function routeProblems(lay) {
+  const out = [], e = 0.01;
+  const inBox = (s, [x, y]) => x >= s.x - e && x <= s.x + s.w + e && y >= s.y - e && y <= s.y + s.h + e;
+  const secOf = new Map([...lay.units.values()].map((u) => [u.id, lay.sections.find((s) => inBox(s, [(u.l + u.r) / 2, (u.ft + u.fb) / 2]))]));
+  const onFace = (id, [x, y]) => {
+    const u = lay.units.get(id);
+    if (!u) return false;
+    const rail = id === lay.coreSerial && (lay.rails ?? []).some((r) => (Math.abs(x - u.l) < e || Math.abs(x - u.r) < e) && y >= r.y0 - e && y <= r.y1 + e);
+    const side = (Math.abs(x - u.l) < e || Math.abs(x - u.r) < e) && y >= u.ft - e && y <= u.fb + e;
+    const cap = (Math.abs(y - u.ft) < e || Math.abs(y - u.fb) < e) && x >= u.l - e && x <= u.r + e;
+    return rail || side || cap;
+  };
+  for (const l of lay.links) {
+    if (l.decor) continue;
+    const tag = `${l.kind} ${lay.name(l.a)}–${lay.name(l.b)}`, p = l.pts;
+    if (!((onFace(l.a, p[0]) && onFace(l.b, p.at(-1))) || (onFace(l.b, p[0]) && onFace(l.a, p.at(-1))))) out.push(`${tag}: an end is off its faceplate`);
+    const ends = new Set([secOf.get(l.a), secOf.get(l.b)]);
+    for (let i = 1; i < p.length; i++) {
+      const [x0, x1] = [p[i - 1][0], p[i][0]].sort((a, b) => a - b), [y0, y1] = [p[i - 1][1], p[i][1]].sort((a, b) => a - b);
+      for (const s of lay.sections) if (!ends.has(s) && x1 > s.x + e && x0 < s.x + s.w - e && y1 > s.y + e && y0 < s.y + s.h - e) out.push(`${tag}: crosses ${s.name}`);
+    }
+    if (ends.size === 1 && l.kind === "peer" && !p.every((pt) => inBox([...ends][0], pt))) out.push(`${tag}: leaves its own section`);
+  }
+  const drawn = new Set(lay.links.map((l) => l.edge).filter(Boolean));
+  for (const pe of lay.peerEdges) if (!drawn.has(pe)) out.push(`${lay.name(pe.from)}–${lay.name(pe.to)}: not drawn`);
+  return out;
+}
 
 test("structured is in the picker, after the existing layouts", () => {
   assert.equal(LAYOUTS.at(-1).id, "structured");
@@ -84,7 +117,7 @@ test("synthetic districts of 1 to 14 buildings stay crossing-free", () => {
   }
 });
 
-test("auto core on the wrong building: real links become stubs, still crossing-free", () => {
+test("auto core on the wrong building: real links become peer lines, still crossing-free", () => {
   const { data: d } = district([8, 6, 5]); // B0-CORE-01 has the highest degree, so it wins Auto core
   const model = buildModel(d);
   const lay = layout(model);
@@ -92,10 +125,11 @@ test("auto core on the wrong building: real links become stubs, still crossing-f
   assert.deepEqual(clean(checkLayout(lay)), ok);
   assert.deepEqual(checkText(lay), []);
   // DO-CORE-01 heads its own section now; its links to the other heads are
-  // listed in a "Links out" row inside that section, not drawn loose.
-  const lo = lay.sections.find((s) => s.name === "District Office").linksOut;
-  assert.ok(lo.length >= 2, "several links out share one row");
-  assert.ok(lay.labels.some((x) => x.kind === "linksout-head" && x.section === "District Office"));
+  // drawn as peer lines that reach both faceplates, not listed as text.
+  const dc = [...lay.units.values()].find((u) => u.name === "DO-CORE-01").id;
+  assert.ok(lay.links.filter((l) => l.kind === "peer" && (l.a === dc || l.b === dc)).length >= 2, "several peer lines from DO-CORE-01");
+  assert.deepEqual(routeProblems(lay), []);
+  assert.ok(!lay.labels.some((x) => /^linksout/.test(x.kind)), "no Links out row");
 });
 
 test("wing links land on the core at least 12px apart, in lane order", () => {
@@ -117,9 +151,43 @@ test("wing links land on the core at least 12px apart, in lane order", () => {
   assert.ok(railed > 0, "some cases outgrow the stack and use padding plus a rail");
 });
 
-test("shared stubs show three labels, then +n more", () => {
-  assert.deepEqual(stubLines(["a", "b"]), ["a", "b"]);
-  assert.deepEqual(stubLines(["a", "b", "c", "d", "e"]), ["a", "b", "c", "+2 more"]);
+test("no line is cut off: every link reaches both faceplates and only crosses its own sections", () => {
+  const cases = [];
+  const full = buildModel(data);
+  for (const shown of [true, false]) cases.push([`mock LLDP ${shown}`, modelForNeighborToggle(full, shown)]);
+  const sample = largeSample();
+  const big = buildModel(sample, { coreSerial: sample.coreSerial });
+  for (const shown of [true, false]) cases.push([`large LLDP ${shown}`, modelForNeighborToggle(big, shown)]);
+  const d44 = district44();
+  const m44 = buildModel(d44, { coreSerial: d44.coreSerial });
+  for (const shown of [true, false]) cases.push([`district44 LLDP ${shown}`, modelForNeighborToggle(m44, shown)]);
+  cases.push(["auto core", buildModel(district([8, 6, 5]).data)]);
+  for (const k of [1, 3, 6, 10, 14]) cases.push([`synthetic k=${k}`, buildModel(...Object.values(district(Array.from({ length: k }, (_, i) => 1 + (i % 5)))))]);
+  let peers = 0;
+  for (const [name, model] of cases) {
+    const lay = layout(model);
+    assert.deepEqual(routeProblems(lay), [], name);
+    assert.deepEqual(clean(checkLayout(lay)), ok, `${name} tree crossings`);
+    peers += lay.links.filter((l) => l.kind === "peer").length;
+  }
+  assert.ok(peers > 10, "the cases include peer lines");
+});
+
+test("district44: links the tree cannot draw are peer lines, not text", () => {
+  const d = district44();
+  const lay = layout(buildModel(d, { coreSerial: d.coreSerial }));
+  assert.ok(lay.peerEdges.length >= 10);
+  // Peer lines may cross each other where one bus encloses another; the count
+  // is a ratchet so a change cannot quietly make it worse.
+  assert.ok(checkLayout(lay).peerCrossings <= 16, `peer crossings ${checkLayout(lay).peerCrossings}`);
+  assert.ok(!lay.labels.some((x) => /^→ |^\+\d+ more$/.test(x.text)), "no → switch lists or +n more");
+  assert.ok(!lay.labels.some((x) => x.kind === "stub" || /^linksout/.test(x.kind)), "no stub or Links out labels");
+  // The IDF to core links that used to stop at a stub now land in the core site.
+  const coreSec = lay.sections.find((s) => s.side === "C");
+  const inCore = (id) => { const u = lay.units.get(id); return u.l >= coreSec.x && u.r <= coreSec.x + coreSec.w && u.ft >= coreSec.y && u.fb <= coreSec.y + coreSec.h; };
+  assert.ok(lay.links.some((l) => l.kind === "peer" && l.cross && (inCore(l.a) || inCore(l.b))), "peer lines reach the core site");
+  const svg = renderSvg(lay.model ?? buildModel(d, { coreSerial: d.coreSerial }), lay, { tokens: TOKENS, title: "t", subtitle: "s" });
+  assert.equal((svg.match(/data-kind="peer"/g) ?? []).length, lay.links.filter((l) => l.kind === "peer").length, "every peer line is drawn");
 });
 
 test("stencil lookup order: model, part number, prefix, family, fallback", () => {

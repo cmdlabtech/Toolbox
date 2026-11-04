@@ -40,17 +40,17 @@ export function renderStructuredSvg(model, lay, opts) {
   for (const l of lay.links) {
     const e = l.edge;
     const down = [l.a, l.b].some((id) => (lay.units.get(id)?.node?.status ?? "").toUpperCase() === "OFFLINE");
-    const tok = down ? "--link-down" : l.kind === "stub" ? "--edge" : `--link-${l.kind}`;
+    const tok = down ? "--link-down" : l.kind === "peer" ? "--edge" : `--link-${l.kind}`;
     const inferred = !e && !l.decor;
     const stroke = inferred ? T["--edge-inferred"] : T[tok];
     const dash = inferred ? "2 5" : down ? "4 3" : e?.source === "neighbours" ? "7 5" : null;
-    const sw = down || inferred ? 1.5 : l.kind === "stub" ? 1.5 : weight(e ?? { speedGbps: 10 });
+    const sw = down || inferred ? 1.5 : l.kind === "peer" ? 1.5 : weight(e ?? { speedGbps: 10 });
     const d = l.pts.map(([px, py], i) => `${i ? "L" : "M"}${px} ${py}`).join(" ");
     const tip = l.decor ? "WAN uplink" : !e ? `Inferred: no ${lay.name(l.a)}–${lay.name(l.b)} link in topology data${l.via ? ` (upstream via ${l.via})` : ""}`
       : `${lay.name(e.from)} ${portsOf(e, "from")} ↔ ${lay.name(e.to)} ${portsOf(e, "to")}${e.legs > 1 ? ` (${e.legs} links)` : ""}${e.source === "neighbours" ? " (LLDP fill-in)" : ""}${down ? " (down)" : ""}`;
     o.push(`<path data-edge="" data-kind="${l.kind}" data-ends="${esc(l.a)}|${esc(l.b)}" d="${d}" stroke="${stroke}" stroke-width="${sw}"${dash ? ` stroke-dasharray="${dash}"` : ""}><title>${esc(tip)}</title></path>`);
     o.push(`<path class="edge-hit" data-hit="${esc(l.a)}|${esc(l.b)}" d="${d}" stroke="transparent" stroke-width="9"><title>${esc(tip)}</title></path>`);
-    if (e?.legs > 1 && l.kind !== "stub") {
+    if (e?.legs > 1 && l.kind !== "peer") {
       const segs = l.pts.slice(1).map((q, i) => [l.pts[i], q]);
       const [[ax, ay], [bx]] = segs.reduce((m, s) => (Math.abs(s[0][0] - s[1][0]) > Math.abs(m[0][0] - m[1][0]) ? s : m));
       const mx = (ax + bx) / 2;
@@ -74,7 +74,10 @@ export function renderStructuredSvg(model, lay, opts) {
 
   const labelsBy = new Map();
   const loose = [];
+  // Warning badges are for the screen; exports leave them out.
+  const badges = opts.badges !== false;
   for (const lb of lay.labels) {
+    if (lb.kind === "badge" && !badges) continue;
     if (lb.unit) labelsBy.set(lb.unit, [...(labelsBy.get(lb.unit) ?? []), lb]);
     else loose.push(lb);
   }
@@ -115,7 +118,7 @@ export function renderStructuredSvg(model, lay, opts) {
       }
       if (f.square) o.push(`<rect x="${f.square.x}" y="${f.square.y}" width="${f.square.w}" height="${f.square.h}" rx="2" fill="${T["--diagram-fg"]}"/>`);
       if (f.pill) o.push(`<rect x="${f.pill.x}" y="${f.pill.y}" width="${f.pill.w}" height="${f.pill.h}" rx="7" fill="${T["--diagram-fg"]}"/>`);
-      if (f.badge) o.push(`<circle class="warn-badge" cx="${f.badge.cx}" cy="${f.badge.cy}" r="${f.badge.r}" fill="${T["--warn"]}"/>`);
+      if (f.badge && badges) o.push(`<circle class="warn-badge" cx="${f.badge.cx}" cy="${f.badge.cy}" r="${f.badge.r}" fill="${T["--warn"]}"/>`);
     }
     for (const rl of u.id === lay.coreSerial ? lay.rails ?? [] : []) {
       o.push(`<rect class="landing-rail" x="${rl.x}" y="${rl.y0}" width="3" height="${rl.y1 - rl.y0}" rx="1.5" fill="${rc}"/>`);
