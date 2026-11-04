@@ -245,8 +245,19 @@ export type Central = ReturnType<typeof central>;
 // Credentials are supplied by the browser on each request and live only in
 // the scope of that request. Nothing here is stored, cached or logged.
 
-// HPE GreenLake platform OAuth2 client-credentials token endpoint.
+// HPE OAuth2 client-credentials token endpoints. These are the only token
+// URLs the Worker will build (no open proxy):
+// - new Central personal API clients: SSO_URL
+// - HPE GreenLake platform (GLP) clients: GLP_TOKEN_ORIGIN + /authorization/v2/oauth2/<workspace>/token
 export const SSO_URL = "https://sso.common.cloud.hpe.com/as/token.oauth2";
+export const GLP_TOKEN_ORIGIN = "https://global.api.greenlake.hpe.com";
+export const WORKSPACE_RE = /^[A-Za-z0-9-]{8,64}$/;
+
+export function tokenUrl(workspaceId?: string | null): string {
+  if (workspaceId == null) return SSO_URL;
+  if (!WORKSPACE_RE.test(workspaceId)) throw new CentralError("workspaceId must be the Workspace ID shown in HPE GreenLake (letters, digits and dashes).", 400);
+  return `${GLP_TOKEN_ORIGIN}/authorization/v2/oauth2/${workspaceId}/token`;
+}
 
 // Only public new Central cluster API hosts may be targeted (no open proxy).
 const BASE_RE = /^https:\/\/(?!internal\.)[a-z]{2}\d\.api\.central\.arubanetworks\.com(\.cn)?$/;
@@ -285,14 +296,16 @@ export function liveGetter(baseUrl: string, token: string): GetJson {
 // Token exchange pass-through, used only if the browser cannot reach the
 // GreenLake token endpoint directly. The result goes straight back to the
 // browser; the Worker keeps nothing.
-export async function exchangeToken(clientId: string, clientSecret: string): Promise<{ access_token: string; expires_in: number | null }> {
-  const resp = await fetch(SSO_URL, {
+export async function exchangeToken(clientId: string, clientSecret: string, workspaceId?: string | null): Promise<{ access_token: string; expires_in: number | null }> {
+  const url = tokenUrl(workspaceId);
+  const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams({ grant_type: "client_credentials", client_id: clientId, client_secret: clientSecret }),
     cache: "no-store",
   });
-  if (!resp.ok) throw new CentralError(`HPE token request failed (HTTP ${resp.status}). Check the client ID and secret, and that the client is a personal API client for your new Central instance.`, resp.status === 400 || resp.status === 401 ? 401 : 502);
+  if (resp.status === 404 && workspaceId != null) throw new CentralError("HPE does not recognise that Workspace ID.", 404);
+  if (!resp.ok) throw new CentralError(`HPE token request failed (HTTP ${resp.status}). Check the client ID and secret${workspaceId != null ? " and the Workspace ID" : ""}.`, resp.status === 400 || resp.status === 401 ? 401 : 502);
   const body = (await resp.json()) as { access_token?: string; expires_in?: number };
   if (!body.access_token) throw new CentralError("GreenLake returned no access token.", 502);
   return { access_token: body.access_token, expires_in: typeof body.expires_in === "number" ? body.expires_in : null };

@@ -54,12 +54,14 @@
       <label>Cluster <select id="cBase"></select></label>
       <fieldset class="method">
         <legend>Sign-in method</legend>
-        <label><input type="radio" name="cMethod" value="client" checked> Client ID + secret (new Central personal API client)</label>
+        <label><input type="radio" name="cMethod" value="client" checked> Client ID + secret (renews itself)</label>
         <label><input type="radio" name="cMethod" value="token"> Bearer token</label>
       </fieldset>
-      <p class="note" data-for="client">Create the client in HPE GreenLake under Manage Workspace &gt; Personal API clients and choose your new Central instance as the service. API clients scoped to the GreenLake platform (GLP) use a different token endpoint; for those, request a token yourself and use Bearer token sign-in.</p>
+      <p class="note" data-for="client">Use a personal API client from HPE GreenLake (Manage Workspace &gt; Personal API clients). Enter the secret once: it keeps working for every new token, so you never need to reset it or paste tokens. Leave Workspace ID empty if the client's service is your new Central instance. If its service is HPE GreenLake platform, add the Workspace ID shown under Manage Workspace.</p>
       <label data-for="client">Client ID <input id="cId" type="text" autocomplete="off" spellcheck="false"></label>
       <label data-for="client">Client secret <input id="cSecret" type="password" autocomplete="off"></label>
+      <label data-for="client">Workspace ID (optional) <input id="cWorkspace" type="text" size="36" autocomplete="off" spellcheck="false" placeholder="GreenLake platform clients only"></label>
+      <p class="note" data-for="token" hidden>A pasted token stops working when it expires (15 minutes for a GreenLake platform client, 2 hours for a new Central client) and you have to paste a new one. Sign in with Client ID + secret instead and this page renews the token for you.</p>
       <label data-for="token" hidden>Bearer token <input id="cToken" type="password" autocomplete="off"></label>
       <label class="check"><input id="cRemember" type="checkbox"> Remember on this device (localStorage; otherwise cleared when the tab closes)</label>
     </div>

@@ -71,6 +71,7 @@ aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; co
 .creds .fields { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; }
 .creds label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .creds label[hidden] { display: none; }
+.creds .fields > .note { flex: 0 0 100%; max-width: none; margin: 0; }
 .creds label.check, .creds .method label { flex-direction: row; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--fg); }
 .creds .method { display: flex; gap: 12px; border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px 6px; margin: 0; }
 .creds .method legend { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding: 0 4px; }
