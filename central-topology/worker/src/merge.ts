@@ -1,5 +1,5 @@
 // Merge per-site topology into one tenant graph.
-import { isSwitch, type Central, type Site, type TopoDevice, type TopoLink } from "./central.ts";
+import { isSwitch, type Central, type Site, type SwitchDetail, type TopoDevice, type TopoLink } from "./central.ts";
 
 export interface MergedSwitch extends TopoDevice {
   siteId: string | null;
@@ -7,6 +7,8 @@ export interface MergedSwitch extends TopoDevice {
   siteSource: string;
   group: string | null;
   central: boolean;
+  jNumber: string | null;        // part number, for stencil matching
+  stackMemberId: number | null;  // member number inside a stack
 }
 
 function blank(v: string | null | undefined) {
@@ -91,21 +93,27 @@ export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[
     }
   }
 
-  // Home site: the only site listing it, else ask the switch detail endpoint.
+  // Switch detail for every switch: part number and stack member id, and the
+  // home site when more than one site lists the switch.
   const switches: MergedSwitch[] = [];
-  const multi = [...devices.values()].filter((d) => isSwitch(d) && (seenIn.get(d.serial)?.length ?? 0) > 1);
-  const detail = new Map<string, { siteId: string | null; siteName: string | null }>();
-  await pool(multi, 4, async (d) => {
-    try { detail.set(d.serial, await c.switchSite(d.serial)); }
-    catch (e) { warn(`${d.name}: switch detail unavailable (${(e as Error).message})`); }
+  const all = [...devices.values()].filter(isSwitch);
+  const detail = new Map<string, SwitchDetail>();
+  const missing: string[] = [];
+  await pool(all, 4, async (d) => {
+    try { detail.set(d.serial, await c.switchDetail(d.serial)); }
+    catch (e) {
+      if ((seenIn.get(d.serial)?.length ?? 0) > 1) warn(`${d.name}: switch detail unavailable (${(e as Error).message})`);
+      else missing.push(d.name);
+    }
   });
-  for (const d of devices.values()) {
-    if (!isSwitch(d)) continue;
+  if (missing.length) warn(`Part numbers unavailable for ${missing.length} switch(es): ${missing.slice(0, 5).join(", ")}${missing.length > 5 ? ", …" : ""}`);
+  for (const d of all) {
     const seen = seenIn.get(d.serial) ?? [];
     const det = detail.get(d.serial);
-    if (seen.length === 1) switches.push({ ...d, siteId: seen[0].id, site: seen[0].name, siteSource: "topology", group: null, central: true });
-    else if (det?.siteName) switches.push({ ...d, siteId: det.siteId, site: det.siteName, siteSource: "switch-detail", group: null, central: true });
-    else switches.push({ ...d, siteId: seen[0]?.id ?? null, site: seen[0]?.name ?? null, siteSource: "ambiguous", group: null, central: true });
+    const extra = { group: null, central: true, jNumber: det?.jNumber ?? null, stackMemberId: det?.stackMemberId ?? null };
+    if (seen.length === 1) switches.push({ ...d, ...extra, siteId: seen[0].id, site: seen[0].name, siteSource: "topology" });
+    else if (det?.siteName) switches.push({ ...d, ...extra, siteId: det.siteId, site: det.siteName, siteSource: "switch-detail" });
+    else switches.push({ ...d, ...extra, siteId: seen[0]?.id ?? null, site: seen[0]?.name ?? null, siteSource: "ambiguous" });
   }
 
   const groupRows = await groupTask;

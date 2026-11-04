@@ -6,6 +6,10 @@ import { buildModel, switchLinks } from "../site/js/model.js";
 import { jsonExport, svgBlob } from "../site/js/export.js";
 import { renderSvg } from "../site/js/render.js";
 import { GEOM, LAYOUTS, layoutById, modelForNeighborToggle } from "../site/js/layout.js";
+
+// Port pills sit on card layouts. Structured keeps ports in link tooltips and
+// stub chips so labels never land on a riser; it is checked on its own below.
+const CARD_LAYOUTS = LAYOUTS.filter((l) => l.id !== "structured");
 import { compactPortNames, formatPortEnd, portsVisible, readShowPorts, writeShowPorts } from "../site/js/ports.js";
 import { UI_KEYS, readUiPrefs, writeUiPref } from "../site/js/prefs.js";
 
@@ -182,7 +186,7 @@ test("hiding access neighbors keeps port labels on the remaining switch links", 
 
 test("every layout and the SVG export include port labels", async () => {
   const opts = { tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: "export" };
-  for (const spec of LAYOUTS) {
+  for (const spec of CARD_LAYOUTS) {
     const lay = layoutById(spec.id, model);
     const svg = renderSvg(model, lay, { ...opts, subtitle: spec.label });
     assert.match(svg, /lag1 \(1\/1\/49-50\)/, spec.id);
@@ -190,6 +194,8 @@ test("every layout and the SVG export include port labels", async () => {
     const ext = new Set(model.externals.map((d) => d.serial));
     for (const l of labelsOf(svg)) assert.equal(ext.has(l.end), false, spec.id);
   }
+  const structured = renderSvg(model, layoutById("structured", model), opts);
+  assert.match(structured, /<title>[^<]*lag1 \(1\/1\/49-50\)/, "structured link tooltip");
   const lay = layoutById("hub", model);
   const svg = renderSvg(model, lay, opts);
   const text = await svgBlob(svg).text();
@@ -204,7 +210,7 @@ function overlaps(a, b) {
 }
 
 test("export bounds include port labels and links, and labels do not collide", () => {
-  for (const spec of LAYOUTS) {
+  for (const spec of CARD_LAYOUTS) {
     const lay = layoutById(spec.id, model, { width: 1100, height: 760 });
     const svg = renderSvg(model, lay, {
       tokens: TOKENS, mgmt: "monitor", title: "Switch topology", subtitle: spec.label, showPorts: true, portScale: 1,

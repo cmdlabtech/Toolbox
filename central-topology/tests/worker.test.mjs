@@ -7,7 +7,8 @@ import { isCentralSwitch } from "../worker/src/merge.ts";
 test("switch list still comes from sites-health + per-site topology", async () => {
   const calls = [];
   const data = await topologyFromFixtures(calls);
-  assert.equal(data.switches.length, 19);
+  // 22 Central rows. The model folds the 3 non-conductor stack members back to 19 nodes.
+  assert.equal(data.switches.length, 22);
   for (const s of data.switches) assert.equal(s.central, true, s.name);
   assert.ok(calls.includes("/network-monitoring/v1/sites-health"));
   assert.equal(calls.filter((c) => c.startsWith("/network-monitoring/v1/topology/")).length, 5);
@@ -144,4 +145,15 @@ test("helpers", () => {
   assert.equal(interfaceKind("1/1/1", "ETHERNET"), "other");
   const s = scrub('Bearer abc.def {"access_token":"xyz"}');
   assert.doesNotMatch(s, /abc\.def|xyz/);
+});
+
+test("every switch carries its part number and stack fields from Central", async () => {
+  const data = await topologyFromFixtures();
+  for (const s of data.switches) assert.match(s.jNumber ?? "", /^J[LHQ]\d{3}[A-Z]$/, `${s.name} jNumber`);
+  const stacked = data.switches.filter((s) => s.stackMemberId != null);
+  assert.equal(stacked.length, 5);
+  const whs2 = data.switches.find((s) => s.name === "WHS-CORE-02");
+  assert.equal(whs2.stackMemberId, 2);
+  assert.equal(whs2.conductorSerial, data.switches.find((s) => s.name === "WHS-CORE-01").serial);
+  assert.equal(data.links.filter((l) => l.isSibling).length, 3);
 });

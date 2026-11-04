@@ -5,6 +5,9 @@ import { contentBounds, renderSvg, readTokens } from "./render.js";
 import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, connectionState, createVault, fetchWithAuth, mintToken, normalise, reuseSavedToken, tokenPlaceholder } from "./creds.js";
 import { UI_KEYS as KEYS, loadPref, readUiPrefs, savePref, writeUiPref } from "./prefs.js";
+import { createRegistry, EMPTY_REGISTRY } from "./stencils.js";
+import { importStencils } from "./stencil/vssx.js";
+import { clearStencils, loadStencils, saveStencils } from "./stencil/store.js";
 
 const $ = (id) => document.getElementById(id);
 // Device data comes from the tenant; escape it before it touches innerHTML.
@@ -25,6 +28,8 @@ const state = {
   view: null,
   openChips: new Set(),
   container: null,
+  // Visio stencils the user imported. They stay in this browser (IndexedDB).
+  stencils: [], registry: EMPTY_REGISTRY,
 };
 if (!LAYOUTS.some((l) => l.id === state.layout)) state.layout = "hub";
 if (!state.positions || typeof state.positions !== "object" || Array.isArray(state.positions)) state.positions = {};
@@ -137,7 +142,7 @@ function paint() {
   const subtitle = `${model.nodes.length} switches · ${model.buildings.length} buildings · ${layoutLabel} · Mgmt: ${mgmtLabel} · ${state.data.mock ? "MOCK DATA · " : ""}${new Date(state.data.generatedAt).toLocaleString()}`;
   const renderOpts = {
     tokens: readTokens(), mgmt: state.mgmt, title: "Switch topology", subtitle,
-    showPorts: state.showPorts !== false,
+    showPorts: state.showPorts !== false, stencils: state.registry,
   };
   const lay = (state.lay = { ...placed, bounds: contentBounds(model, placed, renderOpts) });
   state.svg = renderSvg(model, lay, renderOpts);
@@ -164,6 +169,17 @@ function paneSize(host) {
 
 function legendHtml(T) {
   const chip = (style, label) => `<span class="lg"><i style="${style}"></i>${esc(label)}</span>`;
+  if (state.layout === "structured") {
+    return `<div class="diagram-legend">${[
+      chip(`background:${T["--link-backbone"]}`, "Backbone"),
+      chip(`background:${T["--link-access"]}`, "Access uplink"),
+      chip(`background:${T["--link-wan"]}`, "WAN"),
+      chip(`background:${T["--link-stack"]}`, "Stack connector"),
+      chip(`background:transparent;border:1.5px dashed ${T["--link-down"]}`, "Down"),
+      chip(`background:${T["--edge-inferred"]}`, "Inferred"),
+      chip(`background:${T["--warn"]};border-radius:50%`, "Needs attention"),
+    ].join("")}</div>`;
+  }
   return `<div class="diagram-legend">${[
     chip(`background:${T["--node-core"]}`, "District core"),
     chip(`background:${T["--node-bcore"]}`, "Building core"),
@@ -232,7 +248,7 @@ function mountDiagram(scrollAfter) {
   const bounds = contentBounds(model, lay, frameOptsForBounds);
   scroller.innerHTML = renderSvg(model, { ...lay, bounds }, {
     tokens, mgmt: state.mgmt, title: "Switch topology", subtitle: state.subtitle,
-    ...frameOptsForBounds,
+    stencils: state.registry, ...frameOptsForBounds,
   });
   const svg = scroller.querySelector("svg");
   if (!svg) return;
@@ -362,6 +378,7 @@ function draw() {
 
   paint();
   side(model);
+  stencilState(model);
   const w = state.data.warnings ?? [];
   status(`${model.nodes.length} switches, ${model.edges.length} links. Core: ${model.byId.get(model.coreSerial)?.name ?? "none"} (${model.coreSource}).${w.length ? ` ${w.length} warning(s).` : ""}`);
 }
@@ -500,7 +517,8 @@ function edgeEnds(el) {
     const svg = host.querySelector("svg");
     const serial = g.dataset.serial;
     const origin = state.lay?.pos.get(serial);
-    if (!svg || !origin) return;
+    // Structured places by section rules; a pin there would be ignored.
+    if (!svg || !origin || state.lay?.kind === "structured") return;
     const lines = [...svg.querySelectorAll("line, path")].flatMap((el) => {
       const ends = edgeEnds(el);
       if (!ends) return [];
@@ -560,5 +578,47 @@ function edgeEnds(el) {
     side(state.model);
   });
 }
+
+// Visio stencils: parsed in the browser and stored in this browser only.
+// Nothing is uploaded; the files never reach the Worker.
+function setStencils(list) { state.stencils = list; state.registry = list.length ? createRegistry(list) : EMPTY_REGISTRY; }
+function stencilState(model = state.model) {
+  const el = $("stState");
+  if (!state.stencils.length) { el.textContent = "No stencils (plain faceplates)"; return; }
+  let hit = 0, all = 0;
+  for (const n of model?.nodes ?? []) for (const m of n.stack ?? [n]) { all++; if (state.registry.lookup(m.model ?? n.model, m.jNumber ?? n.jNumber)) hit++; }
+  el.textContent = `${state.stencils.length} stencils · ${hit} of ${all} switches matched`;
+}
+async function importFiles(files) {
+  const list = [...files].filter((f) => /\.(vssx|zip)$/i.test(f.name));
+  if (!list.length) return;
+  try {
+    const found = [];
+    for (const f of list) {
+      $("stState").textContent = `Reading ${f.name}…`;
+      const r = await importStencils(new Uint8Array(await f.arrayBuffer()), f.name);
+      found.push(...r.stencils);
+    }
+    if (!found.length) throw new Error("no front-view switch stencils with a part number found");
+    try { await saveStencils(found); } catch (e) { status(`Stencils loaded for this visit only; could not store them on this device (${e.message}).`, true); }
+    const bySku = new Map(state.stencils.map((x) => [x.sku, x]));
+    for (const x of found) bySku.set(x.sku, x);
+    setStencils([...bySku.values()]);
+    draw();
+  } catch (e) { status(`Stencil import failed: ${e.message}`, true); stencilState(); }
+}
+$("stImport").addEventListener("click", () => $("stFile").click());
+$("stFile").addEventListener("change", (e) => { const fs = [...(e.target.files ?? [])]; e.target.value = ""; importFiles(fs); });
+$("stClear").addEventListener("click", async () => {
+  try { await clearStencils(); } catch { /* nothing stored */ }
+  setStencils([]); draw(); stencilState();
+});
+{
+  const dz = $("diagram");
+  dz.addEventListener("dragover", (e) => { if ([...e.dataTransfer.types].includes("Files")) { e.preventDefault(); dz.classList.add("dropping"); } });
+  dz.addEventListener("dragleave", () => dz.classList.remove("dropping"));
+  dz.addEventListener("drop", (e) => { e.preventDefault(); dz.classList.remove("dropping"); importFiles(e.dataTransfer.files); });
+}
+loadStencils().then((list) => { if (list.length) { setStencils(list); draw(); } stencilState(); }).catch(() => stencilState());
 
 refresh();

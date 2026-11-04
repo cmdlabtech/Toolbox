@@ -29,6 +29,14 @@
   --edge: #8b95a7;
   --edge-inferred: #c0c6d2;
   --warn: #c77700;
+  /* Structured (sections) layout */
+  --section-fill: var(--bg);
+  --section-border: var(--border);
+  --link-backbone: var(--node-bcore);
+  --link-access: #d92d20;
+  --link-wan: var(--warn);
+  --link-stack: #000000;
+  --link-down: var(--node-ext);
 }
 :root[data-theme="dark"] {
   --bg: #161a22;      /* brand Night */
@@ -55,4 +63,11 @@
   --edge: #5b6577;
   --edge-inferred: #3b4250;
   --warn: #f5a524;
+  --section-fill: var(--bg);
+  --section-border: var(--border);
+  --link-backbone: var(--node-bcore);
+  --link-access: #ff6b5b;
+  --link-wan: var(--warn);
+  --link-stack: var(--diagram-fg);
+  --link-down: var(--node-ext);
 }

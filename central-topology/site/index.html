@@ -40,6 +40,12 @@
       <button id="ovReset" type="button">Reset overrides</button>
       <input id="ovFile" type="file" accept="application/json,.json" hidden>
     </div>
+    <div class="group">
+      <button id="stImport" type="button" title="Visio stencils (.vssx, or a .zip of them). Parsed in this browser and kept on this device only.">Import stencils</button>
+      <button id="stClear" type="button">Clear stencils</button>
+      <input id="stFile" type="file" accept=".vssx,.zip" multiple hidden>
+      <span id="stState" class="st-state" role="status"></span>
+    </div>
   </div>
   <section id="credsPanel" class="creds" hidden aria-labelledby="credsTitle">
     <h2 id="credsTitle">Central credentials</h2>

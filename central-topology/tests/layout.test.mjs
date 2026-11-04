@@ -42,7 +42,7 @@ function boxesOf(lay) {
 }
 
 test("layout catalogue keeps hub and spoke first", () => {
-  assert.deepEqual(LAYOUTS.map((l) => l.id), ["hub", "tree-tb", "tree-lr", "radial", "sites", "groups", "force"]);
+  assert.deepEqual(LAYOUTS.map((l) => l.id), ["hub", "tree-tb", "tree-lr", "radial", "sites", "groups", "force", "structured"]);
   assert.equal(LAYOUTS.find((l) => l.id === "groups").label, "Grouped by group");
   assert.equal(LAYOUTS[0].label, "Hub and spoke");
 });
@@ -98,7 +98,9 @@ test("every layout renders, including the management-IP fallback ring", () => {
     const svg = renderSvg(model, lay, { tokens: TOKENS, mgmt: "vlan:99", title: "Switch topology", subtitle: spec.label });
     assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
     for (const n of model.nodes) assert.ok(svg.includes(n.name), `${spec.id} ${n.name}`);
-    assert.match(svg, /stroke-dasharray="5 4"/, `${spec.id} fallback marker`);
+    // Card layouts ring a fallback IP. Structured faceplates carry a "!" badge and say so in the tooltip.
+    if (spec.id === "structured") assert.match(svg, /\(fallback IP\)[\s\S]*?<circle [^>]*r="7"/, `${spec.id} fallback marker`);
+    else assert.match(svg, /stroke-dasharray="5 4"/, `${spec.id} fallback marker`);
     assert.match(svg, /<line |<path /, `${spec.id} edges`);
   }
 });

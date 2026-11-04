@@ -37,6 +37,47 @@ export function adjacency(switches, links) {
   return adj;
 }
 
+/**
+ * A stack (VSF) is one logical switch. Members carry the conductor's serial in
+ * conductorSerial; sibling links join them. Collapse each stack into its
+ * conductor, keep the members on it, and re-point member links at it. Two
+ * links that land on the same pair after that become one link with `legs`
+ * and both ends' ports. A stack whose conductor is missing from the data stays
+ * as separate switches. Data with no stacks passes through unchanged.
+ */
+export function collapseStacks(switches, links) {
+  const ids = new Set(switches.map((s) => s.serial));
+  const unitOf = new Map(switches.map((s) => [s.serial, s.conductorSerial && ids.has(s.conductorSerial) ? s.conductorSerial : s.serial]));
+  const members = new Map();
+  for (const s of switches) members.set(unitOf.get(s.serial), [...(members.get(unitOf.get(s.serial)) ?? []), s]);
+  const logical = switches.filter((s) => unitOf.get(s.serial) === s.serial).map((s) => {
+    const m = members.get(s.serial);
+    if (m.length < 2) return s;
+    // Member id order (1, 2, …) as the stack numbers them; without ids the
+    // conductor goes first, then by name.
+    const id = (x) => (Number.isFinite(x.stackMemberId) ? x.stackMemberId : Infinity);
+    const stack = m.sort((a, b) => id(a) - id(b) || (a.serial === s.serial ? -1 : b.serial === s.serial ? 1 : a.name.localeCompare(b.name)))
+      .map((x) => ({ serial: x.serial, name: x.name, model: x.model, jNumber: x.jNumber ?? null, memberId: Number.isFinite(x.stackMemberId) ? x.stackMemberId : null, status: x.status, ipv4: x.ipv4 }));
+    return { ...s, stack };
+  });
+  if (logical.length === switches.length && !links.some((l) => l.isSibling)) return { switches, links };
+  const ports = (a = [], b = []) => [...a, ...b.filter((p) => !a.some((q) => q.name === p.name && q.lag === p.lag))];
+  const out = new Map();
+  for (const l of links) {
+    if (l.isSibling) continue;
+    const from = unitOf.get(l.from) ?? l.from, to = unitOf.get(l.to) ?? l.to;
+    if (from === to) continue;
+    const k = from < to ? `${from}|${to}` : `${to}|${from}`;
+    const prev = out.get(k);
+    if (!prev) { out.set(k, { ...l, from, to, legs: 1 }); continue; }
+    const same = prev.from === from;
+    prev.legs++;
+    prev.fromPorts = ports(prev.fromPorts, same ? l.fromPorts : l.toPorts);
+    prev.toPorts = ports(prev.toPorts, same ? l.toPorts : l.fromPorts);
+  }
+  return { switches: logical, links: [...out.values()] };
+}
+
 /** Highest switch-to-switch degree wins; ties go to the lower name. */
 export function pickCore(switches, adj) {
   let best = null;
@@ -66,14 +107,14 @@ export function bfs(adj, root) {
  * data: /api/topology response. overrides: { coreSerial, switches: { serial: { building, role } } }
  */
 export function buildModel(data, overrides = {}) {
-  const switches = [];
+  const unique = [];
   const seenSerial = new Set();
   for (const s of data.switches ?? []) {
     if (!s?.serial || seenSerial.has(s.serial)) continue;
     seenSerial.add(s.serial);
-    switches.push(s);
+    unique.push(s);
   }
-  const links = data.links ?? [];
+  const { switches, links } = collapseStacks(unique, data.links ?? []);
   const ov = overrides.switches ?? {};
   const adj = adjacency(switches, links);
   const bySerial = new Map(switches.map((s) => [s.serial, s]));

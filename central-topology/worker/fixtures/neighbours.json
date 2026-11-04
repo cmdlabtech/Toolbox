@@ -72,6 +72,16 @@
     "toPort": "1/1/49",
     "siteId": "2107231",
     "siteName": "District Office"
+   },
+   {
+    "serial": "SGD1C13D9C",
+    "name": "WHS-CORE-02",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/5",
+    "toPort": "2/1/49",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
    }
   ]
  },
@@ -168,6 +178,16 @@
     "health": "Good",
     "localPort": "1/1/4",
     "toPort": "1/1/49",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
+   },
+   {
+    "serial": "SGD1C13D9C",
+    "name": "WHS-CORE-02",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/52",
+    "toPort": "2/1/51",
     "siteId": "2864147",
     "siteName": "Westfield HS"
    }
@@ -320,6 +340,16 @@
     "health": "Good",
     "localPort": "1/1/49",
     "toPort": "1/1/2",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   },
+   {
+    "serial": "SGC00CCC23",
+    "name": "OMS-ACC-02-2",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "1/1/52",
+    "toPort": "2/1/51",
     "siteId": "2910578",
     "siteName": "Oak MS"
    }
@@ -510,6 +540,74 @@
     "toPort": "1/1/20",
     "siteId": "2651049",
     "siteName": "Maple ES"
+   }
+  ]
+ },
+ "SGD1C13D9C": {
+  "id": "SGD1C13D9C",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SG188EFC07",
+    "name": "DO-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "2/1/49",
+    "toPort": "1/1/5",
+    "siteId": "2107231",
+    "siteName": "District Office"
+   },
+   {
+    "serial": "SG6EBB7402",
+    "name": "WHS-CORE-01",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "2/1/51",
+    "toPort": "1/1/52",
+    "siteId": "2864147",
+    "siteName": "Westfield HS"
+   }
+  ]
+ },
+ "SGC00CCC23": {
+  "id": "SGC00CCC23",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SGAE5515DB",
+    "name": "OMS-ACC-02",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "2/1/51",
+    "toPort": "1/1/52",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   },
+   {
+    "serial": "SGCCD1825B",
+    "name": "OMS-ACC-02-3",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "2/1/52",
+    "toPort": "3/1/51",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
+   }
+  ]
+ },
+ "SGCCD1825B": {
+  "id": "SGCCD1825B",
+  "type": "Neighbours",
+  "neighbours": [
+   {
+    "serial": "SGC00CCC23",
+    "name": "OMS-ACC-02-2",
+    "type": "Switch",
+    "health": "Good",
+    "localPort": "3/1/51",
+    "toPort": "2/1/52",
+    "siteId": "2910578",
+    "siteName": "Oak MS"
    }
   ]
  }
