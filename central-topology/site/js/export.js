@@ -59,3 +59,27 @@ export function jsonExport(model, mgmt, overrides, meta) {
     overrides,
   };
 }
+
+/**
+ * Link check: what Central returned for switches, links and LLDP rows, so a
+ * missing uplink can be traced to the row that did not match. Built in the
+ * browser from data already loaded. No IPs, VLANs or credentials.
+ */
+export function linkCheckExport(data) {
+  const switches = (data.switches ?? []).map((s) => ({
+    serial: s.serial, name: s.name, model: s.model ?? null, site: s.site ?? null,
+    deployment: s.deployment ?? null, conductorSerial: s.conductorSerial ?? null, central: s.central ?? null,
+  }));
+  const known = new Set([...switches.map((s) => s.serial), ...(data.externals ?? []).map((d) => d.serial)]);
+  const links = (data.links ?? []).map((l) => ({ from: l.from, to: l.to, fromPort: l.fromPort ?? null, toPort: l.toPort ?? null, source: l.source ?? null }));
+  const lldpRows = (data.lldpRows ?? []).map((r) => ({ ...r }));
+  return {
+    generatedAt: new Date().toISOString(),
+    source: { mock: Boolean(data.mock), generatedAt: data.generatedAt ?? null },
+    switches,
+    links,
+    linksToUnknown: links.filter((l) => !known.has(l.from) || !known.has(l.to)),
+    lldpRows,
+    unmatchedRows: lldpRows.filter((r) => r.matched == null),
+  };
+}
