@@ -33,11 +33,11 @@ export async function topologyFromFixtures(calls = []) {
   const c = central(fixtureGetter(calls));
   const warnings = [];
   const sites = await c.sites();
-  const { switches, externals, links } = await mergeTenant(c, sites, pool, (w) => warnings.push(w));
+  const { switches, externals, links, lldpRows } = await mergeTenant(c, sites, pool, (w) => warnings.push(w));
   const out = [];
   for (const s of switches) {
     out.push({ ...s, vlans: (await c.vlans(s.serial)).filter((v) => v.ipv4),
       interfaces: (await c.interfaces(s.serial)).filter((i) => i.ipv4 && i.kind !== "other") });
   }
-  return { mock: true, generatedAt: new Date().toISOString(), sites, switches: out, externals, links, warnings };
+  return { mock: true, generatedAt: new Date().toISOString(), sites, switches: out, externals, links, lldpRows, warnings };
 }

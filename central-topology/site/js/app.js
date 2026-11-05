@@ -2,7 +2,7 @@ import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED, switchLinks
 import { largeSample } from "./large-sample.js";
 import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, structuredOpeningScale, structuredOpeningScroll, structuredScaleFloor, writePosition } from "./layout.js";
 import { contentBounds, renderSvg, readTokens } from "./render.js";
-import { download, jsonExport, pngBlob, stamp, svgBlob } from "./export.js";
+import { download, jsonExport, linkCheckExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, connectionState, createVault, fetchWithAuth, formatExpiry, mintToken, normalise, renewDue, reuseSavedToken, tokenPlaceholder, tokenValid } from "./creds.js";
 import { UI_KEYS as KEYS, loadPref, readUiPrefs, savePref, writeUiPref } from "./prefs.js";
 import { createRegistry, EMPTY_REGISTRY } from "./stencils.js";
@@ -555,6 +555,10 @@ $("dlPng").addEventListener("click", async () => {
 $("dlJson").addEventListener("click", () => {
   const body = jsonExport(state.model, state.mgmt, state.overrides, { mock: state.data.mock, generatedAt: state.data.generatedAt, layout: state.layout, positions: state.positions });
   download(new Blob([JSON.stringify(body, null, 2)], { type: "application/json" }), `central-topology-${stamp()}.json`);
+});
+$("dlLinks").addEventListener("click", () => {
+  if (!state.data) return;
+  download(new Blob([JSON.stringify(linkCheckExport(state.data), null, 2)], { type: "application/json" }), `central-topology-link-check-${stamp()}.json`);
 });
 $("ovExport").addEventListener("click", () => {
   const body = { ...state.overrides };
