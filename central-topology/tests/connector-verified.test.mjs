@@ -66,3 +66,21 @@ for (const [what, row] of [
   const bb = lay.links.find((l) => l.kind === "backbone" && [l.a, l.b].includes("SGADMMDF01"));
   assert.ok(bb?.edge, "structured backbone has a real edge");
 });
+
+// Issue 1: a peer link between two buildings used to leave its section by
+// the outer channel and run the canvas perimeter to the far building. It is
+// now a stub plus "↔ NAME" at each end, so no line runs between buildings.
+test("cross-building peer links draw as named stubs at both ends, not perimeter runs", async () => {
+  const { largeSample } = await import("../site/js/large-sample.js");
+  const d = largeSample(), model = buildModel(d, { coreSerial: d.coreSerial });
+  const lay = layoutById("structured", model);
+  const cross = lay.links.filter((l) => l.cross);
+  assert.ok(cross.length >= 8, "sample has cross-building peers");
+  for (const l of cross) {
+    assert.equal(l.stub, true);
+    const len = l.pts.slice(1).reduce((n, q, i) => n + Math.abs(q[0] - l.pts[i][0]) + Math.abs(q[1] - l.pts[i][1]), 0);
+    assert.ok(len < 80, `${lay.name(l.a)} stub is short (${len})`);
+    assert.ok(lay.links.some((m) => m.stub && m.a === l.b && m.b === l.a));
+    assert.ok(lay.labels.some((lb) => lb.kind === "far" && lb.unit === l.a && lb.full.includes(lay.name(l.b))));
+  }
+});
