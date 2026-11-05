@@ -110,3 +110,10 @@ aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; co
 #diagram svg.hl [data-edge]:not(.on) { opacity: 0.15; }
 #diagram svg.hl [data-edge].on { stroke-width: 3.5; }
 #diagram svg .edge-hit { pointer-events: stroke; }
+/* Topology loader: a ring in the accent colour beside the phase label. */
+#status.loading { display: flex; align-items: center; gap: 8px; color: var(--fg); }
+#status .ld-spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--accent); animation: ld-spin .8s linear infinite; flex: none; }
+@keyframes ld-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  #status .ld-spin { animation: none; border-color: var(--accent); }
+}

@@ -2,7 +2,7 @@
 // resolved from theme tokens at render time, so a downloaded file looks the
 // same outside the page. Pure function except for tokens passed in.
 import { CARD_NAME_FONT, GEOM, accessChipBoxes, labelBox, linkLeavesBucket, orthoBend, shownBounds } from "./layout.js";
-import { resolveMgmt } from "./model.js";
+import { mgmtLine, resolveMgmt } from "./model.js";
 import { renderStructuredSvg } from "./structured-render.js";
 import { PORT_FONT, portsVisible } from "./ports.js";
 
@@ -303,12 +303,16 @@ export function renderSvg(model, lay, opts) {
     const offline = (n.status ?? "").toUpperCase() === "OFFLINE";
     out.push(`<g data-serial="${esc(n.serial)}">`);
     out.push(`<title>${esc(`${n.name} · ${n.role} · ${n.building}${n.flags.length ? " · " + n.flags.join("; ") : ""}`)}</title>`);
-    out.push(`<rect x="${p.x - W / 2}" y="${p.y - H / 2}" width="${W}" height="${H}" rx="8" fill="${T["--node-fill"]}" stroke="${stroke}" stroke-width="${n.role === "access" ? 1.5 : 2.5}"${offline ? ` opacity="0.6"` : ""}/>`);
-    out.push(`<rect x="${p.x - W / 2}" y="${p.y - H / 2}" width="6" height="${H}" rx="3" fill="${stroke}"/>`);
-    out.push(`<text x="${p.x + 3}" y="${p.y - 4}" text-anchor="middle" font-size="${CARD_NAME_FONT}" font-weight="700" fill="${T["--diagram-fg"]}">${esc(n.name)}</text>`);
-    const ipText = m.ip ? m.ip + (m.fallback ? " (fallback)" : "") : "no IP";
-    out.push(`<text x="${p.x + 3}" y="${p.y + 13}" text-anchor="middle" font-size="11" font-family="${esc(T["--font-mono"])}" fill="${m.fallback ? T["--warn"] : T["--diagram-muted"]}">${esc(ipText)}</text>`);
-    if (m.fallback) out.push(`<rect x="${p.x - W / 2 - 4}" y="${p.y - H / 2 - 4}" width="${W + 8}" height="${H + 8}" rx="11" fill="none" stroke="${T["--warn"]}" stroke-width="1.5" stroke-dasharray="5 4"/>`);
+    // Box (name only) at the top of the footprint; the mgmt line centred below
+    // it on a background plate, so links into the card tuck behind it.
+    const BH = GEOM.boxH, top = p.y - H / 2, ipY = top + BH + GEOM.mgmtH / 2 + 4;
+    out.push(`<rect x="${p.x - W / 2}" y="${top}" width="${W}" height="${BH}" rx="8" fill="${T["--node-fill"]}" stroke="${stroke}" stroke-width="${n.role === "access" ? 1.5 : 2.5}"${offline ? ` opacity="0.6"` : ""}/>`);
+    out.push(`<rect x="${p.x - W / 2}" y="${top}" width="6" height="${BH}" rx="3" fill="${stroke}"/>`);
+    out.push(`<text x="${p.x + 3}" y="${top + BH / 2 + 4.5}" text-anchor="middle" font-size="${CARD_NAME_FONT}" font-weight="700" fill="${T["--diagram-fg"]}">${esc(n.name)}</text>`);
+    const ipText = mgmtLine(m, opts.mgmt);
+    out.push(`<rect class="ip-plate" x="${p.x - W / 2}" y="${top + BH}" width="${W}" height="${H - BH}" fill="${T["--diagram-bg"]}"/>`);
+    out.push(`<text class="mgmt-ip" x="${p.x}" y="${ipY}" text-anchor="middle" font-size="11" font-family="${esc(T["--font-mono"])}" fill="${m.fallback ? T["--warn"] : T["--diagram-muted"]}">${esc(ipText)}</text>`);
+    if (m.fallback) out.push(`<rect x="${p.x - W / 2 - 4}" y="${top - 4}" width="${W + 8}" height="${BH + 8}" rx="11" fill="none" stroke="${T["--warn"]}" stroke-width="1.5" stroke-dasharray="5 4"/>`);
     if (n.flags.length && opts.badges !== false) {
       out.push(`<circle cx="${p.x + W / 2 - 2}" cy="${p.y - H / 2 + 2}" r="9" fill="${T["--warn"]}"/><text x="${p.x + W / 2 - 2}" y="${p.y - H / 2 + 6}" text-anchor="middle" font-size="12" font-weight="700" fill="${T["--diagram-bg"]}">!</text>`);
     }

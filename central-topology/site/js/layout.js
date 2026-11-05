@@ -4,7 +4,9 @@
 import { isLldpOnlySwitch } from "./model.js";
 import { MIN_FONT_PX, TYPE, layoutStructured } from "./structured.js";
 
-export const GEOM = { r1: 290, r2: 600, rExt: 740, nodeW: 156, nodeH: 46, pad: 40 };
+// nodeH is a switch's whole footprint: a boxH name box with its mgmt line
+// (mgmtH) centred below it. Spacing, obstacles and bounds all use nodeH.
+export const GEOM = { r1: 290, r2: 600, rExt: 740, nodeW: 156, nodeH: 46, boxH: 30, mgmtH: 16, pad: 40 };
 
 /** Left margin reserved so grouped layouts can stack port labels beside a site box. */
 export const PORT_LANE = 128;
