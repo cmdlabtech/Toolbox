@@ -45,6 +45,16 @@ export function adjacency(switches, links) {
  * and both ends' ports. A stack whose conductor is missing from the data stays
  * as separate switches. Data with no stacks passes through unchanged.
  */
+/**
+ * Tooltip lines for a stack's members: "Stack of N", then one row per member
+ * with its number, model, serial, and role when known. [] for a lone switch.
+ */
+export function stackLines(n) {
+  if (!(n?.stack?.length > 1)) return [];
+  return [`Stack of ${n.stack.length}`,
+    ...n.stack.map((m, i) => [`  ${m.memberId ?? i + 1}`, m.model ?? "unknown model", m.serial, m.role].filter(Boolean).join("  "))];
+}
+
 export function collapseStacks(switches, links) {
   const ids = new Set(switches.map((s) => s.serial));
   const unitOf = new Map(switches.map((s) => [s.serial, s.conductorSerial && ids.has(s.conductorSerial) ? s.conductorSerial : s.serial]));
@@ -57,23 +67,30 @@ export function collapseStacks(switches, links) {
     // conductor goes first, then by name.
     const id = (x) => (Number.isFinite(x.stackMemberId) ? x.stackMemberId : Infinity);
     const stack = m.sort((a, b) => id(a) - id(b) || (a.serial === s.serial ? -1 : b.serial === s.serial ? 1 : a.name.localeCompare(b.name)))
-      .map((x) => ({ serial: x.serial, name: x.name, model: x.model, jNumber: x.jNumber ?? null, memberId: Number.isFinite(x.stackMemberId) ? x.stackMemberId : null, status: x.status, ipv4: x.ipv4 }));
+      .map((x) => ({ serial: x.serial, name: x.name, model: x.model, jNumber: x.jNumber ?? null, memberId: Number.isFinite(x.stackMemberId) ? x.stackMemberId : null,
+        role: x.serial === s.serial ? "conductor" : x.stackRole ?? null, status: x.status, ipv4: x.ipv4 }));
     return { ...s, stack };
   });
-  if (logical.length === switches.length && !links.some((l) => l.isSibling)) return { switches, links };
+  // One link per neighbour pair: stack (sibling) links and member-to-member
+  // links go, and parallel links (members or LAG legs to the same neighbour)
+  // merge into one edge that lists every port pair.
   const ports = (a = [], b = []) => [...a, ...b.filter((p) => !a.some((q) => q.name === p.name && q.lag === p.lag))];
+  const end = (list, one) => (list?.length ? list : one ? [{ name: one, lag: null }] : []);
   const out = new Map();
   for (const l of links) {
     if (l.isSibling) continue;
     const from = unitOf.get(l.from) ?? l.from, to = unitOf.get(l.to) ?? l.to;
     if (from === to) continue;
+    const fp = end(l.fromPorts, l.fromPort), tp = end(l.toPorts, l.toPort);
     const k = from < to ? `${from}|${to}` : `${to}|${from}`;
     const prev = out.get(k);
-    if (!prev) { out.set(k, { ...l, from, to, legs: 1 }); continue; }
+    if (!prev) { out.set(k, { ...l, from, to, fromPorts: fp, toPorts: tp, legs: 1 }); continue; }
     const same = prev.from === from;
     prev.legs++;
-    prev.fromPorts = ports(prev.fromPorts, same ? l.fromPorts : l.toPorts);
-    prev.toPorts = ports(prev.toPorts, same ? l.toPorts : l.fromPorts);
+    prev.fromPorts = ports(prev.fromPorts, same ? fp : tp);
+    prev.toPorts = ports(prev.toPorts, same ? tp : fp);
+    prev.fromPort ??= prev.fromPorts[0]?.name ?? null;
+    prev.toPort ??= prev.toPorts[0]?.name ?? null;
   }
   return { switches: logical, links: [...out.values()] };
 }

@@ -96,7 +96,7 @@ test("model text is 10px mono and never shrinks; badges sit inside the faceplate
   for (const u of l.units.values()) for (const f of u.faces ?? []) if (f.badge) {
     badges++;
     assert.equal(f.badge.r * 2, 14);
-    assert.equal(u.r - (f.badge.cx + f.badge.r), GEOM.badgeInset, "4px from the right edge");
+    assert.equal(u.l + f.w - (f.badge.cx + f.badge.r), GEOM.badgeInset, "4px from the front card's right edge");
     assert.equal(f.badge.cy, f.y + GEOM.fh / 2, "vertically centred");
   }
   assert.ok(badges > 0);

@@ -48,6 +48,7 @@ With no credentials entered and `MOCK=1` (the default in `wrangler.toml`), the W
 1. The Worker's `/api/topology` lists sites (`sites-health`) and fetches `topology/{site-id}` for each one. It merges devices and links across sites.
    - The Worker asks switch detail for every switch's part number (`jNumber`), used to match stencils. If a switch shows up in more than one site, the same call gives its home site.
    - Stack members (topology `conductorSerial`, sibling links) fold into one switch on the conductor. Its uplinks from different members merge into one link that lists every port.
+   - A stack draws as one switch box with a "×N" pill after its name and two faded cards offset behind it, in every layout and in exports. Its tooltip lists each member: number, model, serial and role when known.
    - If the switches are still in more than one piece, it fills the gap from LLDP (`neighbours/{serial}`). A row that names a stack member, a MAC or a unique switch name is matched to the switch the graph uses, so a stack shown under its stack id still gets its uplink. Download link check saves those rows, their match result, and the switch and link list (no IPs) as JSON in the browser.
    - It adds VLAN SVI and OOBM/loopback IPs as management candidates.
    - Device group names come from one read-only `GET /network-monitoring/v1/device-inventory` (`items[].deviceGroupName`, matched on `items[].serialNumber`). A blank or missing name stays unset. The same bearer token is used. Nothing from that response is stored or logged.
