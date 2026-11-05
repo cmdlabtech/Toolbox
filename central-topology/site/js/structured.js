@@ -18,7 +18,7 @@ export const GEOM = {
   fw: 200, fh: 18, sgap: 6, shadow: 4, pillW: 26, pillGap: 5,
   nameH: 16, lineH: 14, faceGap: 4, laneEdge: 4, tapSpread: 5, channelGap: 8, outerGap: 12,
   titleBand: 32, headGap: 12, rowGap: 12, bottomPad: 16, pad: 16,
-  colMin: 160, colMax: 280, cellPad: 8, gutter: 24, lane: 6, laneInset: 6, textInset: 7,
+  colMin: 160, colMax: 280, cellPad: 8, gutter: 24, lane: 6, stub: 8, laneInset: 6, textInset: 7,
   badgeR: 7, badgeInset: 4, badgeReserve: 22, square: 14,
   secgap: 24, spinePitch: 10, spineInset: 18, canvasPad: 40, titleH: 112, landingGap: 12,
 };
@@ -168,7 +168,7 @@ export function layoutStructured(model, opts = {}) {
     return u;
   };
   const stackH = (k) => k * g.fh + (k - 1) * g.sgap;
-  const textH = (u) => g.nameH + (u.via ? g.lineH : 0);
+  const textH = (u) => g.nameH + (u.via ? g.lineH : 0) + (u.far?.length ? g.lineH : 0);
   // A stack (members > 1) is one faceplate with two stacked-card shadows
   // offset g.shadow and 2 * g.shadow behind it; u.sh is their extra height.
   // A switch's mgmt line sits below the faceplate and shadows (u.ex is the bottom of that line).
@@ -260,6 +260,16 @@ export function layoutStructured(model, opts = {}) {
   }
   const busList = [...buses.values()];
   for (const b of busList) b.secs = new Set([secOf.get(b.hub), ...b.routes.map((r) => secOf.get(r.other))]);
+  // A peer link between two buildings draws as a short stub at each end with
+  // an end dot, and each end names the far switch ("↔ NAME") under its own
+  // name. A full route would wrap the canvas edge and get lost among the
+  // other lines (CMDLAB t738u).
+  for (const b of busList) for (const r of b.routes) {
+    if (secOf.get(b.hub) === secOf.get(r.other)) continue;
+    r.cross = true;
+    for (const [id, far] of [[b.hub, r.other], [r.other, b.hub]]) (unit(id).far ??= []).push(out.name(far));
+  }
+  const farText = (u) => `↔ ${u.far.join(", ")}`;
 
   // Column of each access unit, per section side.
   const columns = (sec, side) => {
@@ -267,7 +277,7 @@ export function layoutStructured(model, opts = {}) {
     return n <= 3 ? (side !== "R" ? [acc, []] : [[], acc]) : [acc.filter((_, i) => i % 2 === 0), acc.filter((_, i) => i % 2 === 1)];
   };
   // Width a unit needs inside a column (text starts textInset in from the faceplate).
-  const textNeed = (u) => g.textInset + Math.max(measure(u.name, TYPE.name) + (u.sh ? g.pillGap + g.pillW : 0), u.via ? measure(`via ${u.via}`, TYPE.sub) : 0, u.ipText ? measure(u.ipText, TYPE.ip) - g.textInset : 0);
+  const textNeed = (u) => g.textInset + Math.max(measure(u.name, TYPE.name) + (u.sh ? g.pillGap + g.pillW : 0), u.via ? measure(`via ${u.via}`, TYPE.sub) : 0, u.far?.length ? measure(farText(u), TYPE.sub) : 0, u.ipText ? measure(u.ipText, TYPE.ip) - g.textInset : 0);
 
   // Section layout at (x0, y0). side: "L" (inner edge right), "R", or "C".
   // pad: extra space above and below the head unit (core landings, LAYOUT-SPEC §5).
@@ -500,6 +510,14 @@ export function layoutStructured(model, opts = {}) {
   };
   for (const b of busList) for (const r of b.routes) {
     const A = leg(b.hub, b, r.hubPort), B = leg(r.other, b, r.otherPort);
+    if (r.cross) {
+      // Stub: faceplate to its own lane, then a short drop with an end dot.
+      for (const [L, me, far] of [[A, b.hub, r.other], [B, r.other, b.hub]]) {
+        const end = L.pts.at(-1), pts = L.pts.length > 1 ? L.pts : [end, [end[0], end[1] + g.stub]];
+        out.links.push({ kind: "peer", a: me, b: far, edge: r.e, bus: b.id, cross: true, stub: true, pts });
+      }
+      continue;
+    }
     let mid;
     if (A.s === B.s) {
       const at = A.s.busAt.get(b);
@@ -555,6 +573,7 @@ export function layoutStructured(model, opts = {}) {
     }
     let ly = u.y + g.nameH;
     if (u.via) { label("via", ellipsize(`via ${u.via}`, TYPE.sub, maxW, measure), `via ${u.via}`, tx, ly + 10.5, TYPE.sub, { unit: u.id, section: sec }); ly += g.lineH; }
+    if (u.far?.length) { const t = farText(u); label("far", ellipsize(t, TYPE.sub, maxW, measure), `Linked to ${u.far.join(", ")} in another building`, tx, ly + 10.5, TYPE.sub, { unit: u.id, section: sec }); ly += g.lineH; }
     // Mgmt line: one centred line below the faceplates, inside the cell.
     if (u.node) {
       const cx = u.l + g.fw / 2, half = Math.min(cx - u.cell.x0, u.cell.x1 - cx);

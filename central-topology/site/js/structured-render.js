@@ -60,6 +60,8 @@ export function renderStructuredSvg(model, lay, opts) {
       : `${lay.name(e.from)} ${portsOf(e, "from")} ↔ ${lay.name(e.to)} ${portsOf(e, "to")}${e.legs > 1 ? ` (${e.legs} links)` : ""}${e.source === "neighbours" ? " (LLDP fill-in)" : ""}`;
     o.push(`<path data-edge="" data-kind="${l.kind}" data-ends="${esc(l.a)}|${esc(l.b)}" d="${d}" stroke="${stroke}" stroke-width="${sw}"${dash ? ` stroke-dasharray="${dash}"` : ""}><title>${esc(tip)}</title></path>`);
     o.push(`<path class="edge-hit" data-hit="${esc(l.a)}|${esc(l.b)}" d="${d}" stroke="transparent" stroke-width="9"><title>${esc(tip)}</title></path>`);
+    // Cross-building stub: a dot marks where it leaves for the far switch.
+    if (l.stub) { const [sx, sy] = l.pts.at(-1); o.push(`<circle data-stub="" cx="${sx}" cy="${sy}" r="2.5" fill="${stroke}" stroke="none"><title>${esc(`${tip} · continues to ${lay.name(l.b)}`)}</title></circle>`); }
     if (e?.legs > 1 && l.kind !== "peer") {
       const segs = l.pts.slice(1).map((q, i) => [l.pts[i], q]);
       const [[ax, ay], [bx]] = segs.reduce((m, s) => (Math.abs(s[0][0] - s[1][0]) > Math.abs(m[0][0] - m[1][0]) ? s : m));

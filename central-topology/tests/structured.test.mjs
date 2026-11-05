@@ -36,6 +36,16 @@ function routeProblems(lay) {
   for (const l of lay.links) {
     if (l.decor) continue;
     const tag = `${l.kind} ${lay.name(l.a)}–${lay.name(l.b)}`, p = l.pts;
+    // A cross-building stub starts on its own faceplate, ends in its own
+    // section, has a twin stub at the far switch, and both ends name the
+    // other ("↔ NAME").
+    if (l.stub) {
+      if (!onFace(l.a, p[0])) out.push(`${tag}: stub is off its faceplate`);
+      if (!inBox(secOf.get(l.a), p.at(-1))) out.push(`${tag}: stub leaves its section`);
+      if (!lay.links.some((m) => m.stub && m.a === l.b && m.b === l.a)) out.push(`${tag}: no stub at the far end`);
+      if (!lay.labels.some((lb) => lb.kind === "far" && lb.unit === l.a && lb.full.includes(lay.name(l.b)))) out.push(`${tag}: far switch not named`);
+      continue;
+    }
     if (!((onFace(l.a, p[0]) && onFace(l.b, p.at(-1))) || (onFace(l.b, p[0]) && onFace(l.a, p.at(-1))))) out.push(`${tag}: an end is off its faceplate`);
     const ends = new Set([secOf.get(l.a), secOf.get(l.b)]);
     for (let i = 1; i < p.length; i++) {
