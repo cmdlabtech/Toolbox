@@ -44,9 +44,8 @@ test("head and mate share the head row inside the box, with nothing else inside"
   for (const id of ms.access) assert.ok(lay.units.get(id).ft > Math.max(a.fb, b.fb), `${lay.name(id)} sits below the pair`);
 });
 
-test("the mate's uplink to the HS core is a stub at both ends; layout rules hold", () => {
-  assert.ok(lay.links.some((l) => l.stub && l.a === C1 && l.b === HS), "stub at CORE1");
-  assert.ok(lay.links.some((l) => l.stub && l.a === HS && l.b === C1), "stub at the HS core");
+test("the mate's uplink to the HS core draws no line, only a far-switch label; layout rules hold", () => {
+  assert.ok(!lay.links.some((l) => [l.a, l.b].includes(C1) && [l.a, l.b].includes(HS)), "no line CORE1–HS core");
   assert.ok(lay.labels.some((x) => x.kind === "far" && x.unit === C1 && x.full.includes("LHS-CORE-VSX-1")));
   const r = checkLayout(lay);
   assert.deepEqual({ c: r.crossings, d: r.diagonal, t: r.throughNodes }, { c: 0, d: 0, t: 0 }, r.detail.join("; "));

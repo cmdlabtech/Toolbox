@@ -64,8 +64,9 @@ test("no wrap-around: second MC-LAG legs are not routed, other links keep their 
     const up = model.byId.get(s).parent;
     if (v.members.includes(up)) assert.equal(u.via, lay.name(up));
   }
-  // Cross-building links to VSX-1 are still peer lines to VSX-1.
-  assert.ok(lay.links.filter((l) => l.kind === "peer" && l.cross && (l.a === V1 || l.b === V1)).length >= 2);
+  // Cross-building links to VSX-1 draw no line; VSX-1 names its far switches.
+  assert.ok(!lay.links.some((l) => l.cross && (l.a === V1 || l.b === V1)));
+  assert.ok(lay.labels.some((x) => x.kind === "far" && x.unit === V1));
 });
 
 test("crossing-free and text rules still hold; SVG export draws the box", () => {

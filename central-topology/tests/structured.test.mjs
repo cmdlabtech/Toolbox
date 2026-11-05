@@ -55,7 +55,9 @@ function routeProblems(lay) {
     if (ends.size === 1 && l.kind === "peer" && !p.every((pt) => inBox([...ends][0], pt))) out.push(`${tag}: leaves its own section`);
   }
   const drawn = new Set(lay.links.map((l) => l.edge).filter(Boolean));
-  for (const pe of lay.peerEdges) if (!drawn.has(pe)) out.push(`${lay.name(pe.from)}–${lay.name(pe.to)}: not drawn`);
+  // A cross-building peer draws no line; both ends must name the other instead.
+  const named = (a, b) => lay.labels.some((lb) => lb.kind === "far" && lb.unit === a && lb.full.includes(lay.name(b)));
+  for (const pe of lay.peerEdges) if (!drawn.has(pe) && !(named(pe.from, pe.to) && named(pe.to, pe.from))) out.push(`${lay.name(pe.from)}–${lay.name(pe.to)}: not drawn`);
   return out;
 }
 
@@ -137,7 +139,7 @@ test("auto core on the wrong building: real links become peer lines, still cross
   // DO-CORE-01 heads its own section now; its links to the other heads are
   // drawn as peer lines that reach both faceplates, not listed as text.
   const dc = [...lay.units.values()].find((u) => u.name === "DO-CORE-01").id;
-  assert.ok(lay.links.filter((l) => l.kind === "peer" && (l.a === dc || l.b === dc)).length >= 2, "several peer lines from DO-CORE-01");
+  assert.ok(lay.labels.some((x) => x.kind === "far" && x.unit === dc), "DO-CORE-01 names its cross-building peers");
   assert.deepEqual(routeProblems(lay), []);
   assert.ok(!lay.labels.some((x) => /^linksout/.test(x.kind)), "no Links out row");
 });
@@ -198,7 +200,8 @@ test("district44: links the tree cannot draw are peer lines, not text", () => {
   // The IDF to core links that used to stop at a stub now land in the core site.
   const coreSec = lay.sections.find((s) => s.side === "C");
   const inCore = (id) => { const u = lay.units.get(id); return u.l >= coreSec.x && u.r <= coreSec.x + coreSec.w && u.ft >= coreSec.y && u.fb <= coreSec.y + coreSec.h; };
-  assert.ok(lay.links.some((l) => l.kind === "peer" && l.cross && (inCore(l.a) || inCore(l.b))), "peer lines reach the core site");
+  assert.ok(lay.labels.some((x) => x.kind === "far" && inCore(x.unit)), "core-site switches name their cross-building peers");
+  assert.ok(!lay.links.some((l) => l.stub), "no dangling stubs");
   const svg = renderSvg(lay.model ?? buildModel(d, { coreSerial: d.coreSerial }), lay, { tokens: TOKENS, title: "t", subtitle: "s" });
   assert.equal((svg.match(/data-kind="peer"/g) ?? []).length, lay.links.filter((l) => l.kind === "peer").length, "every peer line is drawn");
 });

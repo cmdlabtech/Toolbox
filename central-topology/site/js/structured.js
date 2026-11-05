@@ -267,17 +267,16 @@ export function layoutStructured(model, opts = {}) {
     if (!buses.has(hub)) buses.set(hub, { id: buses.size, hub, routes: [] });
     buses.get(hub).routes.push({ e, other, hubPort: hub === e.from ? e.fromPort : e.toPort, otherPort: hub === e.from ? e.toPort : e.fromPort });
   }
-  const busList = [...buses.values()];
-  for (const b of busList) b.secs = new Set([secOf.get(b.hub), ...b.routes.map((r) => secOf.get(r.other))]);
-  // A peer link between two buildings draws as a short stub at each end with
-  // an end dot, and each end names the far switch ("↔ NAME") under its own
-  // name. A full route would wrap the canvas edge and get lost among the
-  // other lines (CMDLAB t738u).
-  for (const b of busList) for (const r of b.routes) {
-    if (secOf.get(b.hub) === secOf.get(r.other)) continue;
-    r.cross = true;
+  // A peer link between two buildings draws no line: each end names the far
+  // switch ("↔ NAME") under its own name. A full route would wrap the canvas
+  // edge (CMDLAB t738u), and a dangling stub read as a stray line (t742u).
+  for (const b of buses.values()) b.routes = b.routes.filter((r) => {
+    if (secOf.get(b.hub) === secOf.get(r.other)) return true;
     for (const [id, far] of [[b.hub, r.other], [r.other, b.hub]]) (unit(id).far ??= []).push(out.name(far));
-  }
+    return false;
+  });
+  const busList = [...buses.values()].filter((b) => b.routes.length);
+  for (const b of busList) b.secs = new Set([secOf.get(b.hub), ...b.routes.map((r) => secOf.get(r.other))]);
   const farText = (u) => `↔ ${u.far.join(", ")}`;
 
   // Column of each access unit, per section side.
@@ -531,14 +530,6 @@ export function layoutStructured(model, opts = {}) {
   };
   for (const b of busList) for (const r of b.routes) {
     const A = leg(b.hub, b, r.hubPort), B = leg(r.other, b, r.otherPort);
-    if (r.cross) {
-      // Stub: faceplate to its own lane, then a short drop with an end dot.
-      for (const [L, me, far] of [[A, b.hub, r.other], [B, r.other, b.hub]]) {
-        const end = L.pts.at(-1), pts = L.pts.length > 1 ? L.pts : [end, [end[0], end[1] + g.stub]];
-        out.links.push({ kind: "peer", a: me, b: far, edge: r.e, bus: b.id, cross: true, stub: true, pts });
-      }
-      continue;
-    }
     let mid;
     if (A.s === B.s) {
       const at = A.s.busAt.get(b);
