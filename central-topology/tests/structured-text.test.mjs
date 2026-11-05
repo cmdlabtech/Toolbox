@@ -36,11 +36,15 @@ test("district44: no crossings and every text rule met, on approximate and wider
 
 test("columns: width from the measured text, clamped, labels never wider than the column", () => {
   const l = lay();
-  for (const s of l.sections) assert.ok(s.colW >= GEOM.colMin && s.colW <= GEOM.colMax, `${s.name} col ${s.colW}`);
+  // A head VSX pair puts two faceplates on the head row, so its column may
+  // pass colMax by what the mate needs (1.5 faceplates plus a gutter).
+  for (const s of l.sections) assert.ok(s.colW >= GEOM.colMin && s.colW <= (s.mate ? 1.5 * GEOM.fw + GEOM.gutter + GEOM.colMax / 2 : GEOM.colMax), `${s.name} col ${s.colW}`);
   const secOf = (u) => l.labels.find((x) => x.unit === u.id && x.kind === "name")?.section;
   const hsCells = new Set([...l.units.values()].filter((u) => secOf(u) === "High School" && u.role === "access").map((u) => u.cell.x0));
   assert.equal(hsCells.size, 2, "High School access switches sit in two columns");
-  for (const u of l.units.values()) if (u.cell && secOf(u)) assert.equal(u.cell.x1 - u.cell.x0, l.sections.find((s) => s.name === secOf(u)).colW, `${u.name} shares its section's column width`);
+  // A head VSX pair shares its head row, so those two cells split it.
+  const headPair = new Set(l.sections.filter((s) => s.mate).flatMap((s) => s.pair));
+  for (const u of l.units.values()) if (u.cell && secOf(u) && !headPair.has(u.id)) assert.equal(u.cell.x1 - u.cell.x0, l.sections.find((s) => s.name === secOf(u)).colW, `${u.name} shares its section's column width`);
   for (const lb of l.labels.filter((x) => x.unit)) {
     const u = l.units.get(lb.unit);
     assert.ok(lb.box.x1 - lb.box.x0 <= u.cell.x1 - u.cell.x0 + 0.01, `${lb.text} fits its column`);

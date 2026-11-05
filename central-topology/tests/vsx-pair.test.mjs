@@ -25,9 +25,10 @@ test("detects the LHS VSX pair from MC-LAG dual-homing", () => {
 test("detects VSX twins by name without LAG data, and not lone or cross-building switches", () => {
   const strip = { ...d, links: d.links.map((l) => ({ ...l, fromPorts: [], toPorts: [] })) };
   const m = buildModel(strip, { coreSerial: d.coreSerial });
-  assert.deepEqual(vsxPairs(m), [[V1, V2]]);
+  const L1 = id("LMS-ER-RM154-CORE1"), L2 = id("LMS-ER-RM154-CORE2");
+  assert.deepEqual(vsxPairs(m).sort(), [[V1, V2], [L1, L2]].sort(), "VSX twins and -CORE1/-CORE2 twins");
   const moved = { ...strip, switches: strip.switches.map((s) => (s.name === "LHS-CORE-VSX-2" ? { ...s, site: "Transportation", siteId: "Transportation" } : s)) };
-  assert.deepEqual(vsxPairs(buildModel(moved, { coreSerial: d.coreSerial })), []);
+  assert.deepEqual(vsxPairs(buildModel(moved, { coreSerial: d.coreSerial })), [[L1, L2]]);
 });
 
 test("pair sits side by side, box encloses both members and nothing else", () => {
@@ -63,8 +64,9 @@ test("no wrap-around: second MC-LAG legs are not routed, other links keep their 
     const up = model.byId.get(s).parent;
     if (v.members.includes(up)) assert.equal(u.via, lay.name(up));
   }
-  // Cross-building links to VSX-1 are still peer lines to VSX-1.
-  assert.ok(lay.links.filter((l) => l.kind === "peer" && l.cross && (l.a === V1 || l.b === V1)).length >= 2);
+  // Cross-building links to VSX-1 draw no line; VSX-1 names its far switches.
+  assert.ok(!lay.links.some((l) => l.cross && (l.a === V1 || l.b === V1)));
+  assert.ok(lay.labels.some((x) => x.kind === "far" && x.unit === V1));
 });
 
 test("crossing-free and text rules still hold; SVG export draws the box", () => {
@@ -74,7 +76,7 @@ test("crossing-free and text rules still hold; SVG export draws the box", () => 
   assert.deepEqual(checkText(lay), []);
   for (const badges of [true, false]) {
     const svg = renderSvg(model, lay, { tokens: TOKENS, title: "t", subtitle: "s", badges });
-    assert.equal((svg.match(/class="vsx-pair"/g) ?? []).length, 1);
+    assert.equal((svg.match(/class="vsx-pair"/g) ?? []).length, 2, "High School and Middle School");
     assert.match(svg, /stroke-dasharray="5 4"\/><rect[^>]*\/><text[^>]*>VSX<\/text>/);
   }
 });
