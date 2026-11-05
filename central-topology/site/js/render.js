@@ -2,11 +2,15 @@
 // resolved from theme tokens at render time, so a downloaded file looks the
 // same outside the page. Pure function except for tokens passed in.
 import { CARD_NAME_FONT, GEOM, accessChipBoxes, labelBox, linkLeavesBucket, orthoBend, shownBounds } from "./layout.js";
-import { mgmtLine, resolveMgmt } from "./model.js";
+import { mgmtLine, resolveMgmt, stackLines } from "./model.js";
+import { approxMeasure, ellipsize } from "./structured.js";
 import { renderStructuredSvg } from "./structured-render.js";
 import { PORT_FONT, portsVisible } from "./ports.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+/** Offset of each stacked-card shadow behind a stack's box. */
+export const STACK_SHADOW = 4;
 
 export const TOKEN_NAMES = ["--diagram-bg", "--diagram-fg", "--diagram-muted", "--node-core", "--node-bcore", "--node-access",
   "--node-ext", "--node-fill", "--edge", "--edge-inferred", "--warn", "--font-sans", "--font-mono",
@@ -301,13 +305,26 @@ export function renderSvg(model, lay, opts) {
     const m = resolveMgmt(n, opts.mgmt);
     const stroke = color[n.role];
     out.push(`<g data-serial="${esc(n.serial)}">`);
-    out.push(`<title>${esc(`${n.name} · ${n.role} · ${n.building}${n.flags.length ? " · " + n.flags.join("; ") : ""}`)}</title>`);
+    out.push(`<title>${esc([`${n.name} · ${n.role} · ${n.building}${n.flags.length ? " · " + n.flags.join("; ") : ""}`, ...stackLines(n)].join("\n"))}</title>`);
     // Box (name only) at the top of the footprint; the mgmt line centred below
     // it on a background plate, so links into the card tuck behind it.
+    // A stack keeps the same footprint: its front card is STACK_SHADOW * 2
+    // smaller, with two faded cards offset behind it, and a ×N pill after the name.
+    const sh = n.stack?.length > 1 ? 2 * STACK_SHADOW : 0;
     const BH = GEOM.boxH, top = p.y - H / 2, ipY = top + BH + GEOM.mgmtH / 2 + 4;
-    out.push(`<rect x="${p.x - W / 2}" y="${top}" width="${W}" height="${BH}" rx="8" fill="${T["--node-fill"]}" stroke="${stroke}" stroke-width="${n.role === "access" ? 1.5 : 2.5}"/>`);
-    out.push(`<rect x="${p.x - W / 2}" y="${top}" width="6" height="${BH}" rx="3" fill="${stroke}"/>`);
-    out.push(`<text x="${p.x + 3}" y="${top + BH / 2 + 4.5}" text-anchor="middle" font-size="${CARD_NAME_FONT}" font-weight="700" fill="${T["--diagram-fg"]}">${esc(n.name)}</text>`);
+    const left = p.x - W / 2, fw = W - sh, fh = BH - sh, sw = n.role === "access" ? 1.5 : 2.5;
+    if (sh) for (const [k, op] of [[2, 0.35], [1, 0.65]]) out.push(`<rect class="stack-shadow" x="${left + k * STACK_SHADOW}" y="${top + k * STACK_SHADOW}" width="${fw}" height="${fh}" rx="8" fill="${T["--node-fill"]}" stroke="${stroke}" stroke-width="1.2" opacity="${op}"/>`);
+    out.push(`<rect x="${left}" y="${top}" width="${fw}" height="${fh}" rx="8" fill="${T["--node-fill"]}" stroke="${stroke}" stroke-width="${sw}"/>`);
+    out.push(`<rect x="${left}" y="${top}" width="6" height="${fh}" rx="3" fill="${stroke}"/>`);
+    const st = { size: CARD_NAME_FONT, weight: 700 }, cx = left + 3 + fw / 2, ty = top + fh / 2 + 4.5;
+    if (sh) {
+      const pill = `×${n.stack.length}`, pw = 26, gap = 5;
+      const name = ellipsize(n.name, st, fw - 16 - pw - gap);
+      const x0 = cx - (approxMeasure(name, st) + gap + pw) / 2, px = x0 + approxMeasure(name, st) + gap;
+      out.push(`<text x="${x0}" y="${ty}" font-size="${CARD_NAME_FONT}" font-weight="700" fill="${T["--diagram-fg"]}">${esc(name)}</text>`);
+      out.push(`<rect class="stack-pill" x="${px}" y="${top + fh / 2 - 7}" width="${pw}" height="14" rx="7" fill="${T["--diagram-fg"]}"/>`);
+      out.push(`<text x="${px + pw / 2}" y="${top + fh / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="${T["--diagram-bg"]}">${pill}</text>`);
+    } else out.push(`<text x="${cx}" y="${ty}" text-anchor="middle" font-size="${CARD_NAME_FONT}" font-weight="700" fill="${T["--diagram-fg"]}">${esc(n.name)}</text>`);
     const ipText = mgmtLine(m, opts.mgmt);
     out.push(`<rect class="ip-plate" x="${p.x - W / 2}" y="${top + BH}" width="${W}" height="${H - BH}" fill="${T["--diagram-bg"]}"/>`);
     out.push(`<text class="mgmt-ip" x="${p.x}" y="${ipY}" text-anchor="middle" font-size="11" font-family="${esc(T["--font-mono"])}" fill="${T["--diagram-muted"]}">${esc(ipText)}</text>`);

@@ -255,7 +255,6 @@ function legendHtml(T) {
       chip(`background:${T["--link-backbone"]}`, "Backbone"),
       chip(`background:${T["--link-access"]}`, "Access uplink"),
       chip(`background:${T["--link-wan"]}`, "WAN"),
-      chip(`background:${T["--link-stack"]}`, "Stack connector"),
       chip(`background:${T["--edge-inferred"]}`, "Inferred"),
       chip(`background:${T["--warn"]};border-radius:50%`, "Needs attention"),
     ].join("")}</div>`;

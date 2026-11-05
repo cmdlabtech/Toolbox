@@ -15,7 +15,7 @@
 import { mgmtLine, resolveMgmt } from "./model.js";
 
 export const GEOM = {
-  fw: 200, fh: 18, sgap: 6, collapseOver: 4,
+  fw: 200, fh: 18, sgap: 6, shadow: 4, pillW: 26, pillGap: 5,
   nameH: 16, lineH: 14, faceGap: 4, laneEdge: 4, tapSpread: 5, channelGap: 8, outerGap: 12,
   titleBand: 32, headGap: 12, rowGap: 12, bottomPad: 16, pad: 16,
   colMin: 160, colMax: 280, cellPad: 8, gutter: 24, lane: 6, laneInset: 6, textInset: 7,
@@ -43,7 +43,6 @@ const WAN_RE = /firewall|router|sd-?wan/i;
 const SLOT_RE = /gateway|controller/i;
 const AP_RE = /access point/i;
 const key = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
-const memberOf = (port) => Number(/^(\d+)\/\d+\/\d+/.exec(port ?? "")?.[1] ?? 1);
 
 // Width table for Node and tests: em per glyph, a little wider than Inter and
 // the monospace fallback in Chrome so test geometry errs on the roomy side.
@@ -161,26 +160,23 @@ export function layoutStructured(model, opts = {}) {
     if (u) return u;
     const n = byId.get(id), x = extBy.get(id);
     const members = n?.stack?.length ?? 1;
-    const collapsed = members > g.collapseOver ? members : 0;
     const m = n ? resolveMgmt(n, mgmt) : null;
     u = { id, node: n ?? null, ext: x ?? null, name: n ? displayName(n) : x?.name ?? id, model: n?.model ?? x?.model ?? x?.type ?? null,
-      role: n?.role ?? "ext", n: collapsed ? 1 : members, collapsed, mgmt: m, ipText: n ? mgmtText(m, mgmt) : null,
+      role: n?.role ?? "ext", n: 1, members, sh: members > 1 ? 2 * g.shadow : 0, mgmt: m, ipText: n ? mgmtText(m, mgmt) : null,
       warn: !!(n && n.flags.length) };
     out.units.set(id, u);
     return u;
   };
   const stackH = (k) => k * g.fh + (k - 1) * g.sgap;
   const textH = (u) => g.nameH + (u.via ? g.lineH : 0);
-  // A switch's mgmt line sits below its faceplates (u.ex is the bottom of that line).
+  // A stack (members > 1) is one faceplate with two stacked-card shadows
+  // offset g.shadow and 2 * g.shadow behind it; u.sh is their extra height.
+  // A switch's mgmt line sits below the faceplate and shadows (u.ex is the bottom of that line).
   const ipH = (u) => (u.node ? g.faceGap + g.lineH : 0);
-  const cellH = (u) => textH(u) + g.faceGap + stackH(u.n) + ipH(u);
-  const place = (u, x, y) => { u.x = x; u.y = y; u.l = x; u.r = x + g.fw; u.ft = y + textH(u) + g.faceGap; u.fb = u.ft + stackH(u.n); u.ex = u.fb + ipH(u); u.mid = u.ft + g.fh / 2; u.bottom = y + cellH(u); };
-  // Attach y on a stack member named by a CX port (m/s/p), else member 1.
-  const memberMid = (u, port) => {
-    const id = memberOf(port), at = u.node?.stack?.findIndex((s) => s.memberId === id) ?? -1;
-    const m = Math.min(Math.max(at >= 0 ? at + 1 : id, 1), u.n) - 1;
-    return u.ft + m * (g.fh + g.sgap) + g.fh / 2;
-  };
+  const cellH = (u) => textH(u) + g.faceGap + stackH(u.n) + u.sh + ipH(u);
+  const place = (u, x, y) => { u.x = x; u.y = y; u.l = x; u.r = x + g.fw; u.ft = y + textH(u) + g.faceGap; u.fb = u.ft + stackH(u.n) + u.sh; u.ex = u.fb + ipH(u); u.mid = u.ft + g.fh / 2; u.bottom = y + cellH(u); };
+  // Every link attaches at the middle of the one faceplate.
+  const memberMid = (u) => u.mid;
 
   // Externals: WAN band, section slot, AP count, or a plain slot.
   const localOf = new Map();
@@ -271,7 +267,7 @@ export function layoutStructured(model, opts = {}) {
     return n <= 3 ? (side !== "R" ? [acc, []] : [[], acc]) : [acc.filter((_, i) => i % 2 === 0), acc.filter((_, i) => i % 2 === 1)];
   };
   // Width a unit needs inside a column (text starts textInset in from the faceplate).
-  const textNeed = (u) => g.textInset + Math.max(measure(u.name, TYPE.name), u.via ? measure(`via ${u.via}`, TYPE.sub) : 0, u.ipText ? measure(u.ipText, TYPE.ip) - g.textInset : 0);
+  const textNeed = (u) => g.textInset + Math.max(measure(u.name, TYPE.name) + (u.sh ? g.pillGap + g.pillW : 0), u.via ? measure(`via ${u.via}`, TYPE.sub) : 0, u.ipText ? measure(u.ipText, TYPE.ip) - g.textInset : 0);
 
   // Section layout at (x0, y0). side: "L" (inner edge right), "R", or "C".
   // pad: extra space above and below the head unit (core landings, LAYOUT-SPEC §5).
@@ -549,7 +545,14 @@ export function layoutStructured(model, opts = {}) {
     const sec = secOf.get(u.id)?.name ?? null;
     const tx = u.l + g.textInset;
     const maxW = Math.min(u.cell.x1, u.l + (u.textMax ?? Infinity)) - tx;
-    label("name", ellipsize(u.name, TYPE.name, maxW, measure), u.name, tx, u.y + 12.5, TYPE.name, { color: "fg", unit: u.id, section: sec });
+    // A stack's member count: a compact pill right after its name.
+    const pillR = u.sh ? g.pillW + g.pillGap : 0;
+    const nm = label("name", ellipsize(u.name, TYPE.name, maxW - pillR, measure), u.name, tx, u.y + 12.5, TYPE.name, { color: "fg", unit: u.id, section: sec });
+    u.pill = null;
+    if (u.sh) {
+      u.pill = { x: nm.box.x1 + g.pillGap, y: u.y + 1, w: g.pillW, h: g.square, text: `×${u.members}` };
+      label("count-badge", u.pill.text, `Stack of ${u.members}`, u.pill.x + g.pillW / 2, u.y + 11.5, TYPE.badge, { anchor: "middle", color: "bg", unit: u.id, section: sec });
+    }
     let ly = u.y + g.nameH;
     if (u.via) { label("via", ellipsize(`via ${u.via}`, TYPE.sub, maxW, measure), `via ${u.via}`, tx, ly + 10.5, TYPE.sub, { unit: u.id, section: sec }); ly += g.lineH; }
     // Mgmt line: one centred line below the faceplates, inside the cell.
@@ -557,22 +560,20 @@ export function layoutStructured(model, opts = {}) {
       const cx = u.l + g.fw / 2, half = Math.min(cx - u.cell.x0, u.cell.x1 - cx);
       label("ip", ellipsize(u.ipText, TYPE.ip, 2 * half, measure), u.ipText, cx, u.fb + g.faceGap + 10.5, TYPE.ip, { anchor: "middle", unit: u.id, section: sec });
     }
-    // Faceplates: stack number square on the left, warning badge on the right,
-    // model text centred between them when it fits at 10px, else tooltip only.
-    const members = u.node?.stack && !u.collapsed ? u.node.stack : [{ model: u.model, memberId: null }];
-    u.faces = members.map((mb, i) => {
-      const fy = u.ft + i * (g.fh + g.sgap);
-      const f = { y: fy, model: mb.model ?? u.model, jNumber: mb.jNumber ?? u.node?.jNumber, square: null, pill: null, badge: null };
-      let left = u.l + 8;
-      if (members.length > 1) { f.square = { x: u.l + 5, y: fy + 2, w: g.square, h: g.square, text: String(mb.memberId ?? i + 1) }; left = u.l + 5 + g.square + 4; }
-      if (u.collapsed) { f.pill = { x: u.l + 5, y: fy + 2, w: 28, h: g.square, text: `×${u.collapsed}` }; left = u.l + 5 + 28 + 4; }
-      const right = u.r - (u.warn ? g.badgeReserve : 8);
-      if (u.warn && i === 0) f.badge = { cx: u.r - g.badgeInset - g.badgeR, cy: fy + g.fh / 2, r: g.badgeR };
+    // Faceplate: warning badge on the right, model text centred when it fits
+    // at 10px, else tooltip only. A stack's front card is u.sh narrower so its
+    // shadows end at u.r; it shows the first member's model.
+    const lead = u.node?.stack?.[0] ?? { model: u.model, jNumber: u.node?.jNumber };
+    u.faces = [lead].map((mb, i) => {
+      const fy = u.ft, fw = g.fw - u.sh;
+      const f = { y: fy, w: fw, model: mb.model ?? u.model, jNumber: mb.jNumber ?? u.node?.jNumber, badge: null,
+        shadows: u.sh ? [2, 1].map((k) => ({ x: u.l + k * g.shadow, y: fy + k * g.shadow })) : [] };
+      const left = u.l + 8;
+      const right = u.l + fw - (u.warn ? g.badgeReserve : 8);
+      if (u.warn && i === 0) f.badge = { cx: u.l + fw - g.badgeInset - g.badgeR, cy: fy + g.fh / 2, r: g.badgeR };
       const full = shortModel(f.model);
       const text = [full, modelFamily(f.model)].find((t) => t && measure(t, TYPE.model) <= right - left) ?? null;
       f.text = text;
-      if (f.square) label("badge", f.square.text, f.square.text, f.square.x + g.square / 2, fy + g.fh / 2 + 3.5, TYPE.badge, { anchor: "middle", color: "bg", unit: u.id, section: sec });
-      if (f.pill) label("badge", f.pill.text, f.pill.text, f.pill.x + f.pill.w / 2, fy + g.fh / 2 + 3.5, TYPE.badge, { anchor: "middle", color: "bg", unit: u.id, section: sec });
       if (f.badge) f.badge.label = label("badge", "!", "!", f.badge.cx, f.badge.cy + 3.5, TYPE.badge, { anchor: "middle", color: "bg", unit: u.id, section: sec });
       if (text) label("model", text, f.model, (left + right) / 2, fy + g.fh / 2 + 3.5, TYPE.model, { anchor: "middle", unit: u.id, section: sec });
       return f;
@@ -663,8 +664,10 @@ export function checkText(lay, scale = 1) {
     }
   }
   for (const u of lay.units.values()) {
+    const p = u.pill;
+    if (p && !(p.x >= u.l && p.x + p.w <= u.cell.x1 + eps && p.y >= u.y && p.y + p.h <= u.ft)) bad.push(`${u.name} stack pill outside its name row`);
     for (const f of u.faces ?? []) {
-      for (const m of [f.square, f.pill]) if (m && !(m.x >= u.l && m.x + m.w <= u.r && m.y >= f.y && m.y + m.h <= f.y + lay.geom.fh)) bad.push(`${u.name} square outside faceplate`);
+      for (const sh of f.shadows ?? []) if (!(sh.x >= u.l && sh.x + f.w <= u.r + eps && sh.y + lay.geom.fh <= u.fb + eps)) bad.push(`${u.name} stack shadow outside its faceplate area`);
       if (f.badge) for (const lb of lay.labels) {
         if (lb.unit === u.id && lb.kind === "model" && lb.box.y0 < f.y + lay.geom.fh && lb.box.y1 > f.y && lb.box.x1 > f.badge.cx - f.badge.r) bad.push(`${u.name} model text under its badge`);
       }

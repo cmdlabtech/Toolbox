@@ -213,7 +213,7 @@ test("family match needs a leading digit; vendor words and part numbers fall thr
   assert.equal(reg.lookup("6100 12G").how, "family");
 });
 
-test("render: stack ordered by member id, black stack connector, one <defs> image per stencil", () => {
+test("render: stack ordered by member id, one faceplate with ×N pill and two shadows, one <defs> image per stencil", () => {
   const { data: d, overrides } = district([8, 6, 5], { coreStack: 2 });
   for (const s of d.switches) s.jNumber = "JL676A";
   d.switches.find((s) => s.name === "DO-CORE-01").stackMemberId = 2;
@@ -221,13 +221,15 @@ test("render: stack ordered by member id, black stack connector, one <defs> imag
   const model = buildModel(d, overrides);
   assert.deepEqual(model.byId.get(model.coreSerial).stack.map((m) => [m.name, m.memberId]), [["DO-CORE-02", 1], ["DO-CORE-01", 2]]);
   const lay = layout(model);
-  const plain = renderSvg(model, lay, { tokens: { ...TOKENS, "--link-stack": "#000000" }, title: "t", subtitle: "s" });
-  assert.match(plain, /class="stack-link"[^>]*fill="#000000"/, "stack connector drawn in the stack token");
+  const plain = renderSvg(model, lay, { tokens: TOKENS, title: "t", subtitle: "s" });
+  assert.equal((plain.match(/class="stack-pill"/g) ?? []).length, 1, "one ×N pill for the one stack");
+  assert.equal((plain.match(/class="stack-shadow"/g) ?? []).length, 2, "two stacked-card shadows");
+  assert.ok(!plain.includes("stack-link"), "no per-member connector");
   assert.ok(!plain.includes("<image"), "no art without stencils");
   const reg = createRegistry([{ match: "", sku: "JL676A", href: "data:image/svg+xml;base64,AAAA" }]);
   const svg = renderSvg(model, lay, { tokens: TOKENS, title: "t", subtitle: "s", stencils: reg });
   assert.equal(svg.match(/<image id=/g).length, 1, "art stored once");
-  assert.equal(svg.match(/<use href="#fp-0"/g).length, d.switches.length, "every faceplate uses it");
+  assert.equal(svg.match(/<use href="#fp-0"/g).length, model.nodes.length, "every logical switch's faceplate uses it");
 });
 
 test("render: mock tenant draws every switch name and stays inside its viewBox", () => {

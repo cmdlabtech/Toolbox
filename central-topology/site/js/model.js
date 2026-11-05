@@ -45,6 +45,16 @@ export function adjacency(switches, links) {
  * and both ends' ports. A stack whose conductor is missing from the data stays
  * as separate switches. Data with no stacks passes through unchanged.
  */
+/**
+ * Tooltip lines for a stack's members: "Stack of N", then one row per member
+ * with its number, model, serial, and role when known. [] for a lone switch.
+ */
+export function stackLines(n) {
+  if (!(n?.stack?.length > 1)) return [];
+  return [`Stack of ${n.stack.length}`,
+    ...n.stack.map((m, i) => [`  ${m.memberId ?? i + 1}`, m.model ?? "unknown model", m.serial, m.role].filter(Boolean).join("  "))];
+}
+
 export function collapseStacks(switches, links) {
   const ids = new Set(switches.map((s) => s.serial));
   const unitOf = new Map(switches.map((s) => [s.serial, s.conductorSerial && ids.has(s.conductorSerial) ? s.conductorSerial : s.serial]));
@@ -57,7 +67,8 @@ export function collapseStacks(switches, links) {
     // conductor goes first, then by name.
     const id = (x) => (Number.isFinite(x.stackMemberId) ? x.stackMemberId : Infinity);
     const stack = m.sort((a, b) => id(a) - id(b) || (a.serial === s.serial ? -1 : b.serial === s.serial ? 1 : a.name.localeCompare(b.name)))
-      .map((x) => ({ serial: x.serial, name: x.name, model: x.model, jNumber: x.jNumber ?? null, memberId: Number.isFinite(x.stackMemberId) ? x.stackMemberId : null, status: x.status, ipv4: x.ipv4 }));
+      .map((x) => ({ serial: x.serial, name: x.name, model: x.model, jNumber: x.jNumber ?? null, memberId: Number.isFinite(x.stackMemberId) ? x.stackMemberId : null,
+        role: x.serial === s.serial ? "conductor" : x.stackRole ?? null, status: x.status, ipv4: x.ipv4 }));
     return { ...s, stack };
   });
   if (logical.length === switches.length && !links.some((l) => l.isSibling)) return { switches, links };

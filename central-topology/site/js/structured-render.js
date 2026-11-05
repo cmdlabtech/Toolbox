@@ -3,7 +3,7 @@
 // downloaded file looks the same outside the page. The legend lives in the
 // page header, as it does for the card layouts. All text comes from
 // lay.labels, already measured, placed, and ellipsised by structured.js.
-import { resolveMgmt } from "./model.js";
+import { resolveMgmt, stackLines } from "./model.js";
 import { EMPTY_REGISTRY } from "./stencils.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -108,27 +108,23 @@ export function renderStructuredSvg(model, lay, opts) {
       .map((e) => (e.from === u.id ? `${portsOf(e, "from")} → ${lay.name(e.to)} ${portsOf(e, "to")}` : `${portsOf(e, "to")} → ${lay.name(e.from)} ${portsOf(e, "from")}`));
     const tip = n ? [`${u.name}${u.name !== n.name ? ` (serial ${n.serial})` : ""}`, `${n.model ?? "unknown model"} · ${n.role} · ${n.building}`, `Serial ${n.serial}`,
       `Mgmt ${m.ip ? m.ip : "none"}`,
-      ...(n.stack ? [`Stack of ${n.stack.length}`] : []), ...(n.flags.length ? [n.flags.join("; ")] : []), ...links].join("\n")
+      ...stackLines(n), ...(n.flags.length ? [n.flags.join("; ")] : []), ...links].join("\n")
       : [`${u.name} · ${u.ext?.type ?? "device"}${u.via ? ` · connected via ${u.via}` : ""}`, ...links].join("\n");
     o.push(`<g ${attr}><title>${esc(tip)}</title>`);
     // First rect: the faceplate area (crossing checks read it).
     o.push(`<rect x="${u.l}" y="${u.ft}" width="${g.fw}" height="${u.fb - u.ft}" fill="none"/>`);
     o.push(`<rect x="${u.x}" y="${u.y + 3}" width="3" height="11" rx="1.5" fill="${rc}"/>`);
-    // Stack connector: a 3px bar joining the member-number squares.
-    const faces = u.faces ?? [];
-    for (let i = 0; i < faces.length - 1; i++) {
-      const a = faces[i].square, b = faces[i + 1].square;
-      if (a && b) o.push(`<rect class="stack-link" x="${a.x + a.w / 2 - 1.5}" y="${a.y + a.h}" width="3" height="${b.y - a.y - a.h}" fill="${T["--link-stack"]}"/>`);
-    }
-    for (const f of faces) {
+    // Stack: the member-count pill after the name.
+    if (u.pill) o.push(`<rect class="stack-pill" x="${u.pill.x}" y="${u.pill.y}" width="${u.pill.w}" height="${u.pill.h}" rx="${u.pill.h / 2}" fill="${T["--diagram-fg"]}"/>`);
+    for (const f of u.faces ?? []) {
+      // Stack: two faded cards behind the front faceplate, back one first.
+      f.shadows?.forEach((sh, i) => o.push(`<rect class="stack-shadow" x="${sh.x}" y="${sh.y}" width="${f.w}" height="${g.fh}" rx="3" fill="${T["--node-fill"]}" stroke="${rc}" stroke-width="1.2" opacity="${i === 0 ? 0.35 : 0.65}"/>`));
       const ref = n ? artFor(f.model, f.jNumber) : null;
-      if (ref) o.push(`<use href="#${ref}" x="${u.l}" y="${f.y}"/>`);
+      if (ref) o.push(f.w === g.fw ? `<use href="#${ref}" x="${u.l}" y="${f.y}"/>` : `<use href="#${ref}" transform="translate(${u.l} ${f.y}) scale(${f.w / g.fw} 1)"/>`);
       else {
-        o.push(`<rect x="${u.l}" y="${f.y}" width="${g.fw}" height="${g.fh}" rx="3" fill="${T["--node-fill"]}" stroke="${rc}" stroke-width="1.5"/>`);
+        o.push(`<rect x="${u.l}" y="${f.y}" width="${f.w}" height="${g.fh}" rx="3" fill="${T["--node-fill"]}" stroke="${rc}" stroke-width="1.5"/>`);
         o.push(`<rect x="${u.l}" y="${f.y}" width="4" height="${g.fh}" rx="2" fill="${rc}"/>`);
       }
-      if (f.square) o.push(`<rect x="${f.square.x}" y="${f.square.y}" width="${f.square.w}" height="${f.square.h}" rx="2" fill="${T["--diagram-fg"]}"/>`);
-      if (f.pill) o.push(`<rect x="${f.pill.x}" y="${f.pill.y}" width="${f.pill.w}" height="${f.pill.h}" rx="7" fill="${T["--diagram-fg"]}"/>`);
       if (f.badge && badges) o.push(`<circle class="warn-badge" cx="${f.badge.cx}" cy="${f.badge.cy}" r="${f.badge.r}" fill="${T["--warn"]}"/>`);
     }
     for (const rl of u.id === lay.coreSerial ? lay.rails ?? [] : []) {
