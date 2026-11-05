@@ -45,9 +45,9 @@ test("device inventory pages with the next cursor", async () => {
     return pages[i++];
   });
   assert.deepEqual(await c.deviceGroups(), [
-    { serial: "A", group: "Group 1", name: null, stackId: null },
-    { serial: "B", group: null, name: null, stackId: null },
-    { serial: "C", group: null, name: null, stackId: null },
+    { serial: "A", group: "Group 1", name: null, stackId: null, model: null },
+    { serial: "B", group: null, name: null, stackId: null, model: null },
+    { serial: "C", group: null, name: null, stackId: null, model: null },
   ]);
   assert.equal(i, 2);
 });

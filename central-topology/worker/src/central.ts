@@ -29,8 +29,8 @@ export interface TopoDevice {
 // serialNumber / macAddress: the hardware identity behind a stack id, used to
 // match LLDP rows that name a member instead of the stack. deviceName: a name
 // fallback when topology names a switch by its serial.
-export interface SwitchDetail { siteId: string | null; siteName: string | null; jNumber: string | null; stackMemberId: number | null; deviceName: string | null; serialNumber: string | null; macAddress: string | null }
-export interface InventoryRow { serial: string; group: string | null; name: string | null; stackId: string | null }
+export interface SwitchDetail { siteId: string | null; siteName: string | null; jNumber: string | null; model: string | null; stackMemberId: number | null; deviceName: string | null; serialNumber: string | null; macAddress: string | null }
+export interface InventoryRow { serial: string; group: string | null; name: string | null; stackId: string | null; model: string | null }
 export interface StackMember { serial: string; mac: string | null; name: string | null; memberId: number | null }
 export interface LinkPort { name: string; lag: string | null }
 export interface TopoLink {
@@ -157,7 +157,7 @@ export function central(get: GetJson) {
     // Central device group name, and the device name as a fallback when the
     // topology name is only a serial. Not used as the switch inventory.
     // GET /network-monitoring/v1/device-inventory → items[].deviceGroupName,
-    // deviceName, stackId, matched on items[].serialNumber (else items[].id).
+    // deviceName, stackId, model, matched on items[].serialNumber (else items[].id).
     async deviceGroups(): Promise<InventoryRow[]> {
       const items = await pagedCursor(get, "/network-monitoring/v1/device-inventory", {
         filter: "deviceType eq 'SWITCH'",
@@ -166,7 +166,7 @@ export function central(get: GetJson) {
       for (const d of items) {
         const serial = str(d?.serialNumber) ?? str(d?.id);
         if (!serial) continue;
-        out.push({ serial, group: str(d?.deviceGroupName), name: str(d?.deviceName), stackId: str(d?.stackId) });
+        out.push({ serial, group: str(d?.deviceGroupName), name: str(d?.deviceName), stackId: str(d?.stackId), model: str(d?.model) });
       }
       return out;
     },
@@ -204,7 +204,7 @@ export function central(get: GetJson) {
       const d = await get(`/network-monitoring/v1/switches/${encodeURIComponent(serial)}`);
       const id = Number(d?.stackMemberId);
       return {
-        siteId: str(d?.siteId), siteName: str(d?.siteName), jNumber: str(d?.jNumber),
+        siteId: str(d?.siteId), siteName: str(d?.siteName), jNumber: str(d?.jNumber), model: str(d?.model),
         stackMemberId: d?.stackMemberId != null && Number.isFinite(id) ? id : null,
         deviceName: str(d?.deviceName), serialNumber: str(d?.serialNumber), macAddress: str(d?.macAddress),
       };
