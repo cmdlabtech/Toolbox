@@ -92,16 +92,16 @@ test("mock nodes, external devices, and labels do not overlap", () => {
   }
 });
 
-test("every layout renders, including the management-IP fallback ring", () => {
+test("every layout renders a fallback IP and an offline switch like any other", () => {
   for (const spec of LAYOUTS) {
     // Structured places the IP line itself, so it takes the selection too.
     const lay = layoutById(spec.id, model, spec.id === "structured" ? { mgmt: "vlan:99" } : undefined);
     const svg = renderSvg(model, lay, { tokens: TOKENS, mgmt: "vlan:99", title: "Switch topology", subtitle: spec.label });
     assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
     for (const n of model.nodes) assert.ok(svg.includes(n.name), `${spec.id} ${n.name}`);
-    // Card layouts ring a fallback IP. Structured faceplates carry a "!" badge and say so in the tooltip.
-    if (spec.id === "structured") assert.match(svg, /\(fallback IP\)[\s\S]*?<circle [^>]*r="7"/, `${spec.id} fallback marker`);
-    else assert.match(svg, /stroke-dasharray="5 4"/, `${spec.id} fallback marker`);
+    // No status or fallback styling: this is a topology diagram, not a monitor.
+    assert.doesNotMatch(svg, /fallback|Fallback|\(down\)|opacity="0\.6"/, `${spec.id} no status styling`);
+    assert.match(svg, />Mgmt: \d/, `${spec.id} fallback IP reads as a normal mgmt line`);
     assert.match(svg, /<line |<path /, `${spec.id} edges`);
   }
 });

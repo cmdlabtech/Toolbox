@@ -260,15 +260,15 @@ export function resolveMgmt(sw, optionId) {
 /**
  * The management line drawn under a switch box: "{label}: {address}".
  * Label is "VLAN <id>" for an SVI, the interface name for OOBM or loopback,
- * "Mgmt" for the monitoring IP, and "Fallback" when the chosen
- * source had no address and the monitoring IP stands in. The prefix shows only
+ * and "Mgmt" for the monitoring IP (also when it stands in for a source with
+ * no address). The prefix shows only
  * when Central's address carries one (Central's ipv4 fields have no mask).
  * No address reads "No mgmt IP".
  */
 export function mgmtLine(m, optionId) {
   if (!m?.ip) return "No mgmt IP";
-  let label = m.fallback ? "Fallback" : "Mgmt";
-  if (!m.fallback && m.source !== "monitor") {
+  let label = "Mgmt";
+  if (m.source !== "monitor") {
     if (optionId?.startsWith("vlan:")) label = `VLAN ${optionId.slice(5)}`;
     else label = m.iface || (optionId === "oobm" ? "OOBM" : "Loopback");
   }

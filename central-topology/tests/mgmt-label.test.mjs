@@ -18,7 +18,7 @@ test("mgmt line is '{label}: {address}' per source", () => {
 });
 
 test("missing source falls back to the monitoring IP, or says there is none", () => {
-  assert.equal(line("vlan:99"), "Fallback: 10.1.0.1");
+  assert.equal(line("vlan:99"), "Mgmt: 10.1.0.1", "a stand-in IP reads like the monitoring IP");
   assert.equal(line("vlan:99", { vlans: [], interfaces: [] }), "No mgmt IP");
   assert.equal(line("oobm", { ipv4: null }), "No mgmt IP");
 });

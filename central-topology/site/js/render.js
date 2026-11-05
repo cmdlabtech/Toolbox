@@ -300,19 +300,17 @@ export function renderSvg(model, lay, opts) {
     if (!p) continue;
     const m = resolveMgmt(n, opts.mgmt);
     const stroke = color[n.role];
-    const offline = (n.status ?? "").toUpperCase() === "OFFLINE";
     out.push(`<g data-serial="${esc(n.serial)}">`);
     out.push(`<title>${esc(`${n.name} · ${n.role} · ${n.building}${n.flags.length ? " · " + n.flags.join("; ") : ""}`)}</title>`);
     // Box (name only) at the top of the footprint; the mgmt line centred below
     // it on a background plate, so links into the card tuck behind it.
     const BH = GEOM.boxH, top = p.y - H / 2, ipY = top + BH + GEOM.mgmtH / 2 + 4;
-    out.push(`<rect x="${p.x - W / 2}" y="${top}" width="${W}" height="${BH}" rx="8" fill="${T["--node-fill"]}" stroke="${stroke}" stroke-width="${n.role === "access" ? 1.5 : 2.5}"${offline ? ` opacity="0.6"` : ""}/>`);
+    out.push(`<rect x="${p.x - W / 2}" y="${top}" width="${W}" height="${BH}" rx="8" fill="${T["--node-fill"]}" stroke="${stroke}" stroke-width="${n.role === "access" ? 1.5 : 2.5}"/>`);
     out.push(`<rect x="${p.x - W / 2}" y="${top}" width="6" height="${BH}" rx="3" fill="${stroke}"/>`);
     out.push(`<text x="${p.x + 3}" y="${top + BH / 2 + 4.5}" text-anchor="middle" font-size="${CARD_NAME_FONT}" font-weight="700" fill="${T["--diagram-fg"]}">${esc(n.name)}</text>`);
     const ipText = mgmtLine(m, opts.mgmt);
     out.push(`<rect class="ip-plate" x="${p.x - W / 2}" y="${top + BH}" width="${W}" height="${H - BH}" fill="${T["--diagram-bg"]}"/>`);
-    out.push(`<text class="mgmt-ip" x="${p.x}" y="${ipY}" text-anchor="middle" font-size="11" font-family="${esc(T["--font-mono"])}" fill="${m.fallback ? T["--warn"] : T["--diagram-muted"]}">${esc(ipText)}</text>`);
-    if (m.fallback) out.push(`<rect x="${p.x - W / 2 - 4}" y="${top - 4}" width="${W + 8}" height="${BH + 8}" rx="11" fill="none" stroke="${T["--warn"]}" stroke-width="1.5" stroke-dasharray="5 4"/>`);
+    out.push(`<text class="mgmt-ip" x="${p.x}" y="${ipY}" text-anchor="middle" font-size="11" font-family="${esc(T["--font-mono"])}" fill="${T["--diagram-muted"]}">${esc(ipText)}</text>`);
     if (n.flags.length && opts.badges !== false) {
       out.push(`<circle cx="${p.x + W / 2 - 2}" cy="${p.y - H / 2 + 2}" r="9" fill="${T["--warn"]}"/><text x="${p.x + W / 2 - 2}" y="${p.y - H / 2 + 6}" text-anchor="middle" font-size="12" font-weight="700" fill="${T["--diagram-bg"]}">!</text>`);
     }
@@ -333,7 +331,6 @@ export function renderSvg(model, lay, opts) {
   items.forEach(([label, c], i) => {
     out.push(`<rect x="${lx}" y="${ly + i * 18}" width="12" height="12" rx="3" fill="${c}"/><text x="${lx + 18}" y="${ly + i * 18 + 10}" font-size="11" fill="${T["--diagram-muted"]}">${label}</text>`);
   });
-  out.push(`<rect x="${lx + 110}" y="${ly}" width="12" height="12" rx="3" fill="none" stroke="${T["--warn"]}" stroke-dasharray="3 2"/><text x="${lx + 128}" y="${ly + 10}" font-size="11" fill="${T["--diagram-muted"]}">IP fallback</text>`);
   out.push(`<line x1="${lx + 110}" y1="${ly + 24}" x2="${lx + 124}" y2="${ly + 24}" stroke="${T["--edge"]}" stroke-width="2" stroke-dasharray="4 3"/><text x="${lx + 128}" y="${ly + 28}" font-size="11" fill="${T["--diagram-muted"]}">LLDP fill-in</text>`);
   out.push(`<line x1="${lx + 110}" y1="${ly + 42}" x2="${lx + 124}" y2="${ly + 42}" stroke="${T["--edge-inferred"]}" stroke-width="1.5" stroke-dasharray="2 3"/><text x="${lx + 128}" y="${ly + 46}" font-size="11" fill="${T["--diagram-muted"]}">Inferred</text>`);
   out.push(`</svg>`);
