@@ -98,9 +98,10 @@ function textBox(x, base, w, size, anchor) {
 
 // VSX pairs. Two switches in one building are a pair when at least two
 // switches dual-home to both over one LAG (MC-LAG, the VSX signature), or
-// when their names say VSX and differ only by a trailing member number.
+// when their names say VSX (or end in COREn) and differ only by a trailing
+// member number, e.g. LMS-ER-RM154-CORE1 / -CORE2.
 // Stacks are not VSX members. Each switch joins at most one pair.
-const twinBase = (name) => (/vsx/i.test(name ?? "") ? /^(.*?)[-_ ]?\d+$/.exec(name)?.[1]?.toLowerCase() ?? null : null);
+const twinBase = (name) => (/vsx|core[-_ ]?\d+$/i.test(name ?? "") ? /^(.*?)[-_ ]?\d+$/.exec(name)?.[1]?.toLowerCase() ?? null : null);
 export function vsxPairs(model) {
   const byId = model.byId ?? new Map(model.nodes.map((n) => [n.serial, n]));
   const sw = (id) => { const n = byId.get(id); return n && !n.stack ? n : null; };
@@ -205,14 +206,20 @@ export function layoutStructured(model, opts = {}) {
     const headId = own ? coreSerial : model.hubs[b] && byId.get(model.hubs[b])?.building === b ? model.hubs[b] : [...members].sort((a, c) => out.name(a.serial).localeCompare(out.name(c.serial)))[0].serial;
     const access = members.filter((n) => n.serial !== headId).sort(byHop).map((n) => n.serial);
     // A VSX pair (neither the head) leads the access list, so its members
-    // share the first row, one per column.
-    const pair = pairsAll.find((p) => p.every((id) => access.includes(id))) ?? null;
+    // share the first row, one per column. A pair that includes a wing
+    // section's head puts the other member (the mate) on the head row beside
+    // it, on the section's outer side; it leaves the access list.
+    let pair = pairsAll.find((p) => p.every((id) => access.includes(id))) ?? null, mate = null;
     if (pair) access.splice(0, access.length, ...pair, ...access.filter((id) => !pair.includes(id)));
-    secs.push({ name: b, own, head: headId, pair, access: [...access, ...(slots.get(b) ?? [])], aps: aps.get(b) ?? 0,
+    else if (!own && (pair = pairsAll.find((p) => p.includes(headId) && access.includes(p.find((id) => id !== headId))) ?? null)) {
+      mate = pair.find((id) => id !== headId);
+      access.splice(access.indexOf(mate), 1);
+    }
+    secs.push({ name: b, own, head: headId, pair, mate, access: [...access, ...(slots.get(b) ?? [])], aps: aps.get(b) ?? 0,
       unassigned: b === "Unassigned", nsw: members.reduce((a, n) => a + (n.stack?.length ?? 1), 0) });
   }
   const secOf = new Map();
-  for (const s of secs) { unit(s.head); secOf.set(s.head, s); for (const id of s.access) { unit(id); secOf.set(id, s); } }
+  for (const s of secs) { unit(s.head); secOf.set(s.head, s); if (s.mate) { unit(s.mate); secOf.set(s.mate, s); } for (const id of s.access) { unit(id); secOf.set(id, s); } }
   const wanUnit = wanDevs.length ? unit(wanDevs[0].x.serial) : null;
 
   // Represented links: WAN, backbone (every non-core section head), risers.
@@ -226,6 +233,8 @@ export function layoutStructured(model, opts = {}) {
     for (const id of s.access) {
       const u = unit(id), n = byId.get(id);
       if (edgeBy.has(key(id, s.head))) drawn.add(key(id, s.head));
+      // Homed only on the head's VSX mate: the riser from the pair box is that link.
+      else if (s.mate && edgeBy.has(key(id, s.mate))) drawn.add(key(id, s.mate));
       else if (n?.parent && n.parent !== s.head && byId.get(n.parent)?.building === s.name) { u.via = out.name(n.parent); drawn.add(key(id, n.parent)); }
       else if (u.ext && localOf.get(id) && localOf.get(id) !== s.head) { u.via = out.name(localOf.get(id)); drawn.add(key(id, localOf.get(id))); }
     }
@@ -287,7 +296,8 @@ export function layoutStructured(model, opts = {}) {
     // Peer lanes: each bus that touches this section gets a lane on every
     // side it uses (left margin, right margin, gutter for the head), and a
     // bottom channel when it joins sides or leaves a wing section.
-    const sideIn = new Map([[bc.id, "h"], ...L.map((u) => [u.id, "l"]), ...R.map((u) => [u.id, "r"])]);
+    const mu = sec.mate ? unit(sec.mate) : null, mside = side === "L" ? "l" : "r";
+    const sideIn = new Map([[bc.id, "h"], ...L.map((u) => [u.id, "l"]), ...R.map((u) => [u.id, "r"]), ...(mu ? [[mu.id, mside]] : [])]);
     const lanes = { l: [], r: [], h: [], b: [] }, busAt = new Map();
     for (const b of busList) {
       if (!b.secs.has(sec)) continue;
@@ -316,19 +326,30 @@ export function layoutStructured(model, opts = {}) {
     const need = Math.max(g.fw, textNeed(bc),
       ...L.map((u) => offL + Math.max(g.fw, textNeed(u))),
       ...R.map((u) => Math.max(g.fw, textNeed(u)) + offR));
-    const colW = Math.min(Math.max(need + g.cellPad, g.colMin), g.colMax);
     const Wg = Math.max(g.gutter, g.lane * (L.length + R.length + 1 + lanes.h.length));
+    // Head pair: the mate sits in the outer column on the head row, a gutter
+    // clear of the head, so the column must hold it and reach past the head.
+    const mateW = mu ? 1.5 * g.fw + g.gutter + (mside === "l" ? offL : offR) - Wg / 2 + g.cellPad : 0;
+    const colW = Math.max(Math.min(Math.max(need + g.cellPad, g.colMin), g.colMax), mateW, mu ? Math.max(g.fw, textNeed(mu)) + g.cellPad : 0);
     const p = g.pad, fw = g.fw;
     let inner, gc;
-    if (L.length && R.length) { gc = colW + Wg / 2; inner = 2 * colW + Wg; }
+    if ((L.length && R.length) || mu) { gc = colW + Wg / 2; inner = 2 * colW + Wg; }
     else if (L.length) { gc = colW + Wg / 2; inner = gc - fw / 2 + colW; }
     else if (R.length) { gc = fw / 2; inner = fw / 2 + Wg / 2 + colW; }
     else { gc = fw / 2; inner = colW; }
     const W = inner + 2 * p, ix0 = x0 + p, ix1 = x0 + p + inner;
     place(bc, ix0 + gc - fw / 2, y0 + g.titleBand + g.headGap + pad);
     bc.cell = { x0: bc.l, x1: Math.min(bc.l + colW, ix1) };
-    let y = bc.bottom + pad + g.rowGap;
     const gl = ix0 + gc - Wg / 2, gr = ix0 + gc + Wg / 2;
+    if (mu) {
+      if (mside === "l") { place(mu, gl - colW + offL, bc.y); mu.cell = { x0: gl - colW, x1: bc.l - VSX_PAD * 2 }; }
+      else { place(mu, gr + colW - offR - g.fw, bc.y); mu.cell = { x0: mu.l, x1: gr + colW }; mu.textMax = offR ? colW - offR - (mu.l - gr) : undefined; bc.cell.x1 = Math.min(bc.cell.x1, mu.l - VSX_PAD * 2); }
+      mu.outer = mside;
+      // Names can wrap to different heights; line the faceplates up.
+      const ft = Math.max(bc.ft, mu.ft);
+      for (const u of [bc, mu]) if (u.ft < ft) { const c = u.cell; place(u, u.x, u.y + ft - u.ft); u.cell = c; }
+    }
+    let y = Math.max(bc.bottom, mu?.bottom ?? -Infinity) + pad + g.rowGap;
     for (let r = 0; r < Math.max(L.length, R.length); r++) {
       const row = [];
       if (r < L.length) { const u = L[r]; place(u, gl - colW + offL, y); u.cell = { x0: gl - colW, x1: gl }; u.outer = "l"; row.push(u); }
@@ -337,7 +358,7 @@ export function layoutStructured(model, opts = {}) {
       y = Math.max(...row.map((u) => u.bottom)) + g.rowGap;
     }
     let bottom = y - g.rowGap;
-    if (!sec.access.length) bottom = bc.bottom + pad;
+    if (!sec.access.length) bottom = Math.max(bc.bottom, mu?.bottom ?? -Infinity) + pad;
     const risers = [];
     L.forEach((a, r) => { const lx = gl + g.laneInset + r * g.lane; risers.push({ a, pts: [[lx, bc.fb], [lx, a.mid], [a.r, a.mid]] }); });
     R.forEach((a, r) => { const lx = gr - g.laneInset - r * g.lane; risers.push({ a, pts: [[lx, bc.fb], [lx, a.mid], [a.l, a.mid]] }); });
@@ -450,7 +471,7 @@ export function layoutStructured(model, opts = {}) {
   // bus with a "via NAME" note and keeps the real upstream link as represented.
   for (const s of secs) {
     for (const r of s.risers) {
-      const id = r.a.id, e = edgeBy.get(key(id, s.head)) ?? null;
+      const id = r.a.id, e = edgeBy.get(key(id, s.head)) ?? (s.mate ? edgeBy.get(key(id, s.mate)) : null) ?? null;
       const slotKind = r.a.ext && SLOT_RE.test(r.a.ext.type ?? "") ? "backbone" : "access";
       out.links.push({ kind: slotKind, a: s.head, b: id, edge: e, pts: r.pts, via: r.a.via ?? null });
     }

@@ -171,6 +171,8 @@ test("no line is cut off: every link reaches both faceplates and only crosses it
   const d44 = district44();
   const m44 = buildModel(d44, { coreSerial: d44.coreSerial });
   for (const shown of [true, false]) cases.push([`district44 LLDP ${shown}`, modelForNeighborToggle(m44, shown)]);
+  const ms = district44({ msCoreUplink: true });
+  cases.push(["district44 MS head pair", buildModel(ms, { coreSerial: ms.coreSerial })]);
   cases.push(["auto core", buildModel(district([8, 6, 5]).data)]);
   for (const k of [1, 3, 6, 10, 14]) cases.push([`synthetic k=${k}`, buildModel(...Object.values(district(Array.from({ length: k }, (_, i) => 1 + (i % 5)))))]);
   let peers = 0;
@@ -186,7 +188,8 @@ test("no line is cut off: every link reaches both faceplates and only crosses it
 test("district44: links the tree cannot draw are peer lines, not text", () => {
   const d = district44();
   const lay = layout(buildModel(d, { coreSerial: d.coreSerial }));
-  assert.ok(lay.peerEdges.length >= 10);
+  // LMS second MC-LAG legs to CORE1 are absorbed by the head-pair VSX box.
+  assert.ok(lay.peerEdges.length >= 6, `peer edges ${lay.peerEdges.length}`);
   // Peer lines may cross each other where one bus encloses another; the count
   // is a ratchet so a change cannot quietly make it worse.
   assert.ok(checkLayout(lay).peerCrossings <= 11, `peer crossings ${checkLayout(lay).peerCrossings}`);

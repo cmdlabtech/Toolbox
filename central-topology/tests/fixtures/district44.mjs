@@ -30,8 +30,9 @@ function hash(s) {
 const serialOf = (key) => `TS${hash(key)}`;
 const macOf = (key) => { const x = hash(`mac${key}`).toLowerCase(); return `02:00:5e:${x.slice(0, 2)}:${x.slice(2, 4)}:${x.slice(4, 6)}`; };
 
-/** API-shaped topology plus coreSerial. */
-export function district44() {
+/** API-shaped topology plus coreSerial. `msCoreUplink` adds the tenant shape
+ * where the Middle School VSX mate (CORE1) is also uplinked to the HS core. */
+export function district44({ msCoreUplink = false } = {}) {
   const switches = [], links = [], externals = [];
   const by = new Map();
   BUILDINGS.forEach((b, bi) => {
@@ -104,6 +105,7 @@ export function district44() {
   link("CEN-TR-A121", ["1/1/48"], "STO-CAFE-STACK", ["1/1/48"]);
   link("ADM-IDF", ["1/1/48"], "TRANS", ["1/1/48"]);
   link("LMS-CAFE-STACK", ["1/1/47"], "LHS-TRAC-SW1", ["1/1/47"]);
+  if (msCoreUplink) link("LMS-ER-RM154-CORE1", ["1/1/51"], "LHS-CORE-VSX-1", ["1/1/45"], "lag45");
 
   // LLDP neighbours: a firewall behind LCSC-DC-INTERNET, some APs, a controller.
   const ext = (name, type, local, port) => {
