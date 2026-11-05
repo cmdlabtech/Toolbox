@@ -245,13 +245,34 @@ export function mgmtOptions(switches) {
 
 /** IP for one switch under the chosen option; falls back to the monitoring IP. */
 export function resolveMgmt(sw, optionId) {
-  let ip = null;
+  let ip = null, iface = null;
   if (optionId === "monitor") ip = sw.ipv4 ?? null;
   else if (optionId?.startsWith("vlan:")) ip = (sw.vlans ?? []).find((v) => v.id === optionId.slice(5))?.ipv4 ?? null;
-  else if (optionId === "oobm" || optionId === "loopback") ip = (sw.interfaces ?? []).find((i) => i.kind === optionId && i.ipv4)?.ipv4 ?? null;
-  if (ip) return { ip, fallback: false, source: optionId };
+  else if (optionId === "oobm" || optionId === "loopback") {
+    const hit = (sw.interfaces ?? []).find((i) => i.kind === optionId && i.ipv4);
+    ip = hit?.ipv4 ?? null; iface = hit?.name ?? null;
+  }
+  if (ip) return iface ? { ip, fallback: false, source: optionId, iface } : { ip, fallback: false, source: optionId };
   if (sw.ipv4) return { ip: sw.ipv4, fallback: optionId !== "monitor", source: "monitor" };
   return { ip: null, fallback: true, source: null };
+}
+
+/**
+ * The management line drawn under a switch box: "{label}: {address}".
+ * Label is "VLAN <id>" for an SVI, the interface name for OOBM or loopback,
+ * "Mgmt" for the monitoring IP, and "Fallback" when the chosen
+ * source had no address and the monitoring IP stands in. The prefix shows only
+ * when Central's address carries one (Central's ipv4 fields have no mask).
+ * No address reads "No mgmt IP".
+ */
+export function mgmtLine(m, optionId) {
+  if (!m?.ip) return "No mgmt IP";
+  let label = m.fallback ? "Fallback" : "Mgmt";
+  if (!m.fallback && m.source !== "monitor") {
+    if (optionId?.startsWith("vlan:")) label = `VLAN ${optionId.slice(5)}`;
+    else label = m.iface || (optionId === "oobm" ? "OOBM" : "Loopback");
+  }
+  return `${label}: ${m.ip}`;
 }
 
 /** A user-typed switch name: control characters removed, spaces collapsed, at most 64 characters. Blank is null. */

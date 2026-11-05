@@ -12,7 +12,7 @@
 // Text is measured (opts.measure, the real font in the browser) and every
 // label is emitted in out.labels with its box, so columns size to their
 // content and tests can check that no text leaves its cell or section.
-import { resolveMgmt } from "./model.js";
+import { mgmtLine, resolveMgmt } from "./model.js";
 
 export const GEOM = {
   fw: 200, fh: 18, sgap: 6, collapseOver: 4,
@@ -88,13 +88,8 @@ export function displayName(n) {
   if (!serialNamed(n)) return n.name;
   return `${modelFamily(n.model) || "Switch"} · ${String(n.serial ?? "").slice(-4)}`;
 }
-/** The management line under a switch name, from the selected Mgmt IP option. */
-export function mgmtText(m, optionId) {
-  if (!m?.ip) return "—";
-  if (m.fallback || m.source === "monitor") return m.ip;
-  if (optionId?.startsWith("vlan:")) return `VL${optionId.slice(5)} → ${m.ip}`;
-  return `${optionId === "oobm" ? "OOBM" : "Lo"} → ${m.ip}`;
-}
+/** The management line under a switch's faceplates (see mgmtLine). */
+export const mgmtText = mgmtLine;
 
 // Text box from a baseline: ascent and descent as fractions of the size.
 function textBox(x, base, w, size, anchor) {
@@ -175,9 +170,11 @@ export function layoutStructured(model, opts = {}) {
     return u;
   };
   const stackH = (k) => k * g.fh + (k - 1) * g.sgap;
-  const textH = (u) => g.nameH + (u.via ? g.lineH : 0) + (u.node ? g.lineH : 0);
-  const cellH = (u) => textH(u) + g.faceGap + stackH(u.n);
-  const place = (u, x, y) => { u.x = x; u.y = y; u.l = x; u.r = x + g.fw; u.ft = y + textH(u) + g.faceGap; u.fb = u.ft + stackH(u.n); u.mid = u.ft + g.fh / 2; u.bottom = y + cellH(u); };
+  const textH = (u) => g.nameH + (u.via ? g.lineH : 0);
+  // A switch's mgmt line sits below its faceplates (u.ex is the bottom of that line).
+  const ipH = (u) => (u.node ? g.faceGap + g.lineH : 0);
+  const cellH = (u) => textH(u) + g.faceGap + stackH(u.n) + ipH(u);
+  const place = (u, x, y) => { u.x = x; u.y = y; u.l = x; u.r = x + g.fw; u.ft = y + textH(u) + g.faceGap; u.fb = u.ft + stackH(u.n); u.ex = u.fb + ipH(u); u.mid = u.ft + g.fh / 2; u.bottom = y + cellH(u); };
   // Attach y on a stack member named by a CX port (m/s/p), else member 1.
   const memberMid = (u, port) => {
     const id = memberOf(port), at = u.node?.stack?.findIndex((s) => s.memberId === id) ?? -1;
@@ -274,7 +271,7 @@ export function layoutStructured(model, opts = {}) {
     return n <= 3 ? (side !== "R" ? [acc, []] : [[], acc]) : [acc.filter((_, i) => i % 2 === 0), acc.filter((_, i) => i % 2 === 1)];
   };
   // Width a unit needs inside a column (text starts textInset in from the faceplate).
-  const textNeed = (u) => g.textInset + Math.max(measure(u.name, TYPE.name), u.via ? measure(`via ${u.via}`, TYPE.sub) : 0, u.ipText ? measure(u.ipText, TYPE.ip) : 0);
+  const textNeed = (u) => g.textInset + Math.max(measure(u.name, TYPE.name), u.via ? measure(`via ${u.via}`, TYPE.sub) : 0, u.ipText ? measure(u.ipText, TYPE.ip) - g.textInset : 0);
 
   // Section layout at (x0, y0). side: "L" (inner edge right), "R", or "C".
   // pad: extra space above and below the head unit (core landings, LAYOUT-SPEC §5).
@@ -525,7 +522,7 @@ export function layoutStructured(model, opts = {}) {
   for (const v of out.vsx) {
     const us = v.members.map(unit), P = VSX_PAD;
     v.box = { x0: Math.min(...us.map((u) => u.l)) - P, x1: Math.max(...us.map((u) => u.r)) + P,
-      y0: Math.min(...us.map((u) => u.y)) - P, y1: Math.max(...us.map((u) => u.fb)) + P };
+      y0: Math.min(...us.map((u) => u.y)) - P, y1: Math.max(...us.map((u) => u.ex)) + P };
   }
 
   // Labels: every piece of structured text, with its box.
@@ -555,7 +552,11 @@ export function layoutStructured(model, opts = {}) {
     label("name", ellipsize(u.name, TYPE.name, maxW, measure), u.name, tx, u.y + 12.5, TYPE.name, { color: "fg", unit: u.id, section: sec });
     let ly = u.y + g.nameH;
     if (u.via) { label("via", ellipsize(`via ${u.via}`, TYPE.sub, maxW, measure), `via ${u.via}`, tx, ly + 10.5, TYPE.sub, { unit: u.id, section: sec }); ly += g.lineH; }
-    if (u.node) label("ip", ellipsize(u.ipText, TYPE.ip, maxW, measure), u.ipText, tx, ly + 10.5, TYPE.ip, { unit: u.id, section: sec });
+    // Mgmt line: one centred line below the faceplates, inside the cell.
+    if (u.node) {
+      const cx = u.l + g.fw / 2, half = Math.min(cx - u.cell.x0, u.cell.x1 - cx);
+      label("ip", ellipsize(u.ipText, TYPE.ip, 2 * half, measure), u.ipText, cx, u.fb + g.faceGap + 10.5, TYPE.ip, { anchor: "middle", unit: u.id, section: sec });
+    }
     // Faceplates: stack number square on the left, warning badge on the right,
     // model text centred between them when it fits at 10px, else tooltip only.
     const members = u.node?.stack && !u.collapsed ? u.node.stack : [{ model: u.model, memberId: null }];
@@ -621,7 +622,9 @@ export function checkLayout(lay) {
     for (const [, p, q] of segs) if (hit(p, q, [u.l + 1, u.r - 1, u.ft + 1, u.fb - 1])) through.push(`${u.name} faceplate`);
   }
   for (const lb of lay.labels) {
-    for (const [, p, q] of segs) if (hit(p, q, [lb.box.x0, lb.box.x1, lb.box.y0, lb.box.y1])) through.push(`${lb.kind} "${lb.text}"`);
+    // A head switch's own risers leave its faceplate bottom and pass behind its
+    // mgmt tag (drawn on a background plate); any other link through it counts.
+    for (const [li, p, q] of segs) if (!(lb.kind === "ip" && (lay.links[li].a === lb.unit || lay.links[li].b === lb.unit)) && hit(p, q, [lb.box.x0, lb.box.x1, lb.box.y0, lb.box.y1])) through.push(`${lb.kind} "${lb.text}"`);
   }
   // Title bands are reserved for the title. The WAN lane is the one route
   // that must cross the core site's band to reach the firewall above it.

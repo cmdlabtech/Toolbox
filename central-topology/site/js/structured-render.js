@@ -94,7 +94,9 @@ export function renderStructuredSvg(model, lay, opts) {
   }
   const text = (lb) => {
     const tip = lb.full && lb.full !== lb.text ? `<title>${esc(lb.full)}</title>` : "";
-    return `<text class="lbl-${lb.kind}" x="${lb.x}" y="${lb.y}"${lb.anchor !== "start" ? ` text-anchor="${lb.anchor}"` : ""} font-size="${lb.size}" font-weight="${lb.weight}"${lb.mono ? ` font-family="${esc(T["--font-mono"])}"` : ""}${lb.ls ? ` letter-spacing="${lb.ls}"` : ""} fill="${color[lb.color] ?? color.muted}">${esc(lb.text)}${tip}</text>`;
+    // The mgmt tag sits on a background plate so its own risers tuck behind it.
+    const plate = lb.kind === "ip" ? `<rect class="ip-plate" x="${lb.box.x0 - 2}" y="${lb.box.y0 - 1}" width="${lb.box.x1 - lb.box.x0 + 4}" height="${lb.box.y1 - lb.box.y0 + 2}" fill="${T["--diagram-bg"]}"/>` : "";
+    return `${plate}<text class="lbl-${lb.kind}" x="${lb.x}" y="${lb.y}"${lb.anchor !== "start" ? ` text-anchor="${lb.anchor}"` : ""} font-size="${lb.size}" font-weight="${lb.weight}"${lb.mono ? ` font-family="${esc(T["--font-mono"])}"` : ""}${lb.ls ? ` letter-spacing="${lb.ls}"` : ""} fill="${color[lb.color] ?? color.muted}">${esc(lb.text)}${tip}</text>`;
   };
 
   // Units: name block, then faceplate(s), then their labels.

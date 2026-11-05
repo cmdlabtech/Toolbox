@@ -133,24 +133,27 @@ test("management IP follows the selected VLAN, changes on reselect, and stays in
   assert.notEqual(a.text, b.text, "reselect changes the IP");
   assert.equal(c.text, a.text, "back to VLAN 1 restores it");
   assert.equal(a.size, 11); assert.equal(a.mono, true); assert.equal(a.color, "muted");
-  // The IP is its own line under the name and inside the cell.
+  // The IP is one centred line below the faceplates, inside the cell, above the next row.
   for (const l of [lay("vlan:1"), lay("vlan:20")]) for (const ip of l.labels.filter((x) => x.kind === "ip")) {
-    const u = l.units.get(ip.unit), name = l.labels.find((x) => x.unit === ip.unit && x.kind === "name");
+    const u = l.units.get(ip.unit);
     assert.ok(ip.box.x0 >= u.cell.x0 - 0.01 && ip.box.x1 <= u.cell.x1 + 0.01, `${u.name} IP in column`);
-    assert.ok(ip.y > name.y && ip.box.y1 <= u.ft, `${u.name} IP under the name, above the faceplate`);
+    assert.ok(ip.box.y0 >= u.fb && ip.box.y1 <= u.bottom, `${u.name} IP below the faceplate, inside the cell`);
+    assert.equal(ip.anchor, "middle"); assert.equal(ip.x, u.l + l.geom.fw / 2);
+    assert.ok(!l.labels.some((x) => x.unit === ip.unit && x !== ip && x.box.y1 > ip.box.y0), `${u.name}: nothing of the unit below the IP line`);
   }
   // Fallback keeps the badge; no address shows a dash.
   const l = lay("vlan:1");
   const fb = [...l.units.values()].find((u) => u.mgmt?.fallback && u.mgmt.ip);
   assert.ok(fb.faces.some((f) => f.badge), "fallback IP keeps the badge");
-  assert.equal(label(l, "HAR-IDF-426B", "ip").text, "—");
+  assert.equal(label(l, "HAR-IDF-426B", "ip").text, "No mgmt IP");
 });
 
 test("render: labels come out as drawn, IP in mono, ports in the tooltip", () => {
   const l = lay("vlan:20");
   const svg = renderSvg(model, l, { tokens: { ...TOKENS, "--font-mono": "MONO" }, mgmt: "vlan:20", title: "t", subtitle: "s" });
-  const ip = l.labels.find((x) => x.kind === "ip" && /^VL20 /.test(x.text));
+  const ip = l.labels.find((x) => x.kind === "ip" && /^VLAN 20: /.test(x.text));
   assert.match(svg, new RegExp(`class="lbl-ip"[^>]*font-family="MONO"[^>]*>${ip.text.replace(/[.]/g, "\\.")}<`));
+  assert.ok(svg.includes(`class="ip-plate"`), "mgmt tag has its background plate");
   assert.match(svg, /<path data-edge=""[^>]*><title>[^<]*lag\d+/, "LAG names in link tooltips");
   assert.ok(!/<text[^>]*>[^<]*lag\d+/.test(svg), "no LAG names as text");
 });
@@ -182,10 +185,10 @@ test(`WAN line stays ${WAN_CLEAR}px clear of the core title text`, () => {
   }
 });
 
-test("mgmt line is VLAN arrow IP in 11px mono", () => {
+test("mgmt line is 'VLAN id: IP' in 11px mono", () => {
   const l = lay();
-  const ip = l.labels.find((x) => x.kind === "ip" && x.text.startsWith("VL1 "));
-  assert.match(ip.text, /^VL1 → \d+\.\d+\.\d+\.\d+$/);
+  const ip = l.labels.find((x) => x.kind === "ip" && x.text.startsWith("VLAN 1: "));
+  assert.match(ip.text, /^VLAN 1: \d+\.\d+\.\d+\.\d+$/);
   assert.equal(ip.size, 11);
   assert.equal(ip.mono, true);
   const model10 = l.labels.find((x) => x.kind === "model");
