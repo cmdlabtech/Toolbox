@@ -179,7 +179,7 @@ test("district44: links the tree cannot draw are peer lines, not text", () => {
   assert.ok(lay.peerEdges.length >= 10);
   // Peer lines may cross each other where one bus encloses another; the count
   // is a ratchet so a change cannot quietly make it worse.
-  assert.ok(checkLayout(lay).peerCrossings <= 16, `peer crossings ${checkLayout(lay).peerCrossings}`);
+  assert.ok(checkLayout(lay).peerCrossings <= 11, `peer crossings ${checkLayout(lay).peerCrossings}`);
   assert.ok(!lay.labels.some((x) => /^→ |^\+\d+ more$/.test(x.text)), "no → switch lists or +n more");
   assert.ok(!lay.labels.some((x) => x.kind === "stub" || /^linksout/.test(x.kind)), "no stub or Links out labels");
   // The IDF to core links that used to stop at a stub now land in the core site.
