@@ -5,7 +5,7 @@ import { contentBounds, renderSvg, readTokens } from "./render.js";
 import { createLoader } from "./loader.js";
 import { download, htmlExport, jsonExport, linkCheckExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, connectionState, createVault, fetchWithAuth, formatExpiry, mintToken, normalise, renewDue, reuseSavedToken, tokenPlaceholder, tokenValid } from "./creds.js";
-import { UI_KEYS as KEYS, loadPref, readUiPrefs, savePref, writeUiPref } from "./prefs.js";
+import { UI_KEYS as KEYS, DEFAULT_TITLE, cleanLabel, loadPref, readUiPrefs, savePref, writeUiPref } from "./prefs.js";
 import { createRegistry, EMPTY_REGISTRY } from "./stencils.js";
 import { importStencils } from "./stencil/vssx.js";
 import { clearStencils, loadStencils, saveStencils } from "./stencil/store.js";
@@ -25,7 +25,11 @@ const state = {
   mgmt: prefs.mgmt,
   showLldpNeighbors: prefs.showLldpNeighbors,
   showPorts: prefs.showPorts,
+  // Diagram labels. Title defaults to DEFAULT_TITLE; subtitleCustom null means auto.
+  title: prefs.title,
+  subtitleCustom: prefs.subtitleCustom,
   model: null, lay: null, svg: "",
+  subtitle: "",
   view: null,
   openChips: new Set(),
   container: null,
@@ -199,9 +203,11 @@ function paint() {
   const box = readContainer();
   const layOpts = state.layout === "structured" ? { width: box.w, height: box.h, mgmt: state.mgmt, measure: textMeasurer() } : { width: box.w, height: box.h };
   const placed = applyPositionOverrides(layoutById(state.layout, model, layOpts), state.positions[state.layout]);
-  const subtitle = `${model.nodes.length} switches · ${model.buildings.length} buildings · ${layoutLabel} · Mgmt: ${mgmtLabel} · ${state.data.mock ? "MOCK DATA · " : ""}${new Date(state.data.generatedAt).toLocaleString()}`;
+  const autoSubtitle = `${model.nodes.length} switches · ${model.buildings.length} buildings · ${layoutLabel} · Mgmt: ${mgmtLabel} · ${state.data.mock ? "MOCK DATA · " : ""}${new Date(state.data.generatedAt).toLocaleString()}`;
+  const title = state.title || DEFAULT_TITLE;
+  const subtitle = state.subtitleCustom ?? autoSubtitle;
   const renderOpts = {
-    tokens: readTokens(), mgmt: state.mgmt, title: "Switch topology", subtitle,
+    tokens: readTokens(), mgmt: state.mgmt, title, subtitle,
     showPorts: state.showPorts !== false, stencils: state.registry,
     // Export only: the on-screen view keeps its warning badges.
     badges: false,
@@ -209,6 +215,7 @@ function paint() {
   const lay = (state.lay = { ...placed, bounds: contentBounds(model, placed, renderOpts) });
   state.svg = renderSvg(model, lay, renderOpts);
   state.subtitle = subtitle;
+  state.autoSubtitle = autoSubtitle;
   mountDiagram();
 }
 
@@ -269,8 +276,58 @@ function legendHtml(T) {
   ].join("")}</div>`;
 }
 
+function commitDiagramLabels(ev) {
+  const titleEl = $("diagramTitle");
+  const subEl = $("diagramSubtitle");
+  if (!titleEl || !subEl) return;
+  const nextTitle = cleanLabel(titleEl.value) || DEFAULT_TITLE;
+  const typed = subEl.value;
+  // Blank restores the auto line. Unchanged auto text stays auto (not persisted).
+  let custom;
+  if (typed.trim() === "") custom = null;
+  else if (state.subtitleCustom == null && typed === (state.autoSubtitle ?? "")) custom = null;
+  else custom = cleanLabel(typed, 200);
+  const titleChanged = nextTitle !== state.title;
+  const subChanged = custom !== state.subtitleCustom;
+  if (titleChanged || subChanged) {
+    state.title = nextTitle;
+    state.subtitleCustom = custom;
+    writeUiPref(localStorage, "title", state.title);
+    if (custom == null) localStorage.removeItem(KEYS.subtitle);
+    else writeUiPref(localStorage, "subtitle", custom);
+    if (custom != null) state.subtitle = custom;
+    else if (state.autoSubtitle) state.subtitle = state.autoSubtitle;
+  }
+  // Remounting the head while Tab/click moves between the two fields steals focus.
+  const to = ev?.relatedTarget;
+  if (to && (to.id === "diagramTitle" || to.id === "diagramSubtitle")) return;
+  if ((titleChanged || subChanged) && state.model) paint();
+}
+
+function wireDiagramLabels() {
+  const titleEl = $("diagramTitle");
+  const subEl = $("diagramSubtitle");
+  if (!titleEl || !subEl || titleEl.dataset.wired) return;
+  titleEl.dataset.wired = "1";
+  subEl.dataset.wired = "1";
+  for (const el of [titleEl, subEl]) {
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        titleEl.value = state.title || DEFAULT_TITLE;
+        subEl.value = state.subtitle ?? "";
+        el.blur();
+      }
+    });
+    el.addEventListener("blur", (e) => commitDiagramLabels(e));
+  }
+}
+
 function diagramHead(tokens) {
-  return `<div class="diagram-head"><div><div class="diagram-title">Switch topology</div><div class="diagram-sub">${esc(state.subtitle ?? "")}</div></div><div class="diagram-tools"><button type="button" id="zoomOut" aria-label="Zoom out">−</button><button type="button" id="zoomFit">Fit</button><button type="button" id="zoomIn" aria-label="Zoom in">+</button></div>${legendHtml(tokens)}</div>`;
+  const title = state.title || DEFAULT_TITLE;
+  const sub = state.subtitle ?? "";
+  return `<div class="diagram-head"><div class="diagram-labels"><input type="text" class="diagram-title" id="diagramTitle" maxlength="120" spellcheck="false" value="${esc(title)}" aria-label="Diagram title (saved in this browser only)" title="Edit the title. Saved in this browser; Central is not changed."><input type="text" class="diagram-sub" id="diagramSubtitle" maxlength="200" spellcheck="false" value="${esc(sub)}" placeholder="${esc(state.autoSubtitle ?? "")}" aria-label="Diagram subtitle (saved in this browser only)" title="Edit the subtitle. Saved in this browser; clear and blur to restore the auto line."></div><div class="diagram-tools"><button type="button" id="zoomOut" aria-label="Zoom out">−</button><button type="button" id="zoomFit">Fit</button><button type="button" id="zoomIn" aria-label="Zoom in">+</button></div>${legendHtml(tokens)}</div>`;
 }
 
 function cropped(bounds) {
@@ -296,6 +353,7 @@ function mountDiagram(scrollAfter) {
   const tokens = readTokens();
   host.innerHTML = `<div class="diagram-card scrolls">${diagramHead(tokens)}<div class="diagram-scroll"></div></div>`;
   const scroller = host.querySelector(".diagram-scroll");
+  wireDiagramLabels();
   const avail = graphAvail(scroller, host);
   if (!state.view) {
     const frameOpts = lay.id === "hub" ? HUB_FRAME : {};
@@ -326,7 +384,7 @@ function mountDiagram(scrollAfter) {
   };
   const bounds = contentBounds(model, lay, frameOptsForBounds);
   scroller.innerHTML = renderSvg(model, { ...lay, bounds }, {
-    tokens, mgmt: state.mgmt, title: "Switch topology", subtitle: state.subtitle,
+    tokens, mgmt: state.mgmt, title: state.title || DEFAULT_TITLE, subtitle: state.subtitle,
     stencils: state.registry, ...frameOptsForBounds,
   });
   const svg = scroller.querySelector("svg");
@@ -583,7 +641,7 @@ $("dlPng").addEventListener("click", async () => {
   try { download(await pngBlob(state.svg), `central-topology-${stamp()}.png`); } catch (e) { status(e.message, true); }
 });
 $("dlHtml").addEventListener("click", () => {
-  const html = htmlExport(state.svg, { title: "Switch topology", subtitle: state.subtitle, tokens: readTokens() });
+  const html = htmlExport(state.svg, { title: state.title || DEFAULT_TITLE, subtitle: state.subtitle, tokens: readTokens() });
   download(new Blob([html], { type: "text/html" }), `central-topology-${stamp()}.html`);
 });
 $("dlJson").addEventListener("click", () => {
