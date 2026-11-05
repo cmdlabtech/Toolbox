@@ -73,7 +73,7 @@ async function topology(c: Central, mock: boolean, include: Set<string>, secrets
   const warnings: string[] = [];
   const warn = (m: string) => warnings.push(scrub(m, ...secrets));
   const sites = await c.sites();
-  const { switches, externals, links } = await mergeTenant(c, sites, pool, warn);
+  const { switches, externals, links, lldpRows } = await mergeTenant(c, sites, pool, warn);
   const detailed = await pool(switches, 4, async (sw) => {
     let vlans = null, interfaces = null;
     if (include.has("vlans")) {
@@ -84,7 +84,7 @@ async function topology(c: Central, mock: boolean, include: Set<string>, secrets
     }
     return { ...sw, vlans, interfaces };
   });
-  return { mock, generatedAt: new Date().toISOString(), sites, switches: detailed, externals, links, warnings };
+  return { mock, generatedAt: new Date().toISOString(), sites, switches: detailed, externals, links, lldpRows, warnings };
 }
 
 async function tokenRoute(request: Request): Promise<Response> {

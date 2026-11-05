@@ -27,6 +27,17 @@ export function renderStructuredSvg(model, lay, opts) {
     o.push(`<rect class="section" data-building="${esc(s.name)}" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="10" fill="${T["--section-fill"]}" stroke="${s.unassigned ? T["--warn"] : T["--section-border"]}" stroke-width="1"${s.unassigned ? ` stroke-dasharray="5 4"` : ""}/>`);
   }
 
+  // VSX pairs: a dashed rounded box around the two members, labelled on its
+  // top-left border. The second MC-LAG legs it stands for are in its tooltip.
+  for (const v of lay.vsx ?? []) {
+    const b = v.box, names = v.members.map(lay.name);
+    const tip = [`VSX pair: ${names.join(" + ")}`, ...v.absorbed.map((e) => `${lay.name(e.from)} ${portsOf(e, "from")} ↔ ${lay.name(e.to)} ${portsOf(e, "to")}`)].join("\n");
+    o.push(`<g class="vsx-pair" data-vsx="${esc(v.members.join("|"))}"><title>${esc(tip)}</title>`);
+    o.push(`<rect x="${b.x0}" y="${b.y0}" width="${b.x1 - b.x0}" height="${b.y1 - b.y0}" rx="8" fill="none" stroke="${T["--diagram-muted"]}" stroke-width="1.2" stroke-dasharray="5 4"/>`);
+    o.push(`<rect x="${b.x0 + 8}" y="${b.y0 - 5.5}" width="26" height="11" fill="${T["--section-fill"]}"/>`);
+    o.push(`<text x="${b.x0 + 21}" y="${b.y0 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" letter-spacing="0.4" fill="${T["--diagram-muted"]}">VSX</text></g>`);
+  }
+
   // Internet cloud.
   if (lay.wan) {
     const { x: cx, y: cy } = lay.wan.cloud;

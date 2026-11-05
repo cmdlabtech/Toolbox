@@ -24,9 +24,14 @@ export interface TopoDevice {
   vlanIds: number[];           // topology devices[].vlans (IDs only, no addresses)
   deployment: string | null;   // "Standalone", or a stack deployment (exact stack value unverified)
   conductorSerial: string | null; // stack conductor's serial when the switch is a stack member
+  mac: string | null;          // topology devices[].mac
 }
-export interface SwitchDetail { siteId: string | null; siteName: string | null; jNumber: string | null; stackMemberId: number | null; deviceName: string | null; serialNumber: string | null }
+// serialNumber / macAddress: the hardware identity behind a stack id, used to
+// match LLDP rows that name a member instead of the stack. deviceName: a name
+// fallback when topology names a switch by its serial.
+export interface SwitchDetail { siteId: string | null; siteName: string | null; jNumber: string | null; stackMemberId: number | null; deviceName: string | null; serialNumber: string | null; macAddress: string | null }
 export interface InventoryRow { serial: string; group: string | null; name: string | null; stackId: string | null }
+export interface StackMember { serial: string; mac: string | null; name: string | null; memberId: number | null }
 export interface LinkPort { name: string; lag: string | null }
 export interface TopoLink {
   from: string; to: string;
@@ -37,6 +42,9 @@ export interface TopoLink {
   source: "topology" | "neighbours";
   isSibling: boolean;          // stack (VSF) link between members of one stack
 }
+// One LLDP neighbour, before it is matched to a switch in the graph.
+// peerName: neighbours[].name. localMember: neighbours[].memberSerial.
+export interface NeighbourLink extends TopoLink { peerName: string | null; localMember: string | null }
 export interface NormVlan { id: string; name: string | null; ipv4: string | null }
 export interface NormInterface { name: string; type: string | null; ipv4: string | null; kind: "oobm" | "loopback" | "other" }
 
@@ -176,6 +184,7 @@ export function central(get: GetJson) {
         vlanIds: Array.isArray(d.vlans) ? d.vlans.map(Number).filter(Number.isFinite) : [],
         deployment: str(d.deployment),
         conductorSerial: str(d.conductorSerial),
+        mac: str(d.mac),
       }));
       const links = asList(body?.links)
         .filter((l: any) => str(l.from) && str(l.to))
@@ -197,16 +206,33 @@ export function central(get: GetJson) {
       return {
         siteId: str(d?.siteId), siteName: str(d?.siteName), jNumber: str(d?.jNumber),
         stackMemberId: d?.stackMemberId != null && Number.isFinite(id) ? id : null,
-        deviceName: str(d?.deviceName), serialNumber: str(d?.serialNumber),
+        deviceName: str(d?.deviceName), serialNumber: str(d?.serialNumber), macAddress: str(d?.macAddress),
       };
+    },
+
+    // Members of one stack, by stack id or conductor serial.
+    // GET /network-monitoring/v1/stack/{serial-number}/members → items[].serialNumber,
+    // macAddress, deviceName, stackMemberId (listStackMembersV1).
+    async stackMembers(stack: string): Promise<StackMember[]> {
+      const body = await get(`/network-monitoring/v1/stack/${encodeURIComponent(stack)}/members`);
+      const out: StackMember[] = [];
+      for (const m of asList(body?.items ?? body?.members)) {
+        const serial = str(m?.serialNumber) ?? str(m?.id);
+        if (!serial || out.some((x) => x.serial === serial)) continue;
+        const id = Number(m?.stackMemberId);
+        out.push({ serial, mac: str(m?.macAddress), name: str(m?.deviceName), memberId: m?.stackMemberId != null && Number.isFinite(id) ? id : null });
+      }
+      return out;
     },
 
     // LLDP fill-in when topology leaves a switch cut off from the rest.
     // LLDP fill-in. Several rows for one neighbor (LAG members) become one link.
     // localPort is this switch; toPort is the remote interface.
-    async neighbours(serial: string): Promise<TopoLink[]> {
+    // neighbours[].serial is the neighbour as LLDP saw it: it can be a stack
+    // member serial or tpd_<mac>, not the id the topology uses. merge.ts maps it.
+    async neighbours(serial: string): Promise<NeighbourLink[]> {
       const body = await get(`/network-monitoring/v1/neighbours/${encodeURIComponent(serial)}`);
-      const grouped = new Map<string, TopoLink>();
+      const grouped = new Map<string, NeighbourLink>();
       for (const n of asList(body?.neighbours)) {
         const to = str(n.serial);
         if (!to || to === serial) continue;
@@ -214,12 +240,16 @@ export function central(get: GetJson) {
         const remote = str(n.toPort);
         const hit = grouped.get(to);
         if (!hit) {
-          grouped.set(to, linkEnds(
-            serial, to,
-            local ? [{ name: local, lag: null }] : [],
-            remote ? [{ name: remote, lag: null }] : [],
-            null, "neighbours",
-          ));
+          grouped.set(to, {
+            ...linkEnds(
+              serial, to,
+              local ? [{ name: local, lag: null }] : [],
+              remote ? [{ name: remote, lag: null }] : [],
+              null, "neighbours",
+            ),
+            peerName: str(n.name),
+            localMember: str(n.memberSerial),
+          });
           continue;
         }
         if (local && !hit.fromPorts.some((p) => p.name === local)) hit.fromPorts.push({ name: local, lag: null });
