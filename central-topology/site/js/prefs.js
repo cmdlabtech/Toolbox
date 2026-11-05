@@ -1,7 +1,8 @@
 // View preferences. One JSON localStorage load/save path for the controls
-// the page already keeps (layout, theme, management IP), whether LLDP
-// neighbors are drawn, and whether switch-link port labels are drawn.
-// `storage` is localStorage or a test double with getItem/setItem.
+// the page already keeps (layout, theme, management IP, diagram title and
+// subtitle), whether LLDP neighbors are drawn, and whether switch-link port
+// labels are drawn. `storage` is localStorage or a test double with
+// getItem/setItem.
 
 export const UI_KEYS = {
   overrides: "ct-overrides",
@@ -11,7 +12,18 @@ export const UI_KEYS = {
   positions: "ct-positions",
   showLldpNeighbors: "ct-show-lldp-neighbors",
   showPorts: "ct-ports",
+  title: "ct-title",
+  subtitle: "ct-subtitle",
 };
+
+/** Default diagram title when nothing is saved in this browser. */
+export const DEFAULT_TITLE = "Switch topology";
+
+/** Trim and cap a title/subtitle. Blank becomes "". */
+export function cleanLabel(value, max = 120) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\s+/g, " ").trim().slice(0, max);
+}
 
 /** Previous LLDP toggle key. Read once so a saved on/off choice survives the rename. */
 const LLDP_KEY_PREV = "ct-show-access-neighbors";
@@ -70,12 +82,19 @@ export function savePref(storage, key, value) {
 /** Missing LLDP choice stays off. An explicit saved choice stays. Missing showPorts stays on. */
 export function readUiPrefs(storage) {
   const ports = loadPref(storage, UI_KEYS.showPorts, true);
+  const titleRaw = loadPref(storage, UI_KEYS.title, null);
+  const subtitleRaw = loadPref(storage, UI_KEYS.subtitle, null);
+  const title = typeof titleRaw === "string" && titleRaw.trim() ? cleanLabel(titleRaw) : DEFAULT_TITLE;
+  // null = still using the auto-built subtitle. A saved string (even "") is custom.
+  const subtitleCustom = typeof subtitleRaw === "string" ? cleanLabel(subtitleRaw, 200) : null;
   return {
     layout: loadPref(storage, UI_KEYS.layout, "hub"),
     mgmt: loadPref(storage, UI_KEYS.mgmt, "monitor"),
     theme: loadPref(storage, UI_KEYS.theme, "light"),
     showLldpNeighbors: readShowLldpNeighbors(storage),
     showPorts: ports !== false,
+    title,
+    subtitleCustom,
   };
 }
 

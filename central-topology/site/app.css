@@ -39,8 +39,27 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; flex: 1; min-
 .diagram-card.scrolls { width: 100%; height: 100%; }
 .diagram-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; padding: 12px 16px 10px; border-bottom: 1px solid var(--border); background: var(--diagram-bg); flex: none; }
 .diagram-tools { display: flex; gap: 6px; align-items: center; flex: none; }
+.diagram-labels { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 220px; }
+.diagram-title, .diagram-sub {
+  font: inherit;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+}
 .diagram-title { font-size: 20px; font-weight: 700; color: var(--diagram-fg); line-height: 1.2; }
-.diagram-sub { margin-top: 4px; font-size: 12px; color: var(--diagram-muted); }
+.diagram-sub { font-size: 12px; color: var(--diagram-muted); }
+.diagram-title:hover, .diagram-sub:hover { border-color: var(--border); }
+.diagram-title:focus, .diagram-sub:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+  background: var(--surface);
+}
 .diagram-legend { display: grid; grid-template-columns: auto auto; gap: 3px 16px; font-size: 11px; color: var(--diagram-muted); flex: none; }
 .diagram-legend .lg { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .diagram-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; box-sizing: border-box; }
