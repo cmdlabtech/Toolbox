@@ -347,8 +347,10 @@ async function readJson(resp) {
  * A bearer 401 clears the token and asks for a new one.
  * A client-credential 401 mints one new token and retries the request once.
  */
-export async function fetchWithAuth(creds, { fetchImpl = fetch, apiBase = "", mint = mintToken, path = TOPOLOGY_PATH, now = Date.now() } = {}) {
+/** onPhase(id) reports real steps: "connecting" (token check or mint), "fetching" (request out), "reading" (body in). */
+export async function fetchWithAuth(creds, { fetchImpl = fetch, apiBase = "", mint = mintToken, path = TOPOLOGY_PATH, now = Date.now(), onPhase = () => {} } = {}) {
   let current = creds ?? null;
+  onPhase("connecting");
   if (current && !tokenValid(current, now)) {
     if (current.method !== "client") {
       throw new AuthError(missingBearerMessage(current, now), { reopen: current.method === "token", creds: clearToken(current) });
@@ -362,7 +364,9 @@ export async function fetchWithAuth(creds, { fetchImpl = fetch, apiBase = "", mi
   let mintedRetry = false;
   for (let attempt = 0; attempt < 2; attempt++) {
     const { url, init } = apiRequest(apiBase, path, current);
+    onPhase("fetching");
     const resp = await fetchImpl(url, init);
+    onPhase("reading");
     const body = await readJson(resp);
     const rejected = resp.status === 401 && current;
     if (rejected && current.method === "client" && !mintedRetry) {

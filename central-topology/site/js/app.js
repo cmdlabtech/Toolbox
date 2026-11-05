@@ -2,6 +2,7 @@ import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED, switchLinks
 import { largeSample } from "./large-sample.js";
 import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, structuredOpeningScale, structuredOpeningScroll, structuredScaleFloor, writePosition } from "./layout.js";
 import { contentBounds, renderSvg, readTokens } from "./render.js";
+import { createLoader } from "./loader.js";
 import { download, jsonExport, linkCheckExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, connectionState, createVault, fetchWithAuth, formatExpiry, mintToken, normalise, renewDue, reuseSavedToken, tokenPlaceholder, tokenValid } from "./creds.js";
 import { UI_KEYS as KEYS, loadPref, readUiPrefs, savePref, writeUiPref } from "./prefs.js";
@@ -35,7 +36,14 @@ if (!LAYOUTS.some((l) => l.id === state.layout)) state.layout = "hub";
 if (!state.positions || typeof state.positions !== "object" || Array.isArray(state.positions)) state.positions = {};
 document.documentElement.dataset.theme = prefs.theme;
 
-function status(msg, err = false) { const s = $("status"); s.textContent = msg; s.className = err ? "err" : ""; }
+const loader = createLoader($("status"));
+// While a topology load runs, the next status message ends the loader.
+function status(msg, err = false) {
+  if (loader.active) return err ? loader.fail(msg) : loader.done(msg);
+  const s = $("status"); s.textContent = msg; s.className = err ? "err" : "";
+}
+// Let the browser paint the current phase before a long synchronous step.
+const nextPaint = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 
 const apiBase = (window.CT_CONFIG?.apiBase ?? "").replace(/\/+$/, "");
 const vault = createVault({ session: sessionStorage, local: localStorage });
@@ -69,23 +77,28 @@ setInterval(renewTick, 15_000);
 document.addEventListener("visibilitychange", renewTick);
 
 async function refresh() {
-  status("Loading topology…");
+  loader.start();
   try {
     if (new URLSearchParams(location.search).get("sample") === "large") {
+      loader.phase("sample"); await nextPaint();
       const sample = largeSample();
       state.data = sample;
       const saved = state.overrides.coreSerial;
       const known = sample.switches.some((s) => s.serial === saved);
       if (!known) state.overrides = { ...state.overrides, coreSerial: sample.coreSerial };
       $("mockBadge").hidden = false;
+      loader.phase("layout"); await nextPaint();
       draw();
+      if (loader.active) loader.done();
       return true;
     }
-    const result = await fetchWithAuth(vault.get(), { apiBase });
+    const result = await fetchWithAuth(vault.get(), { apiBase, onPhase: (id) => loader.phase(id) });
     if (result.creds) vault.save(result.creds);
     state.data = result.body;
     $("mockBadge").hidden = !result.body.mock;
+    loader.phase("layout"); await nextPaint();
     draw();
+    if (loader.active) loader.done();
     connState();
     return true;
   } catch (e) {
