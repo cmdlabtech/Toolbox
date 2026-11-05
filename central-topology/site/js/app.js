@@ -1,4 +1,4 @@
-import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED, switchLinks } from "./model.js";
+import { buildModel, mgmtOptions, parseOverrides, ROLES, UNASSIGNED, switchLinks, withSwitchName } from "./model.js";
 import { largeSample } from "./large-sample.js";
 import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, structuredOpeningScale, structuredOpeningScroll, structuredScaleFloor, writePosition } from "./layout.js";
 import { contentBounds, renderSvg, readTokens } from "./render.js";
@@ -499,8 +499,12 @@ function side(model) {
     for (const n of model.nodes.filter((x) => x.building === b).sort((x, y) => (x.hop ?? 99) - (y.hop ?? 99) || x.name.localeCompare(y.name))) {
       const o = state.overrides.switches[n.serial] ?? {};
       const placed = state.positions[state.layout]?.[n.serial];
-      html.push(`<div class="sw" data-serial="${esc(n.serial)}"><div class="name">${esc(n.name)} ${o.role || o.building || placed ? '<span class="ovr">override</span>' : ""}</div>
+      const renamed = n.nameSource === "override";
+      html.push(`<div class="sw" data-serial="${esc(n.serial)}"><div class="name">${esc(n.name)} ${o.role || o.building || o.name || placed ? '<span class="ovr">override</span>' : ""}</div>
         <div class="meta">${esc(n.serial)} · ${esc(n.model)} · hop ${n.hop ?? "–"} · site ${esc(n.site ?? "none")} · ${esc(deviceGroup(n))}</div>
+        <div class="row rename"><input type="text" data-k="name" maxlength="64" spellcheck="false" value="${esc(n.name)}" placeholder="${esc(n.centralName ?? n.name)}" aria-label="Switch name (saved in this browser only)" title="Rename in this tool only. Saved in this browser; Central is not changed.">
+        ${renamed ? `<button type="button" data-act="reset-name" title="Back to the Central name">Reset name</button>` : ""}</div>
+        ${renamed ? `<div class="meta">Central name: ${esc(n.centralName)}</div>` : ""}
         <div class="row"><select data-k="role">${["", ...ROLES].map((r) => `<option value="${r}"${(o.role ?? "") === r ? " selected" : ""}>${r ? r : `role: ${n.role} (auto)`}</option>`).join("")}</select>
         <select data-k="building">${["", ...buildings, UNASSIGNED].map((x) => `<option value="${esc(x)}"${(o.building ?? "") === x ? " selected" : ""}>${esc(x ? x : `building: ${n.site ?? UNASSIGNED} (site)`)}</option>`).join("")}</select></div>
         ${linkListHtml(model, n.serial)}
@@ -513,15 +517,31 @@ function side(model) {
 }
 
 $("side").addEventListener("change", (ev) => {
-  const sel = ev.target.closest("select"); const card = ev.target.closest(".sw");
+  const sel = ev.target.closest("select, input[data-k=name]"); const card = ev.target.closest(".sw");
   if (!sel || !card) return;
   const serial = card.dataset.serial;
+  if (sel.dataset.k === "name") { setSwitchName(serial, sel.value); return; }
   const cur = { ...(state.overrides.switches[serial] ?? {}) };
   if (sel.value) cur[sel.dataset.k] = sel.value; else delete cur[sel.dataset.k];
   if (cur.role === "district-core") { state.overrides.coreSerial = serial; delete cur.role; }
   if (Object.keys(cur).length) state.overrides.switches[serial] = cur; else delete state.overrides.switches[serial];
   persist();
 });
+$("side").addEventListener("keydown", (ev) => {
+  const input = ev.target.closest("input[data-k=name]");
+  if (!input) return;
+  if (ev.key === "Enter") { ev.preventDefault(); input.blur(); }
+  if (ev.key === "Escape") { input.value = state.model?.byId.get(input.closest(".sw").dataset.serial)?.name ?? input.value; input.blur(); }
+});
+$("side").addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button[data-act=reset-name]"); const card = ev.target.closest(".sw");
+  if (btn && card) setSwitchName(card.dataset.serial, "");
+});
+/** Browser-only rename: saved with the other overrides in localStorage; never sent to Central. */
+function setSwitchName(serial, value) {
+  state.overrides = withSwitchName(state.overrides, serial, value, state.model?.byId.get(serial)?.centralName);
+  persist();
+}
 $("coreSel").addEventListener("change", (e) => { state.overrides.coreSerial = e.target.value || null; persist(); });
 $("layoutSel").innerHTML = LAYOUTS.map((l) => `<option value="${esc(l.id)}">${esc(l.label)}</option>`).join("");
 $("layoutSel").value = state.layout;

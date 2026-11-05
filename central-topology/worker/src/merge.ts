@@ -1,5 +1,5 @@
 // Merge per-site topology into one tenant graph.
-import { isSwitch, type Central, type NeighbourLink, type Site, type StackMember, type SwitchDetail, type TopoDevice, type TopoLink } from "./central.ts";
+import { isSwitch, type Central, type InventoryRow, type NeighbourLink, type Site, type StackMember, type SwitchDetail, type TopoDevice, type TopoLink } from "./central.ts";
 
 export interface MergedSwitch extends TopoDevice {
   siteId: string | null;
@@ -9,6 +9,37 @@ export interface MergedSwitch extends TopoDevice {
   central: boolean;
   jNumber: string | null;        // part number, for stencil matching
   stackMemberId: number | null;  // member number inside a stack
+  nameFrom: "topology" | "switch-detail" | "inventory";
+}
+
+/**
+ * A name that is only an identifier: blank, a stack UUID, or a serial the
+ * tenant knows (this switch's ids, or any serial in inventory, switch detail
+ * or topology), optionally with a short "G-" style prefix. A hostname that
+ * merely looks like a serial is kept.
+ */
+export function serialLikeName(name: string | null | undefined, ids: (string | null | undefined)[] = [], known?: Set<string>): boolean {
+  const n = (name ?? "").trim();
+  if (!n) return true;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(n)) return true;
+  const up = n.toUpperCase();
+  const hit = (v: string) => ids.some((id) => id && id.trim().toUpperCase() === v) || !!known?.has(v);
+  return hit(up) || hit(up.replace(/^[A-Z]{1,2}-/, ""));
+}
+
+/** First candidate that is a real name; else the topology name unchanged. */
+export function pickName(
+  topologyName: string,
+  ids: (string | null | undefined)[],
+  candidates: [MergedSwitch["nameFrom"], string | null | undefined][],
+  known?: Set<string>,
+): { name: string; nameFrom: MergedSwitch["nameFrom"] } {
+  if (!serialLikeName(topologyName, ids, known)) return { name: topologyName, nameFrom: "topology" };
+  for (const [from, v] of candidates) {
+    const t = (v ?? "").trim();
+    if (t && !serialLikeName(t, ids, known)) return { name: t, nameFrom: from };
+  }
+  return { name: topologyName, nameFrom: "topology" };
 }
 
 function blank(v: string | null | undefined) {
@@ -129,7 +160,7 @@ export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[
   let inventoryFailed = false;
   const groupTask = c.deviceGroups().then(
     (rows) => rows,
-    (e) => { inventoryFailed = true; warn(`Device groups unavailable (${(e as Error).message})`); return [] as { serial: string; group: string | null }[]; },
+    (e) => { inventoryFailed = true; warn(`Device groups unavailable (${(e as Error).message})`); return [] as InventoryRow[]; },
   );
   const perSite = await pool(sites, 4, async (s) => {
     try { return { site: s, ...(await c.topology(s.id)) }; }
@@ -169,7 +200,7 @@ export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[
   for (const d of all) {
     const seen = seenIn.get(d.serial) ?? [];
     const det = detail.get(d.serial);
-    const extra = { group: null, central: true, jNumber: det?.jNumber ?? null, stackMemberId: det?.stackMemberId ?? null };
+    const extra = { group: null, central: true, jNumber: det?.jNumber ?? null, stackMemberId: det?.stackMemberId ?? null, nameFrom: "topology" as const };
     if (seen.length === 1) switches.push({ ...d, ...extra, siteId: seen[0].id, site: seen[0].name, siteSource: "topology" });
     else if (det?.siteName) switches.push({ ...d, ...extra, siteId: det.siteId, site: det.siteName, siteSource: "switch-detail" });
     else switches.push({ ...d, ...extra, siteId: seen[0]?.id ?? null, site: seen[0]?.name ?? null, siteSource: "ambiguous" });
@@ -212,6 +243,31 @@ export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[
     if (prev === undefined || (prev === null && row.group)) groupBySerial.set(row.serial, row.group);
   }
   for (const sw of switches) sw.group = groupBySerial.get(sw.serial) ?? null;
+
+  // Some switches come back from topology named by a serial or stack id.
+  // Prefer switch detail deviceName, then the inventory deviceName for the
+  // serial (or for a member whose stackId is this switch's id). Unverified
+  // which of these is set on a live tenant; the topology name stays when
+  // none is a real name.
+  const invName = new Map<string, string>();
+  const known = new Set<string>();
+  for (const id of [...devices.keys(), ...groupRows.map((r) => r.serial), ...[...detail.values()].map((d) => d.serialNumber)]) if (id) known.add(id.toUpperCase());
+  for (const row of groupRows) {
+    if (!row.name) continue;
+    if (!invName.has(row.serial.toUpperCase())) invName.set(row.serial.toUpperCase(), row.name);
+    if (row.stackId && !invName.has(row.stackId.toUpperCase())) invName.set(row.stackId.toUpperCase(), row.name);
+  }
+  for (const sw of switches) {
+    const det = detail.get(sw.serial);
+    const ids = [sw.serial, det?.serialNumber, sw.conductorSerial];
+    const picked = pickName(sw.name, ids, [
+      ["switch-detail", det?.deviceName],
+      ["inventory", invName.get(sw.serial.toUpperCase())],
+      ["inventory", det?.serialNumber ? invName.get(det.serialNumber.toUpperCase()) : null],
+    ], known);
+    sw.name = picked.name;
+    sw.nameFrom = picked.nameFrom;
+  }
 
   // LLDP fill-in when the switch graph is in pieces. The district core is
   // picked in the browser, so the biggest piece is not assumed to hold it:

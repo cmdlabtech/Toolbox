@@ -57,7 +57,9 @@ With no credentials entered and `MOCK=1` (the default in `wrangler.toml`), the W
    - Each building's core is its switch closest to the district core, measured by BFS hops.
    - Everything else is access.
    - Ambiguous switches are flagged: no site, linked into another building, multi-homed, or no path to the core.
-3. Overrides are stored in `localStorage` under `ct-overrides`. You can set the district core, or a switch's building or role, then export or import them as JSON. Those apply in every layout.
+3. Overrides are stored in `localStorage` under `ct-overrides`. You can set the district core, or a switch's building, role or name, then export or import them as JSON. Those apply in every layout.
+   - Rename a switch in its sidebar card: type the name and press Enter (Esc cancels). It is keyed by the switch serial, shows in every layout, the link lists and the SVG, PNG and JSON downloads, and the card keeps Central's name with a Reset name button. It stays in this browser; nothing is written to Central.
+   - When Central's topology `name` is only a serial or stack id, the Worker uses switch detail `deviceName`, then the inventory `deviceName` for that serial or `stackId`. A real hostname is never replaced. JSON records `centralName`, `nameSource` and `nameFrom`.
 4. `layout.js` places nodes. The Layout picker selects one of the eight layouts below; the choice is kept in `localStorage` under `ct-layout`. `render.js` produces one self-contained SVG with colors taken from the `theme.css` tokens.
 5. Downloads follow the layout on screen:
    - SVG is that string.
