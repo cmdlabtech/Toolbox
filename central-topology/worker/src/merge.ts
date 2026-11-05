@@ -221,36 +221,6 @@ export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[
     else switches.push({ ...d, ...extra, siteId: seen[0]?.id ?? null, site: seen[0]?.name ?? null, siteSource: "ambiguous" });
   }
 
-  // Stack ids: read the member hardware so LLDP rows that name a member, and
-  // other sites' links to a member, land on the stack.
-  const members = new Map<string, StackMember[]>();
-  await pool(all.filter((d) => STACK_ID_RE.test(d.serial)), 4, async (d) => {
-    try { members.set(d.serial, await c.stackMembers(d.serial)); }
-    catch (e) { warn(`${d.name}: stack members unavailable (${(e as Error).message})`); }
-  });
-  const aliasRows: { id: string | null; serial: string }[] = [];
-  for (const d of all) {
-    const det = detail.get(d.serial);
-    aliasRows.push({ id: det?.serialNumber ?? null, serial: d.serial }, { id: det?.macAddress ?? null, serial: d.serial });
-    for (const m of members.get(d.serial) ?? []) aliasRows.push({ id: m.serial, serial: d.serial }, { id: m.mac, serial: d.serial });
-  }
-  const resolve = aliasIndex(all, aliasRows);
-
-  // Topology links whose end is a member serial or MAC of a known switch
-  // (a cross-site uplink, say) are re-pointed at that switch.
-  for (const [k, l] of [...links]) {
-    if (devices.has(l.from) && devices.has(l.to)) continue;
-    const from = devices.has(l.from) ? l.from : resolve(l.from) ?? l.from;
-    const to = devices.has(l.to) ? l.to : resolve(l.to) ?? l.to;
-    if (from === l.from && to === l.to) continue;
-    links.delete(k);
-    if (from === to) continue;
-    const nk = key(from, to);
-    const moved = { ...l, from, to };
-    const prev = links.get(nk);
-    links.set(nk, prev ? keepRicher(prev, moved) : moved);
-  }
-
   const groupRows = await groupTask;
   const groupBySerial = new Map<string, string | null>();
   for (const row of groupRows) {
@@ -296,6 +266,59 @@ export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[
     ], known);
     sw.name = picked.name;
     sw.nameFrom = picked.nameFrom;
+  }
+
+  // Stacks: read the member hardware so LLDP rows that name a member, and
+  // other sites' links to a member, land on the stack. A stack is a stack id
+  // (UUID), an id the inventory lists as some row's stackId, or a switch whose
+  // detail carries a stack member id. Topology can name a stack by its
+  // conductor's hardware serial, so the UUID shape alone misses stacks.
+  const stackIds = new Set(groupRows.map((r) => r.stackId?.toUpperCase()).filter(Boolean));
+  const isStack = (d: TopoDevice) => STACK_ID_RE.test(d.serial) || stackIds.has(d.serial.toUpperCase()) || detail.get(d.serial)?.stackMemberId != null;
+  const members = new Map<string, StackMember[]>();
+  await pool(all.filter(isStack), 4, async (d) => {
+    try { members.set(d.serial, await c.stackMembers(d.serial)); }
+    catch (e) { warn(`${d.name}: stack members unavailable (${(e as Error).message})`); }
+  });
+  const aliasRows: { id: string | null; serial: string }[] = [];
+  for (const d of all) {
+    const det = detail.get(d.serial);
+    aliasRows.push({ id: det?.serialNumber ?? null, serial: d.serial }, { id: det?.macAddress ?? null, serial: d.serial });
+    for (const m of members.get(d.serial) ?? []) aliasRows.push({ id: m.serial, serial: d.serial }, { id: m.mac, serial: d.serial });
+  }
+  // Inventory rows tie each member serial to its stack id. Point them at the
+  // switch the graph uses for that stack (the stack id itself, or a member
+  // that topology lists).
+  const bySerial = new Map(all.map((d) => [d.serial.toUpperCase(), d.serial]));
+  const stackHome = new Map<string, string>();
+  for (const r of groupRows) {
+    const sid = r.stackId?.toUpperCase();
+    if (!sid) continue;
+    const home = bySerial.get(sid) ?? bySerial.get(r.serial.toUpperCase());
+    if (home && !stackHome.has(sid)) stackHome.set(sid, home);
+  }
+  for (const r of groupRows) {
+    const home = r.stackId ? stackHome.get(r.stackId.toUpperCase()) : null;
+    if (home) aliasRows.push({ id: r.serial, serial: home });
+  }
+  // Names after the deviceName fix-up, so an LLDP row naming "LCSC-DC-Stack1"
+  // matches a stack whose topology name was a serial. Topology names stay as
+  // aliases too.
+  const resolve = aliasIndex([...switches, ...all], aliasRows);
+
+  // Topology links whose end is a member serial or MAC of a known switch
+  // (a cross-site uplink, say) are re-pointed at that switch.
+  for (const [k, l] of [...links]) {
+    if (devices.has(l.from) && devices.has(l.to)) continue;
+    const from = devices.has(l.from) ? l.from : resolve(l.from) ?? l.from;
+    const to = devices.has(l.to) ? l.to : resolve(l.to) ?? l.to;
+    if (from === l.from && to === l.to) continue;
+    links.delete(k);
+    if (from === to) continue;
+    const nk = key(from, to);
+    const moved = { ...l, from, to };
+    const prev = links.get(nk);
+    links.set(nk, prev ? keepRicher(prev, moved) : moved);
   }
 
   // LLDP fill-in when the switch graph is in pieces. The district core is
