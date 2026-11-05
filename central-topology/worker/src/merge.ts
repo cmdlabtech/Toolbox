@@ -42,6 +42,21 @@ export function pickName(
   return { name: topologyName, nameFrom: "topology" };
 }
 
+/**
+ * A model string too short to name hardware: blank, or no digit at all
+ * (live tenants have sent "CX-"). Every Aruba switch model has a number.
+ */
+export function incompleteModel(m: string | null | undefined): boolean {
+  return blank(m) || !/\d/.test(m as string);
+}
+
+/** The topology model, unless it is incomplete and a later source has a complete one. */
+export function pickModel(topologyModel: string | null, candidates: (string | null | undefined)[]): string | null {
+  if (!incompleteModel(topologyModel)) return topologyModel;
+  for (const c of candidates) if (!incompleteModel(c)) return (c as string).trim();
+  return topologyModel;
+}
+
 function blank(v: string | null | undefined) {
   return v == null || v.trim() === "";
 }
@@ -257,6 +272,20 @@ export async function mergeTenant(c: Central, sites: Site[], pool: <T, R>(xs: T[
     if (!invName.has(row.serial.toUpperCase())) invName.set(row.serial.toUpperCase(), row.name);
     if (row.stackId && !invName.has(row.stackId.toUpperCase())) invName.set(row.stackId.toUpperCase(), row.name);
   }
+  // An incomplete topology model ("CX-", blank) is filled from switch detail
+  // model, then the inventory model for the serial, member serial or
+  // stackId. Unverified which field is set on a live tenant; a complete
+  // topology model is never replaced.
+  const invModel = new Map<string, string>();
+  for (const row of groupRows) {
+    if (incompleteModel(row.model)) continue;
+    for (const id of [row.serial, row.stackId]) if (id && !invModel.has(id.toUpperCase())) invModel.set(id.toUpperCase(), row.model as string);
+  }
+  for (const sw of switches) {
+    const det = detail.get(sw.serial);
+    sw.model = pickModel(sw.model, [det?.model, invModel.get(sw.serial.toUpperCase()), det?.serialNumber ? invModel.get(det.serialNumber.toUpperCase()) : null]);
+  }
+
   for (const sw of switches) {
     const det = detail.get(sw.serial);
     const ids = [sw.serial, det?.serialNumber, sw.conductorSerial];
