@@ -165,7 +165,7 @@ export function layoutStructured(model, opts = {}) {
     const m = n ? resolveMgmt(n, mgmt) : null;
     u = { id, node: n ?? null, ext: x ?? null, name: n ? displayName(n) : x?.name ?? id, model: n?.model ?? x?.model ?? x?.type ?? null,
       role: n?.role ?? "ext", n: collapsed ? 1 : members, collapsed, mgmt: m, ipText: n ? mgmtText(m, mgmt) : null,
-      warn: !!(n && (m.fallback || n.flags.length)) };
+      warn: !!(n && n.flags.length) };
     out.units.set(id, u);
     return u;
   };

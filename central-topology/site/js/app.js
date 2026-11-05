@@ -256,7 +256,6 @@ function legendHtml(T) {
       chip(`background:${T["--link-access"]}`, "Access uplink"),
       chip(`background:${T["--link-wan"]}`, "WAN"),
       chip(`background:${T["--link-stack"]}`, "Stack connector"),
-      chip(`background:transparent;border:1.5px dashed ${T["--link-down"]}`, "Down"),
       chip(`background:${T["--edge-inferred"]}`, "Inferred"),
       chip(`background:${T["--warn"]};border-radius:50%`, "Needs attention"),
     ].join("")}</div>`;
@@ -266,7 +265,6 @@ function legendHtml(T) {
     chip(`background:${T["--node-bcore"]}`, "Building core"),
     chip(`background:${T["--node-access"]}`, "Access"),
     chip(`background:${T["--node-ext"]}`, "Other device"),
-    chip(`background:transparent;border:1.5px dashed ${T["--warn"]}`, "IP fallback"),
     chip(`background:${T["--edge"]}`, "LLDP fill-in"),
     chip(`background:${T["--edge-inferred"]}`, "Inferred"),
   ].join("")}</div>`;

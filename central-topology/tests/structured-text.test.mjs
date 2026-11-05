@@ -141,10 +141,10 @@ test("management IP follows the selected VLAN, changes on reselect, and stays in
     assert.equal(ip.anchor, "middle"); assert.equal(ip.x, u.l + l.geom.fw / 2);
     assert.ok(!l.labels.some((x) => x.unit === ip.unit && x !== ip && x.box.y1 > ip.box.y0), `${u.name}: nothing of the unit below the IP line`);
   }
-  // Fallback keeps the badge; no address shows a dash.
+  // A fallback IP is not flagged; no address says so.
   const l = lay("vlan:1");
   const fb = [...l.units.values()].find((u) => u.mgmt?.fallback && u.mgmt.ip);
-  assert.ok(fb.faces.some((f) => f.badge), "fallback IP keeps the badge");
+  assert.ok(!fb.faces.some((f) => f.badge) || fb.node.flags.length, "fallback IP alone adds no badge");
   assert.equal(label(l, "HAR-IDF-426B", "ip").text, "No mgmt IP");
 });
 

@@ -50,15 +50,14 @@ export function renderStructuredSvg(model, lay, opts) {
   o.push(`<g class="edges" fill="none" stroke-linecap="square">`);
   for (const l of lay.links) {
     const e = l.edge;
-    const down = [l.a, l.b].some((id) => (lay.units.get(id)?.node?.status ?? "").toUpperCase() === "OFFLINE");
-    const tok = down ? "--link-down" : l.kind === "peer" ? "--edge" : `--link-${l.kind}`;
+    const tok = l.kind === "peer" ? "--edge" : `--link-${l.kind}`;
     const inferred = !e && !l.decor;
     const stroke = inferred ? T["--edge-inferred"] : T[tok];
-    const dash = inferred ? "2 5" : down ? "4 3" : e?.source === "neighbours" ? "7 5" : null;
-    const sw = down || inferred ? 1.5 : l.kind === "peer" ? 1.5 : weight(e ?? { speedGbps: 10 });
+    const dash = inferred ? "2 5"  : e?.source === "neighbours" ? "7 5" : null;
+    const sw = inferred ? 1.5 : l.kind === "peer" ? 1.5 : weight(e ?? { speedGbps: 10 });
     const d = l.pts.map(([px, py], i) => `${i ? "L" : "M"}${px} ${py}`).join(" ");
     const tip = l.decor ? "WAN uplink" : !e ? `Inferred: no ${lay.name(l.a)}–${lay.name(l.b)} link in topology data${l.via ? ` (upstream via ${l.via})` : ""}`
-      : `${lay.name(e.from)} ${portsOf(e, "from")} ↔ ${lay.name(e.to)} ${portsOf(e, "to")}${e.legs > 1 ? ` (${e.legs} links)` : ""}${e.source === "neighbours" ? " (LLDP fill-in)" : ""}${down ? " (down)" : ""}`;
+      : `${lay.name(e.from)} ${portsOf(e, "from")} ↔ ${lay.name(e.to)} ${portsOf(e, "to")}${e.legs > 1 ? ` (${e.legs} links)` : ""}${e.source === "neighbours" ? " (LLDP fill-in)" : ""}`;
     o.push(`<path data-edge="" data-kind="${l.kind}" data-ends="${esc(l.a)}|${esc(l.b)}" d="${d}" stroke="${stroke}" stroke-width="${sw}"${dash ? ` stroke-dasharray="${dash}"` : ""}><title>${esc(tip)}</title></path>`);
     o.push(`<path class="edge-hit" data-hit="${esc(l.a)}|${esc(l.b)}" d="${d}" stroke="transparent" stroke-width="9"><title>${esc(tip)}</title></path>`);
     if (e?.legs > 1 && l.kind !== "peer") {
@@ -105,14 +104,13 @@ export function renderStructuredSvg(model, lay, opts) {
     const n = u.node, rc = role[u.role] ?? T["--node-ext"];
     const m = u.mgmt ?? (n ? resolveMgmt(n, opts.mgmt) : null);
     const attr = n ? `data-serial="${esc(u.id)}"` : `data-ext="${esc(u.id)}"`;
-    const offline = (n?.status ?? "").toUpperCase() === "OFFLINE";
     const links = model.edges.filter((e) => e.from === u.id || e.to === u.id)
       .map((e) => (e.from === u.id ? `${portsOf(e, "from")} → ${lay.name(e.to)} ${portsOf(e, "to")}` : `${portsOf(e, "to")} → ${lay.name(e.from)} ${portsOf(e, "from")}`));
     const tip = n ? [`${u.name}${u.name !== n.name ? ` (serial ${n.serial})` : ""}`, `${n.model ?? "unknown model"} · ${n.role} · ${n.building}`, `Serial ${n.serial}`,
-      `Mgmt ${m.ip ? m.ip + (m.fallback ? " (fallback IP)" : "") : "none"}`,
+      `Mgmt ${m.ip ? m.ip : "none"}`,
       ...(n.stack ? [`Stack of ${n.stack.length}`] : []), ...(n.flags.length ? [n.flags.join("; ")] : []), ...links].join("\n")
       : [`${u.name} · ${u.ext?.type ?? "device"}${u.via ? ` · connected via ${u.via}` : ""}`, ...links].join("\n");
-    o.push(`<g ${attr}${offline ? ` opacity="0.6"` : ""}><title>${esc(tip)}</title>`);
+    o.push(`<g ${attr}><title>${esc(tip)}</title>`);
     // First rect: the faceplate area (crossing checks read it).
     o.push(`<rect x="${u.l}" y="${u.ft}" width="${g.fw}" height="${u.fb - u.ft}" fill="none"/>`);
     o.push(`<rect x="${u.x}" y="${u.y + 3}" width="3" height="11" rx="1.5" fill="${rc}"/>`);

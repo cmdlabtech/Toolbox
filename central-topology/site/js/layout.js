@@ -1209,7 +1209,7 @@ export function layoutTree(model, orientation) {
   for (const kids of children.values()) {
     kids.sort((a, b) => siblingPull(a) - siblingPull(b) || byId.get(a).name.localeCompare(byId.get(b).name));
   }
-  // Siblings share a tier. The gap clears a node rect plus a fallback ring.
+  // Siblings share a tier. The gap clears a node rect with room to spare.
   const unit = tb ? GEOM.nodeW + 36 : GEOM.nodeH + 28;
   const tier = tb ? GEOM.nodeH + 76 : GEOM.nodeW + 88;
   const width = new Map();

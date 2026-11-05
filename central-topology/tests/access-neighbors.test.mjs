@@ -300,7 +300,7 @@ test("fallback LLDP cards hide, Central switches and every site stay, with no du
     const on = renderSvg(model, full, { ...opts, subtitle: id });
     const off = renderSvg(view, hid, { ...opts, subtitle: id });
     assert.match(on, /CNFALLBACK1/);
-    assert.match(on, />Fallback: 10\.8\.0\.8</);
+    assert.match(on, />Mgmt: 10\.8\.0\.8</);
     assert.equal(off.includes("CNFALLBACK1"), false, id);
     assert.equal(off.includes("AP-CORE-1"), false, id);
     assert.equal(off.includes("PH-DIST-1"), false, id);
