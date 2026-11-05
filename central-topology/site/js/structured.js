@@ -37,6 +37,8 @@ export const TYPE = {
 export const MIN_FONT_PX = 10;
 
 export const WAN_CLEAR = 8;
+/** Gap between a VSX pair's box and its members' cells. */
+export const VSX_PAD = 5;
 const WAN_RE = /firewall|router|sd-?wan/i;
 const SLOT_RE = /gateway|controller/i;
 const AP_RE = /access point/i;
@@ -100,6 +102,47 @@ function textBox(x, base, w, size, anchor) {
   return { x0, x1: x0 + w, y0: base - 0.8 * size, y1: base + 0.24 * size };
 }
 
+// VSX pairs. Two switches in one building are a pair when at least two
+// switches dual-home to both over one LAG (MC-LAG, the VSX signature), or
+// when their names say VSX and differ only by a trailing member number.
+// Stacks are not VSX members. Each switch joins at most one pair.
+const twinBase = (name) => (/vsx/i.test(name ?? "") ? /^(.*?)[-_ ]?\d+$/.exec(name)?.[1]?.toLowerCase() ?? null : null);
+export function vsxPairs(model) {
+  const byId = model.byId ?? new Map(model.nodes.map((n) => [n.serial, n]));
+  const sw = (id) => { const n = byId.get(id); return n && !n.stack ? n : null; };
+  const lagsAt = (e, id) => new Set(((id === e.from ? e.fromPorts : e.toPorts) ?? []).map((p) => p.lag).filter(Boolean));
+  const ups = new Map(); // child -> [{ up, lags }]
+  for (const e of model.edges) {
+    if (e.external) continue;
+    for (const [c, up] of [[e.from, e.to], [e.to, e.from]]) {
+      const lags = lagsAt(e, c);
+      if (lags.size && byId.has(c) && sw(up)) ups.set(c, [...(ups.get(c) ?? []), { up, lags }]);
+    }
+  }
+  const score = new Map();
+  for (const list of ups.values()) for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+    const a = list[i], b = list[j];
+    if (![...a.lags].some((l) => b.lags.has(l))) continue;
+    const k = key(a.up, b.up);
+    score.set(k, (score.get(k) ?? 0) + 1);
+  }
+  const cand = [];
+  for (const [k, n] of score) if (n >= 2) cand.push([k, n]);
+  const nodes = model.nodes.filter((n) => !n.stack && twinBase(n.name));
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+    if (twinBase(nodes[i].name) === twinBase(nodes[j].name)) cand.push([key(nodes[i].serial, nodes[j].serial), 1]);
+  }
+  const used = new Set(), out = [];
+  for (const [k] of cand.sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1))) {
+    const [a, b] = k.split("|");
+    const na = sw(a), nb = sw(b);
+    if (!na || !nb || used.has(a) || used.has(b) || na.building !== nb.building) continue;
+    used.add(a); used.add(b);
+    out.push([na, nb].sort((x, y) => x.name.localeCompare(y.name)).map((n) => n.serial));
+  }
+  return out;
+}
+
 export function layoutStructured(model, opts = {}) {
   const measure = opts.measure ?? approxMeasure;
   const mgmt = opts.mgmt ?? "monitor";
@@ -161,13 +204,18 @@ export function layoutStructured(model, opts = {}) {
   // Sections and their columns (topology only; geometry comes later).
   const byHop = (a, b) => (a.hop ?? 99) - (b.hop ?? 99) || out.name(a.serial).localeCompare(out.name(b.serial));
   const secs = [];
+  const pairsAll = vsxPairs(model);
   for (const b of model.buildings) {
     const members = nodes.filter((n) => n.building === b);
     if (!members.length) continue;
     const own = b === core.building;
     const headId = own ? coreSerial : model.hubs[b] && byId.get(model.hubs[b])?.building === b ? model.hubs[b] : [...members].sort((a, c) => out.name(a.serial).localeCompare(out.name(c.serial)))[0].serial;
     const access = members.filter((n) => n.serial !== headId).sort(byHop).map((n) => n.serial);
-    secs.push({ name: b, own, head: headId, access: [...access, ...(slots.get(b) ?? [])], aps: aps.get(b) ?? 0,
+    // A VSX pair (neither the head) leads the access list, so its members
+    // share the first row, one per column.
+    const pair = pairsAll.find((p) => p.every((id) => access.includes(id))) ?? null;
+    if (pair) access.splice(0, access.length, ...pair, ...access.filter((id) => !pair.includes(id)));
+    secs.push({ name: b, own, head: headId, pair, access: [...access, ...(slots.get(b) ?? [])], aps: aps.get(b) ?? 0,
       unassigned: b === "Unassigned", nsw: members.reduce((a, n) => a + (n.stack?.length ?? 1), 0) });
   }
   const secOf = new Map();
@@ -189,6 +237,21 @@ export function layoutStructured(model, opts = {}) {
       else if (u.ext && localOf.get(id) && localOf.get(id) !== s.head) { u.via = out.name(localOf.get(id)); drawn.add(key(id, localOf.get(id))); }
     }
   }
+  // VSX: a switch drawn to one member reaches the other over the same
+  // MC-LAG. The pair box stands for that second leg, so it is not routed.
+  out.vsx = [];
+  for (const s of secs) {
+    if (!s.pair) continue;
+    const [p, q] = s.pair, absorbed = [];
+    for (const id of s.access) {
+      const up = s.pair.find((m) => drawn.has(key(id, m)));
+      const other = up && s.pair.find((m) => m !== up);
+      if (other && !drawn.has(key(id, other)) && edgeBy.has(key(id, other))) { drawn.add(key(id, other)); absorbed.push(edgeBy.get(key(id, other))); }
+    }
+    if (edgeBy.has(key(p, q))) { drawn.add(key(p, q)); absorbed.push(edgeBy.get(key(p, q))); }
+    out.vsx.push({ members: s.pair, section: s, absorbed });
+  }
+
   // Every other link between drawn units is a peer route. Routes group into
   // buses, one per hub: the end with more peer links (then the name). A bus
   // draws as one line that branches, so its routes may share lanes.
@@ -457,6 +520,13 @@ export function layoutStructured(model, opts = {}) {
     out.links.push({ kind: "peer", a: b.hub, b: r.other, edge: r.e, bus: b.id, cross: A.s !== B.s, pts: tidy([...A.pts, ...mid, ...[...B.pts].reverse()]) });
   }
   out.sections = secs;
+  // VSX boxes: a dashed rounded box tight around the pair's cells, with
+  // VSX_PAD clear of every faceplate and name (rowGap is 12).
+  for (const v of out.vsx) {
+    const us = v.members.map(unit), P = VSX_PAD;
+    v.box = { x0: Math.min(...us.map((u) => u.l)) - P, x1: Math.max(...us.map((u) => u.r)) + P,
+      y0: Math.min(...us.map((u) => u.y)) - P, y1: Math.max(...us.map((u) => u.fb)) + P };
+  }
 
   // Labels: every piece of structured text, with its box.
   const L = out.labels;
@@ -511,6 +581,7 @@ export function layoutStructured(model, opts = {}) {
   // Bounds: every box, path, and label, padding, and the title block.
   const xs = [], ys = [];
   for (const s of secs) { xs.push(s.x, s.x + s.w); ys.push(s.y, s.y + s.h); }
+  for (const v of out.vsx) { xs.push(v.box.x0, v.box.x1); ys.push(v.box.y0, v.box.y1); }
   for (const l of out.links) for (const [x, y] of l.pts) { xs.push(x); ys.push(y); }
   for (const lb of L) { xs.push(lb.box.x0, lb.box.x1); ys.push(lb.box.y0, lb.box.y1); }
   if (out.wan) { xs.push(out.wan.cloud.x - 50, out.wan.cloud.x + 50); ys.push(out.wan.cloud.y - 26); }
