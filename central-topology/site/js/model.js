@@ -71,20 +71,26 @@ export function collapseStacks(switches, links) {
         role: x.serial === s.serial ? "conductor" : x.stackRole ?? null, status: x.status, ipv4: x.ipv4 }));
     return { ...s, stack };
   });
-  if (logical.length === switches.length && !links.some((l) => l.isSibling)) return { switches, links };
+  // One link per neighbour pair: stack (sibling) links and member-to-member
+  // links go, and parallel links (members or LAG legs to the same neighbour)
+  // merge into one edge that lists every port pair.
   const ports = (a = [], b = []) => [...a, ...b.filter((p) => !a.some((q) => q.name === p.name && q.lag === p.lag))];
+  const end = (list, one) => (list?.length ? list : one ? [{ name: one, lag: null }] : []);
   const out = new Map();
   for (const l of links) {
     if (l.isSibling) continue;
     const from = unitOf.get(l.from) ?? l.from, to = unitOf.get(l.to) ?? l.to;
     if (from === to) continue;
+    const fp = end(l.fromPorts, l.fromPort), tp = end(l.toPorts, l.toPort);
     const k = from < to ? `${from}|${to}` : `${to}|${from}`;
     const prev = out.get(k);
-    if (!prev) { out.set(k, { ...l, from, to, legs: 1 }); continue; }
+    if (!prev) { out.set(k, { ...l, from, to, fromPorts: fp, toPorts: tp, legs: 1 }); continue; }
     const same = prev.from === from;
     prev.legs++;
-    prev.fromPorts = ports(prev.fromPorts, same ? l.fromPorts : l.toPorts);
-    prev.toPorts = ports(prev.toPorts, same ? l.toPorts : l.fromPorts);
+    prev.fromPorts = ports(prev.fromPorts, same ? fp : tp);
+    prev.toPorts = ports(prev.toPorts, same ? tp : fp);
+    prev.fromPort ??= prev.fromPorts[0]?.name ?? null;
+    prev.toPort ??= prev.toPorts[0]?.name ?? null;
   }
   return { switches: logical, links: [...out.values()] };
 }
