@@ -3,7 +3,7 @@ import { largeSample } from "./large-sample.js";
 import { CANVAS_PAD, HUB_FRAME, LAYOUTS, applyPositionOverrides, canvasSize, chipsExpanded, clearPosition, deviceGroup, fitScale, hubOpeningScale, layoutById, modelForNeighborToggle, openingScale, opensAtNameFloor, orthoBend, refillsOnWidth, replaceMeasure, structuredOpeningScale, structuredOpeningScroll, structuredScaleFloor, writePosition } from "./layout.js";
 import { contentBounds, renderSvg, readTokens } from "./render.js";
 import { createLoader } from "./loader.js";
-import { download, jsonExport, linkCheckExport, pngBlob, stamp, svgBlob } from "./export.js";
+import { download, htmlExport, jsonExport, linkCheckExport, pngBlob, stamp, svgBlob } from "./export.js";
 import { CLUSTERS, connectionState, createVault, fetchWithAuth, formatExpiry, mintToken, normalise, renewDue, reuseSavedToken, tokenPlaceholder, tokenValid } from "./creds.js";
 import { UI_KEYS as KEYS, loadPref, readUiPrefs, savePref, writeUiPref } from "./prefs.js";
 import { createRegistry, EMPTY_REGISTRY } from "./stencils.js";
@@ -581,6 +581,10 @@ $("themeBtn").addEventListener("click", () => {
 $("dlSvg").addEventListener("click", () => download(svgBlob(state.svg), `central-topology-${stamp()}.svg`));
 $("dlPng").addEventListener("click", async () => {
   try { download(await pngBlob(state.svg), `central-topology-${stamp()}.png`); } catch (e) { status(e.message, true); }
+});
+$("dlHtml").addEventListener("click", () => {
+  const html = htmlExport(state.svg, { title: "Switch topology", subtitle: state.subtitle, tokens: readTokens() });
+  download(new Blob([html], { type: "text/html" }), `central-topology-${stamp()}.html`);
 });
 $("dlJson").addEventListener("click", () => {
   const body = jsonExport(state.model, state.mgmt, state.overrides, { mock: state.data.mock, generatedAt: state.data.generatedAt, layout: state.layout, positions: state.positions });

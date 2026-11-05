@@ -249,6 +249,7 @@ export function renderSvg(model, lay, opts) {
   const portLabels = prepared.portLabels;
   const drawEdge = (x1, y1, x2, y2, from, to, attrs, title) => {
     const d = routeEdge({ x: x1, y: y1 }, { x: x2, y: y2 }, from, to, lay);
+    attrs += ` data-ends="${esc(from)}|${esc(to)}"`;
     if (d) out.push(`<path d="${d}" ${attrs}><title>${title}</title></path>`);
     else out.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${attrs}><title>${title}</title></line>`);
   };
