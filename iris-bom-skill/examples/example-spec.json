@@ -1,0 +1,18 @@
+{
+  "project": "Example Project",
+  "client": "Example Client",
+  "vendor": "juniper",
+  "region": "US",
+  "sites": [
+    {
+      "name": "Site 1",
+      "lines": [
+        {"sku": "<SWITCH-SKU>", "qty": 2},
+        {"sku": "<PSU-SKU>", "qty": 2, "parent": "<SWITCH-SKU>"},
+        {"sku": "<AP-SKU>", "qty": 4},
+        {"sku": "<SUBSCRIPTION-SKU>", "qty": 4, "parent": "<AP-SKU>"},
+        {"sku": "<OPTIC-SKU>", "qty": 2}
+      ]
+    }
+  ]
+}
