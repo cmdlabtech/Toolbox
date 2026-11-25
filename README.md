@@ -40,6 +40,7 @@
 | **[GreenLake AP Licensing](greenlake-ap-licensing/)** | Join GreenLake subscriptions with Central AP status into one searchable HTML report | **[Launch hosted app](https://ap-license-report.admin2655.workers.dev/)** · [Docs](greenlake-ap-licensing/) |
 | **[Central Topology](central-topology/)** | Hub-and-spoke switch topology for new Central, with SVG, PNG, and JSON export; credentials stay in the browser | **[Launch preview (mock data)](https://central-topology-preview.pages.dev/)** · [Docs](central-topology/) |
 | **[ClearPass Endpoint Console](clearpass-endpoint-console/)** | Bulk / manual MAC import into Policy Manager endpoints and Guest devices | [Open console](clearpass-endpoint-console/) · [Docs](clearpass-endpoint-console/) |
+| **[Iris BOM skill](iris-bom-skill/)** | Agent skill that builds Iris-style BOM exports (and, on request, an Iris project file) from a part list using your own local Intangi Iris install; no catalog data included. Unofficial | [Docs](iris-bom-skill/) |
 | **[ClearPass CertKit notes](clearpass-certkit/)** | Ops checklist for CertKit → ClearPass certificate deploy + ISRG Root X1 PEM | [Docs](clearpass-certkit/) |
 
 ---

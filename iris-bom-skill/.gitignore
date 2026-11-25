@@ -1,0 +1,8 @@
+# Never commit anything derived from a real Iris catalog or a real project.
+.iris-bom/
+index-*.json.gz
+iris-bom-output/
+*.isf
+*.xlsx
+__pycache__/
+*.pyc
